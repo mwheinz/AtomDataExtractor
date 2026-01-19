@@ -4,6 +4,7 @@ Convert information from an Atom flight log into a Telemetry Overlay CSV
 '''
 
 import os
+import re
 import argparse
 import sys
 import struct
@@ -11,37 +12,85 @@ import math
 import datetime
 import logging
 
+timeStamp: float
+
 class FLFD:
-	def __init__(self, name, fmtString, startPos, length, scale=0):
+	def __init__(self, name, fmtString, startPos, length, scale=None):
 		self.name = name # This will be the header in the CSV.
 		self.fmtString = fmtString # how to unpack the data in the flight log.
 		self.startPos = startPos # Where the data starts in the flight log.
 		self.length = length # the length of the field in the flight log.
-		self.scale = scale # A multiplier for adjusting the data.
+		self.scale = scale # A numeric multiplier or parsing function for adjusting the data.
+
+	# radians to decimal degrees. 
+	def r2d(data) -> float:
+		return round((360 + data * 180/math.pi) % 360, 3)
+
+	# Atom 2 use integers to store the decimal lat/long with 7 digits of precision.
+	def fixLatLong(data) -> float:
+		if data == 0:
+			return None # error case.
+		return data / 1e7
+
+	# No idea why the altitude appears to be a negative number...
+	def fixAlt(data) -> float:
+		return abs(round(data,3))
+
+	# Convert the relative timestamp to an absolute timestamp.
+	def fixTime(data) -> str:
+		global timeStamp
+		if timeStamp == None:
+			return None
+		dt = timeStamp + data/1000
+		return dt
 
 	def getField(self,record) -> str:
 		data = struct.unpack(self.fmtString,record[self.startPos:self.startPos+self.length])
 		if data == ():
 			return None
 		data = data[0]
-		if self.scale != 0:
+		if isinstance(self.scale,int) or isinstance(self.scale,float):
 			data = data * self.scale
-		if isinstance(data,float):
-			return f"{data:.3f}"
-		return str(data)
+		elif self.scale != None:
+			data = self.scale(data)
+		return data
+
+	def flightMode(data) -> str:
+		if data == 7: return "Video"
+		if data == 8: return "Normal"
+		if data == 9: return "Sport"
+		return f"{data} Unknown"
 	
 #
 # Field specs for an Atom2 log.
 #
 ATOM2_FORMAT = [
 	# fields appear in the order they should be in the CSV file.
-	FLFD("time (ms)", "<Q", 5, 8, 1e-3), # elapsed time since the drone started.
-	FLFD("lat (deg)", "<i", 47, 4, 1e-7), # drone latitude * 1e7
-	FLFD("lon (deg)", "<i", 51, 4, 1e-7), # drone latitude * 1e7
-	FLFD("dist (m)", "<i", 416, 4), # Distance to home in meters ?
-	FLFD("hlat (deg)", "<i", 420, 4, 1e-7), # drone latitude * 1e7
-	FLFD("hlon (deg)", "<i", 424, 4, 1e-7), # drone latitude * 1e7
-	FLFD("EOD","",0,0,0) # Flags the end of the list.
+	FLFD("utc (ms)", "<Q", 5, 8, FLFD.fixTime), # elapsed time since the drone started.
+	FLFD("lat (deg)", "<i", 47, 4, FLFD.fixLatLong), # drone latitude * 1e7
+	FLFD("lon (deg)", "<i", 51, 4, FLFD.fixLatLong), # drone latitude * 1e7
+	FLFD("alt (m)", "<f", 328, 4, FLFD.fixAlt), # No idea if this is right...
+	FLFD("dist (m)", "<f", 416, 4), # Distance to home in meters ?
+	FLFD("heading (deg)", "<f", 160, 4, FLFD.r2d), # compass heading.
+	FLFD("FCOUNTER", "<H", 17, 2), # how many times the drone has flown
+	FLFD("SATS","<B", 46, 1), # how many sats were visible
+	FLFD("Controller Lat (deg)", "<i", 144, 4, FLFD.fixLatLong), # relative controller latitude? Not needed
+	FLFD("Controller Lon (deg)", "<i", 148, 4, FLFD.fixLatLong), # relative controller longitude? Not needed
+	#FLFD("HLAT", "<i", 420, 4, FLFD.fixLatLong), # home latitude * 1e7 Not needed.
+	#FLFD("HLONG", "<i", 424, 4, FLFD.fixLatLong), # home longitude * 1e7 Not needed.
+	#FLFD("GPS","<f",269, 4), # GPS status. float?!?
+	FLFD("ACTIVE", "<B", 280, 1), # 0 = active, 1 = idle.
+	FLFD("M1STATE", "<B", 297, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+	FLFD("M2STATE", "<B", 298, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+	FLFD("M3STATE", "<B", 299, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+	FLFD("M4STATE", "<B", 300, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+	FLFD("Battery Voltage 1 (mv)", "<h", 440, 2), # Voltage 1
+	FLFD("Battery Voltage 2 (mv)", "<h", 442, 2), # Voltage 2
+	FLFD("Battery Current (ma)", "<h", 444, 2, abs), # Current drain.
+	FLFD("Battery Level", "<B", 451, 1), # Current battery charge.
+	FLFD("Battery Temperature (c)", "<B", 462, 1), # Temperature in Celcius.
+	FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flightMode), # Flight Mode: Video, Normal, Sports.
+	FLFD("Drone Mode", "<B", 456, 1), # 0 = motors off, 1 = grounded/launching, 2 = flying, 3 = landing.
 ]
 
 #
@@ -71,7 +120,10 @@ logger.addHandler(cHandler)
 logger.propagate = False
 
 def atomParse(fieldList, fileName):
-	baseName, extension = os.path.splitext(fileName)
+	global timeStamp
+	baseName = os.path.basename(fileName)
+	baseName, extension = os.path.splitext(baseName)
+	timeStamp = datetime.datetime.strptime(re.sub("-.*", "", baseName), "%Y%m%d%H%M%S").timestamp()*1000
 	cname=f"{baseName}.csv"
 
 	logger.debug(f"Creating {cname}.")
@@ -98,11 +150,18 @@ def atomParse(fieldList, fileName):
 			rCount += 1
 			
 			line=""
+			error = 0
 			for flfd in fieldList:
 				#logger.debug(f"extracting {flfd.name}")
 				data = flfd.getField(record)
+				if data == None:
+					#logging.warning(f"Illegal value for {flfd.name}. Skipping.")
+					error = 1
+					eCount += 1
+					break
 				line=line+f"{data}, "
-			print(line, file=csvFile)
+			if error == 0:
+				print(line, file=csvFile)
 
 	logger.info(f"{rCount} valid records in {fileName}. {eCount} bad records in file.")
 	
