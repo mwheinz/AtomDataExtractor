@@ -26,7 +26,8 @@ class FLFD:
 		data = data[0]
 		if self.scale != 0:
 			data = data * self.scale
-
+		if isinstance(data,float):
+			return f"{data:.3f}"
 		return str(data)
 	
 #
@@ -34,9 +35,12 @@ class FLFD:
 #
 ATOM2_FORMAT = [
 	# fields appear in the order they should be in the CSV file.
-	FLFD("time (ms)", "<Q", 5, 8), # elapsed time since the drone started.
+	FLFD("time (ms)", "<Q", 5, 8, 1e-3), # elapsed time since the drone started.
 	FLFD("lat (deg)", "<i", 47, 4, 1e-7), # drone latitude * 1e7
-	FLFD("long (deg)", "<i", 51, 4, 1e-7), # drone latitude * 1e7
+	FLFD("lon (deg)", "<i", 51, 4, 1e-7), # drone latitude * 1e7
+	FLFD("dist (m)", "<i", 416, 4), # Distance to home in meters ?
+	FLFD("hlat (deg)", "<i", 420, 4, 1e-7), # drone latitude * 1e7
+	FLFD("hlon (deg)", "<i", 424, 4, 1e-7), # drone latitude * 1e7
 	FLFD("EOD","",0,0,0) # Flags the end of the list.
 ]
 
@@ -99,6 +103,7 @@ def atomParse(fieldList, fileName):
 				data = flfd.getField(record)
 				line=line+f"{data}, "
 			print(line, file=csvFile)
+
 	logger.info(f"{rCount} valid records in {fileName}. {eCount} bad records in file.")
 	
 def main() -> None:
