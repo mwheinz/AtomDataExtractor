@@ -16,15 +16,26 @@ timeStamp: float
 
 class FLFD:
 	def __init__(self, name, fmtString, startPos, length, scale=None):
-		self.name = name # This will be the header in the CSV.
-		self.fmtString = fmtString # how to unpack the data in the flight log.
-		self.startPos = startPos # Where the data starts in the flight log.
-		self.length = length # the length of the field in the flight log.
-		self.scale = scale # A numeric multiplier or parsing function for adjusting the data.
+		# This will be the header in the CSV. If it has specific unit, include
+		# it in parens. For example, "lat (deg)" is the latitude, in decimal degrees.
+		self.name = name
+		# how to unpack the data in the flight log.
+		self.fmtString = fmtString
+		# Where the data starts in the flight log record.
+		self.startPos = startPos
+		# the length of the field in the flight log.
+		self.length = length
+		# A numeric multiplier or parsing function for adjusting the data.
+		self.scale = scale
 
 	# radians to decimal degrees. 
 	def r2d(data) -> float:
-		return round((360 + data * 180/math.pi) % 360, 3)
+		result = round((360 + data * 180/math.pi) % 360, 3)
+		if math.isnan(result):
+			# TODO: Figure out better handling of bad records.
+			logger.critical(f"Bad heading value {data} found.");
+			sys.exit(-1)
+		return result
 
 	# Atom 2 use integers to store the decimal lat/long with 7 digits of precision.
 	def fixLatLong(data) -> float:
@@ -61,6 +72,12 @@ class FLFD:
 		if data == 9: return "Sport"
 		return f"{data} Unknown"
 	
+	def droneMode(data) -> str:
+		if data == 0: return "Idle/Off"
+		if data == 1: return "Launching"
+		if data == 2: return "Flight Mode"
+		return f"{data} Unknown"
+	
 #
 # Field specs for an Atom2 log.
 #
@@ -71,9 +88,9 @@ ATOM2_FORMAT = [
 	FLFD("lon (deg)", "<i", 51, 4, FLFD.fixLatLong), # drone latitude * 1e7
 	FLFD("alt (m)", "<f", 328, 4, FLFD.fixAlt), # No idea if this is right...
 	FLFD("dist (m)", "<f", 416, 4), # Distance to home in meters ?
-	FLFD("heading (deg)", "<f", 160, 4, FLFD.r2d), # compass heading.
+	FLFD("heading (deg)", "<f", 376, 4, FLFD.r2d), # compass heading.
 	FLFD("FCOUNTER", "<H", 17, 2), # how many times the drone has flown
-	FLFD("SATS","<B", 46, 1), # how many sats were visible
+	FLFD("Satellites","<B", 46, 1), # how many sats were visible
 	FLFD("Controller Lat (deg)", "<i", 144, 4, FLFD.fixLatLong), # relative controller latitude? Not needed
 	FLFD("Controller Lon (deg)", "<i", 148, 4, FLFD.fixLatLong), # relative controller longitude? Not needed
 	#FLFD("HLAT", "<i", 420, 4, FLFD.fixLatLong), # home latitude * 1e7 Not needed.
@@ -84,13 +101,14 @@ ATOM2_FORMAT = [
 	FLFD("M2STATE", "<B", 298, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("M3STATE", "<B", 299, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("M4STATE", "<B", 300, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
-	FLFD("Battery Voltage 1 (mv)", "<h", 440, 2), # Voltage 1
-	FLFD("Battery Voltage 2 (mv)", "<h", 442, 2), # Voltage 2
+	FLFD("Battery V1 (mv)", "<h", 440, 2), # Voltage 1
+	FLFD("Battery V2 2 (mv)", "<h", 442, 2), # Voltage 2
 	FLFD("Battery Current (ma)", "<h", 444, 2, abs), # Current drain.
 	FLFD("Battery Level", "<B", 451, 1), # Current battery charge.
-	FLFD("Battery Temperature (c)", "<B", 462, 1), # Temperature in Celcius.
+	FLFD("Battery Temp (c)", "<B", 462, 1), # Temperature in Celcius.
 	FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flightMode), # Flight Mode: Video, Normal, Sports.
-	FLFD("Drone Mode", "<B", 456, 1), # 0 = motors off, 1 = grounded/launching, 2 = flying, 3 = landing.
+	FLFD("Drone Mode (text)", "<B", 456, 1, FLFD.droneMode), # 0 = motors off, 1 = grounded/launching, 2 = flying, 3 = landing.
+	FLFD("Positioning Mode", "<B", 457, 1) # 3 = GPS, OPTI = 2, Other values unclear.
 ]
 
 #
@@ -107,7 +125,7 @@ class ColorFormatter(logging.Formatter):
 
 	def format(self, record):
 		color= self.COLORS.get(record.levelname,"\033[0m")
-		return f"{color}{record.levelname:<8}\033[0m{super().format(record)}"
+		return f"{color}{record.levelname:<8}\033[0m {super().format(record)}"
 
 #
 # The global logger.
