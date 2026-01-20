@@ -10,3 +10,8 @@ https://goprotelemetryextractor.com/docs/telemetry-overlay-manual.pdf
 1. The FC2 file format uses 512 byte records. The first 4 bytes are a record id.
 
 TODO: Document the rest of the record format here.
+
+TODO: Learn how to package a python app.
+
+TODO: Turn this thing into something someone without developer experience can
+use.
