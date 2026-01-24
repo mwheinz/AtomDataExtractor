@@ -40,7 +40,7 @@ class FLFD:
 	# Atom 2 use integers to store the decimal lat/long with 7 digits of precision.
 	def fixLatLong(data) -> float:
 		if data == 0:
-			return None # error case.
+			return "" # Treat this as missing data.
 		return data / 1e7
 
 	# No idea why the altitude appears to be a negative number...
@@ -51,20 +51,9 @@ class FLFD:
 	def fixTime(data) -> str:
 		global timeStamp
 		if timeStamp == None:
-			return None
+			return None # error case.
 		dt = timeStamp + data/1000
 		return dt
-
-	def getField(self,record) -> str:
-		data = struct.unpack(self.fmtString,record[self.startPos:self.startPos+self.length])
-		if data == ():
-			return None
-		data = data[0]
-		if isinstance(self.scale,int) or isinstance(self.scale,float):
-			data = data * self.scale
-		elif self.scale != None:
-			data = self.scale(data)
-		return data
 
 	def flightMode(data) -> str:
 		if data == 7: return "Video"
@@ -77,7 +66,26 @@ class FLFD:
 		if data == 1: return "Launching"
 		if data == 2: return "Flight Mode"
 		return f"{data} Unknown"
+
+	def motorState(data) -> str:
+		if data == 3: return "Off"
+		if data == 4: return "Idle"
+		if data == 5: return "Low"
+		if data == 6: return "Medium"
+		if data == 7: return "High"
+		return f"{data} Unknown"
 	
+	def getField(self,record) -> str:
+		data = struct.unpack(self.fmtString,record[self.startPos:self.startPos+self.length])
+		if data == ():
+			return None
+		data = data[0]
+		if isinstance(self.scale,int) or isinstance(self.scale,float):
+			data = data * self.scale
+		elif self.scale != None:
+			data = self.scale(data)
+		return data
+
 #
 # Field specs for an Atom2 log.
 #
@@ -89,7 +97,7 @@ ATOM2_FORMAT = [
 	FLFD("alt (m)", "<f", 328, 4, FLFD.fixAlt), # No idea if this is right...
 	FLFD("dist (m)", "<f", 416, 4), # Distance to home in meters ?
 	FLFD("heading (deg)", "<f", 376, 4, FLFD.r2d), # compass heading.
-	FLFD("FCOUNTER", "<H", 17, 2), # how many times the drone has flown
+	FLFD("FCOUNTER", "<H", 17, 2), # how many times the drone has flown? It can increase in the middle of a flight...
 	FLFD("Satellites","<B", 46, 1), # how many sats were visible
 	FLFD("Controller Lat (deg)", "<i", 144, 4, FLFD.fixLatLong), # relative controller latitude? Not needed
 	FLFD("Controller Lon (deg)", "<i", 148, 4, FLFD.fixLatLong), # relative controller longitude? Not needed
@@ -97,15 +105,15 @@ ATOM2_FORMAT = [
 	#FLFD("HLONG", "<i", 424, 4, FLFD.fixLatLong), # home longitude * 1e7 Not needed.
 	#FLFD("GPS","<f",269, 4), # GPS status. float?!?
 	FLFD("ACTIVE", "<B", 280, 1), # 0 = active, 1 = idle.
-	FLFD("M1STATE", "<B", 297, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
-	FLFD("M2STATE", "<B", 298, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
-	FLFD("M3STATE", "<B", 299, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
-	FLFD("M4STATE", "<B", 300, 1), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+	FLFD("M1STATE", "<B", 297, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+	FLFD("M2STATE", "<B", 299, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+	FLFD("M3STATE", "<B", 301, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+	FLFD("M4STATE", "<B", 303, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("Battery V1 (mv)", "<h", 440, 2), # Voltage 1
 	FLFD("Battery V2 2 (mv)", "<h", 442, 2), # Voltage 2
 	FLFD("Battery Current (ma)", "<h", 444, 2, abs), # Current drain.
-	FLFD("Battery Level", "<B", 451, 1), # Current battery charge.
-	FLFD("Battery Temp (c)", "<B", 462, 1), # Temperature in Celcius.
+	FLFD("Battery Level (%)", "<B", 451, 1), # Current battery charge.
+	FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celcius.
 	FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flightMode), # Flight Mode: Video, Normal, Sports.
 	FLFD("Drone Mode (text)", "<B", 456, 1, FLFD.droneMode), # 0 = motors off, 1 = grounded/launching, 2 = flying, 3 = landing.
 	FLFD("Positioning Mode", "<B", 457, 1) # 3 = GPS, OPTI = 2, Other values unclear.
@@ -173,7 +181,7 @@ def atomParse(fieldList, fileName):
 				#logger.debug(f"extracting {flfd.name}")
 				data = flfd.getField(record)
 				if data == None:
-					#logging.warning(f"Illegal value for {flfd.name}. Skipping.")
+					logging.warning(f"Illegal value for {flfd.name}. Skipping.")
 					error = 1
 					eCount += 1
 					break
