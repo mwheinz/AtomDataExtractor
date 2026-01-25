@@ -16,7 +16,7 @@ timeStamp: float
 
 class FLFD:
 	def __init__(self, name, fmtString, startPos, length, scale=None):
-		# This will be the header in the CSV. If it has specific unit, include
+		# This will be the header in the CSV. If it uses specific units, include
 		# it in parens. For example, "lat (deg)" is the latitude, in decimal degrees.
 		self.name = name
 		# how to unpack the data in the flight log.
@@ -111,12 +111,12 @@ ATOM2_FORMAT = [
 	FLFD("Satellites","<B", 46, 1), # how many sats were visible
 	FLFD("lat (deg)", "<i", 47, 4, FLFD.fixLatLong), # drone latitude * 1e7
 	FLFD("lon (deg)", "<i", 51, 4, FLFD.fixLatLong), # drone longitude * 1e7
-	FLFD("alt (m)", "<f", 328, 4, FLFD.fixAlt), # No idea if this is right...
-	FLFD("heading (deg)", "<f", 376, 4, FLFD.r2d), # compass heading.
 	FLFD("M1STATE", "<B", 297, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("M2STATE", "<B", 299, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("M3STATE", "<B", 301, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("M4STATE", "<B", 303, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+	FLFD("alt (m)", "<f", 328, 4, FLFD.fixAlt), # Altitude above controller(?)
+	FLFD("heading (deg)", "<f", 376, 4, FLFD.r2d), # compass heading.
 	FLFD("dist (m)", "<f", 416, 4, FLFD.fixAlt), # Distance to home in meters. Using fixAlt to round the number.
 	FLFD("Home Lat (deg)", "<i", 420, 4, FLFD.fixLatLong), # home latitude * 1e7 Not needed.
 	FLFD("Home Lon (deg)", "<i", 424, 4, FLFD.fixLatLong), # home longitude * 1e7 Not needed.
@@ -206,21 +206,19 @@ def main() -> None:
 	parser = argparse.ArgumentParser(
 		description="Convert Potensic Flight Log files to Telemetry Overlay format.",
 		epilog="Written by Michael Heinz, based on information provided by potdrownflightparser by koen-arts.")
-	parser.add_argument("-l","--log", type=int, help="Set log level. 0=error, higher values increase logging.", default=0)
+	parser.add_argument("-l","--log", type=int, help="Set log level. 0=error, higher values increase logging.", default=2)
 	parser.add_argument("files", nargs="+", help="One or more FlightLog files to convert.")
 	args = parser.parse_args()
 
 	match args.log:
 		case 0:
-			ll = logging.ERROR
+			logger.setLevel(logging.ERROR)
 		case 1: 
-			ll = logging.WARNING
+			logger.setLevel(logging.WARNING)
 		case 2:
-			ll = logging.INFO
+			logger.setLevel(logging.INFO)
 		case _:
-			ll = logging.DEBUG
-
-	logger.setLevel(ll)
+			logger.setLevel(logging.DEBUG)
 
 	print(f"Atom Flight Log to Telemetry Overlay Converter.")
 
