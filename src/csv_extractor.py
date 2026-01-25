@@ -103,28 +103,29 @@ class FLFD:
 # Field specs for an Atom2 log.
 #
 ATOM2_FORMAT = [
-	# fields appear in the order they should be in the CSV file.
-	FLFD("utc (ms)", "<Q", 5, 8, FLFD.fixTime), # Absolute time.
+	# fields listed in the order they will appear in the CSV file.
+	FLFD("utc (ms)", "<Q", 5, 8, FLFD.fixTime), # Absolute time in ms.
+	FLFD("elapsed (ms)", "<Q", 5, 8), # Relative time in ms.
 	FLFD("Flight Counter", "<H", 17, 2), # how many times the drone has flown? It can increase in the middle of a flight...
 	FLFD("GPS Lock", "<B", 45, 1, FLFD.gpsLock),
 	FLFD("Satellites","<B", 46, 1), # how many sats were visible
 	FLFD("lat (deg)", "<i", 47, 4, FLFD.fixLatLong), # drone latitude * 1e7
 	FLFD("lon (deg)", "<i", 51, 4, FLFD.fixLatLong), # drone longitude * 1e7
 	FLFD("alt (m)", "<f", 328, 4, FLFD.fixAlt), # No idea if this is right...
-	FLFD("dist (m)", "<f", 416, 4), # Distance to home in meters ?
 	FLFD("heading (deg)", "<f", 376, 4, FLFD.r2d), # compass heading.
-	FLFD("Home Lat (deg)", "<i", 420, 4, FLFD.fixLatLong), # home latitude * 1e7 Not needed.
-	FLFD("Home Lon (deg)", "<i", 424, 4, FLFD.fixLatLong), # home longitude * 1e7 Not needed.
 	FLFD("M1STATE", "<B", 297, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("M2STATE", "<B", 299, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("M3STATE", "<B", 301, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("M4STATE", "<B", 303, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+	FLFD("dist (m)", "<f", 416, 4, FLFD.fixAlt), # Distance to home in meters. Using fixAlt to round the number.
+	FLFD("Home Lat (deg)", "<i", 420, 4, FLFD.fixLatLong), # home latitude * 1e7 Not needed.
+	FLFD("Home Lon (deg)", "<i", 424, 4, FLFD.fixLatLong), # home longitude * 1e7 Not needed.
+	FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flightMode), # Flight Mode: Video, Normal, Sports.
 	FLFD("Battery V1 (mv)", "<h", 440, 2), # Voltage 1
 	FLFD("Battery V2 2 (mv)", "<h", 442, 2), # Voltage 2
 	FLFD("Battery Current (ma)", "<h", 444, 2, abs), # Current drain.
-	FLFD("Battery Level (%)", "<B", 451, 1), # Current battery charge.
 	FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celcius.
-	FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flightMode), # Flight Mode: Video, Normal, Sports.
+	FLFD("Battery Level (%)", "<B", 451, 1), # Current battery charge.
 	FLFD("Drone Mode (text)", "<B", 456, 1, FLFD.droneMode), # 0 = motors off, 1 = grounded/launching, 2 = flying, 3 = landing.
 	FLFD("Positioning Mode (text)", "<B", 457, 1, FLFD.positioningMode) # 3 = GPS, OPTI = 2, Other values unclear.
 ]
