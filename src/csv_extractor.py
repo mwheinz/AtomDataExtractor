@@ -67,6 +67,12 @@ class FLFD:
 		if data == 2: return "Flight Mode"
 		return f"{data} Unknown"
 
+	def positioningMode(data) -> str:
+		if data == 1: return "ATTI"
+		if data == 2: return "OPTI"
+		if data == 3: return "GPS"
+		return f"{data} Unknown"
+
 	def motorState(data) -> str:
 		if data == 3: return "Off"
 		if data == 4: return "Idle"
@@ -75,6 +81,13 @@ class FLFD:
 		if data == 7: return "High"
 		return f"{data} Unknown"
 	
+	def gpsLock(data) -> str:
+		if data > 0: return "Yes"
+		return "No"
+
+	def hexDump(data) -> str:
+		return hex(data)
+
 	def getField(self,record) -> str:
 		data = struct.unpack(self.fmtString,record[self.startPos:self.startPos+self.length])
 		if data == ():
@@ -91,20 +104,17 @@ class FLFD:
 #
 ATOM2_FORMAT = [
 	# fields appear in the order they should be in the CSV file.
-	FLFD("utc (ms)", "<Q", 5, 8, FLFD.fixTime), # elapsed time since the drone started.
+	FLFD("utc (ms)", "<Q", 5, 8, FLFD.fixTime), # Absolute time.
+	FLFD("Flight Counter", "<H", 17, 2), # how many times the drone has flown? It can increase in the middle of a flight...
+	FLFD("GPS Lock", "<B", 45, 1, FLFD.gpsLock),
+	FLFD("Satellites","<B", 46, 1), # how many sats were visible
 	FLFD("lat (deg)", "<i", 47, 4, FLFD.fixLatLong), # drone latitude * 1e7
-	FLFD("lon (deg)", "<i", 51, 4, FLFD.fixLatLong), # drone latitude * 1e7
+	FLFD("lon (deg)", "<i", 51, 4, FLFD.fixLatLong), # drone longitude * 1e7
 	FLFD("alt (m)", "<f", 328, 4, FLFD.fixAlt), # No idea if this is right...
 	FLFD("dist (m)", "<f", 416, 4), # Distance to home in meters ?
 	FLFD("heading (deg)", "<f", 376, 4, FLFD.r2d), # compass heading.
-	FLFD("FCOUNTER", "<H", 17, 2), # how many times the drone has flown? It can increase in the middle of a flight...
-	FLFD("Satellites","<B", 46, 1), # how many sats were visible
-	FLFD("Controller Lat (deg)", "<i", 144, 4, FLFD.fixLatLong), # relative controller latitude? Not needed
-	FLFD("Controller Lon (deg)", "<i", 148, 4, FLFD.fixLatLong), # relative controller longitude? Not needed
-	#FLFD("HLAT", "<i", 420, 4, FLFD.fixLatLong), # home latitude * 1e7 Not needed.
-	#FLFD("HLONG", "<i", 424, 4, FLFD.fixLatLong), # home longitude * 1e7 Not needed.
-	#FLFD("GPS","<f",269, 4), # GPS status. float?!?
-	FLFD("ACTIVE", "<B", 280, 1), # 0 = active, 1 = idle.
+	FLFD("Home Lat (deg)", "<i", 420, 4, FLFD.fixLatLong), # home latitude * 1e7 Not needed.
+	FLFD("Home Lon (deg)", "<i", 424, 4, FLFD.fixLatLong), # home longitude * 1e7 Not needed.
 	FLFD("M1STATE", "<B", 297, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("M2STATE", "<B", 299, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
 	FLFD("M3STATE", "<B", 301, 1, FLFD.motorState), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
@@ -116,7 +126,7 @@ ATOM2_FORMAT = [
 	FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celcius.
 	FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flightMode), # Flight Mode: Video, Normal, Sports.
 	FLFD("Drone Mode (text)", "<B", 456, 1, FLFD.droneMode), # 0 = motors off, 1 = grounded/launching, 2 = flying, 3 = landing.
-	FLFD("Positioning Mode", "<B", 457, 1) # 3 = GPS, OPTI = 2, Other values unclear.
+	FLFD("Positioning Mode (text)", "<B", 457, 1, FLFD.positioningMode) # 3 = GPS, OPTI = 2, Other values unclear.
 ]
 
 #
