@@ -37,7 +37,10 @@ while {![end]} {
 				int8  "batteryT";           # 447
 				bytes 4 "unknown11";		# 451
 				int8  "battery%";			# 452
-				bytes 60 "data";			# 512
+				bytes 4 "unknown12";		# 456
+				int8 "droneMode";			# 457
+				int8 "positioningMode";		# 458
+				bytes 54 "data";			# 512
 		}
 }
 
