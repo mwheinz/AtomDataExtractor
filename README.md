@@ -54,7 +54,7 @@ Fields are all little-endian.
 | 416 | 4 | float | distance to home, in meters. | Yes |
 | 420 | 4 | integer | latitude of the home point in degrees * 1e7. | Yes |
 | 424 | 4 | integer | longitude of the home point in degrees * 1e7 | Yes |
-| 433 | 1 | byte | Flight mode 0 = video, 1 = normal, 2 = sport | Yes |
+| 433 | 1 | byte | Flight mode 7 = video, 8 = normal, 9 = sport | Yes |
 | 440 | 2 | short | Battery voltage #1 (mv?) | Yes |
 | 442 | 2 | short | Battery voltage #2 (mv?) | Yes |
 | 444 | 2 | short | Battery current (ma) | Yes |
