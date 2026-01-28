@@ -58,7 +58,7 @@ Fields are all little-endian.
 | 440 | 2 | short | Battery voltage #1 (mv?) | Yes |
 | 442 | 2 | short | Battery voltage #2 (mv?) | Yes |
 | 444 | 2 | short | Battery current (ma) | Yes |
-| 446 | 1 | byte | Battery Temp (c) | Yes |
+| 446 | 1 | byte | Battery Temp (celsius) | Yes |
 | 451 | 1 | byte | Battery Level (%) | Yes |
 | 456 | 1 | byte | Drone mode 0 = motors off, 1 = idle/launching, 2 = flying, 3 = landing | Yes |
 | 457 | 1 | byte | Positioning mode. 3 = GPS, 2 = Optical, 1 = Attitude(?) | 75% sure |
