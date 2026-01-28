@@ -65,6 +65,7 @@ class FLFD:
 		if data == 0: return "Idle/Off"
 		if data == 1: return "Launching"
 		if data == 2: return "Flight Mode"
+		if data == 3: return "Landing"
 		return f"{data} Unknown"
 
 	def positioningMode(data) -> str:
