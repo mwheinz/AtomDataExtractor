@@ -10,7 +10,8 @@ import sys
 import struct
 import math
 import datetime
-import logging
+import mwhlogging
+from mwhlogging import mwhLogger
 
 timeStamp: float
 
@@ -33,7 +34,7 @@ class FLFD:
 		result = round((360 + data * 180/math.pi) % 360, 3)
 		if math.isnan(result):
 			# TODO: Figure out better handling of bad records.
-			logger.critical(f"Bad heading value {data} found.");
+			mwhLogger.critical(f"Bad heading value {data} found.");
 			sys.exit(-1)
 		return result
 
@@ -131,32 +132,6 @@ ATOM2_FORMAT = [
 	FLFD("Positioning Mode (text)", "<B", 457, 1, FLFD.positioningMode) # 3 = GPS, OPTI = 2, Other values unclear.
 ]
 
-#
-# Colorize our logging output.
-#
-class ColorFormatter(logging.Formatter):
-	COLORS= {
-		'DEBUG': "\033[1;34m",		# Blue
-		'INFO': "\033[1;32m",		# Green
-		'WARNING': "\033[1;33m",	# Yellow
-		'ERROR': "\033[1;31m",		# Red
-		'CRITICAL': "\033[1;41m",	# Red on background
-    }
-
-	def format(self, record):
-		color= self.COLORS.get(record.levelname,"\033[0m")
-		return f"{color}{record.levelname:<8}\033[0m {super().format(record)}"
-
-#
-# The global logger.
-#
-cHandler = logging.StreamHandler()
-cHandler.setFormatter(ColorFormatter())
-logging.basicConfig(level=logging.DEBUG)
-logger=logging.getLogger(sys.argv[0])
-logger.addHandler(cHandler)
-logger.propagate = False
-
 def atomParse(fieldList, fileName):
 	global timeStamp
 	baseName = os.path.basename(fileName)
@@ -164,12 +139,12 @@ def atomParse(fieldList, fileName):
 	timeStamp = datetime.datetime.strptime(re.sub("-.*", "", baseName), "%Y%m%d%H%M%S").timestamp()*1000
 	cname=f"{baseName}.csv"
 
-	logger.debug(f"Creating {cname}.")
+	mwhLogger.debug(f"Creating {cname}.")
 
 	try:
 		csvFile = open(cname, mode="w")
 	except:
-		logger.critical(f"Unable to create {cname}. Terminating.")
+		mwhLogger.critical(f"Unable to create {cname}. Terminating.")
 		sys.exit(-1)
 
 	header=""
@@ -190,7 +165,7 @@ def atomParse(fieldList, fileName):
 			line=""
 			error = 0
 			for flfd in fieldList:
-				#logger.debug(f"extracting {flfd.name}")
+				#mwhLogger.debug(f"extracting {flfd.name}")
 				data = flfd.getField(record)
 				if data == None:
 					logging.warning(f"Illegal value for {flfd.name}. Skipping.")
@@ -201,7 +176,7 @@ def atomParse(fieldList, fileName):
 			if error == 0:
 				print(line, file=csvFile)
 
-	logger.info(f"{rCount} valid records in {fileName}. {eCount} bad records in file.")
+	mwhLogger.info(f"{rCount} valid records in {fileName}. {eCount} bad records in file.")
 	
 def main() -> None:
 	parser = argparse.ArgumentParser(
@@ -213,29 +188,29 @@ def main() -> None:
 
 	match args.log:
 		case 0:
-			logger.setLevel(logging.ERROR)
+			mwhLogger.setLevel(mwhlogging.ERROR)
 		case 1: 
-			logger.setLevel(logging.WARNING)
+			mwhLogger.setLevel(mwhlogging.WARNING)
 		case 2:
-			logger.setLevel(logging.INFO)
+			mwhLogger.setLevel(mwhlogging.INFO)
 		case _:
-			logger.setLevel(logging.DEBUG)
+			mwhLogger.setLevel(mwhlogging.DEBUG)
 
 	print(f"Atom Flight Log to Telemetry Overlay Converter.")
 
 	for f in args.files:
 		baseName, extension = os.path.splitext(f)
 		if not os.path.exists(f):
-			logger.error(f"{f} does not exist.")
+			mwhLogger.error(f"{f} does not exist.")
 			sys.exit(-1)
 		elif extension == ".fc2":
-			logger.info(f"Parsing {f} as an Atom2 log file.")
+			mwhLogger.info(f"Parsing {f} as an Atom2 log file.")
 			atomParse(ATOM2_FORMAT, f)
 		elif extension == ".fc":
-			logger.error(f"Sorry, I can't handle Atom1 log files yet. Can't parse {f}.")
+			mwhLogger.error(f"Sorry, I can't handle Atom1 log files yet. Can't parse {f}.")
 			sys.exit(-1)
 		else:
-			logger.info(f"{f} appears to be an unsupported file type.")
+			mwhLogger.info(f"{f} appears to be an unsupported file type.")
 			sys.exit(-1)
 
 if __name__ == '__main__':

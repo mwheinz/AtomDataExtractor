@@ -1,11 +1,11 @@
 # Development notes:
 
-TODO: Document the rest of the record format here.
+Building:
 
-TODO: Learn how to package a python app.
+From the AtomDataExtractor directory, 
 
-TODO: Turn this thing into something someone without developer experience can
-use.
+python3 -m venv venv
+source venv/bin/activate
 
 ## Telemetry Overlay Documentation:
 https://goprotelemetryextractor.com/docs/telemetry-overlay-manual.pdf
