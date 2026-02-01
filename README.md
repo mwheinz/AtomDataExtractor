@@ -4,8 +4,15 @@ Building:
 
 From the AtomDataExtractor directory, 
 
-python3 -m venv venv
-source venv/bin/activate
+```
+$ python3 -m venv venv
+$ source venv/bin/activate
+$ cd atomdataviewer
+$ briefcase build
+```
+
+## Briefcase & Toga:
+https://beeware.org/
 
 ## Telemetry Overlay Documentation:
 https://goprotelemetryextractor.com/docs/telemetry-overlay-manual.pdf
