@@ -129,7 +129,8 @@ ATOM2_FORMAT = [
 	FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celcius.
 	FLFD("Battery Level (%)", "<B", 451, 1), # Current battery charge.
 	FLFD("Drone Mode (text)", "<B", 456, 1, FLFD.droneMode), # 0 = motors off, 1 = grounded/launching, 2 = flying, 3 = landing.
-	FLFD("Positioning Mode (text)", "<B", 457, 1, FLFD.positioningMode) # 3 = GPS, OPTI = 2, Other values unclear.
+	FLFD("Positioning Mode (text)", "<B", 457, 1, FLFD.positioningMode), # 3 = GPS, OPTI = 2, Other values unclear.
+	FLFD("Wind (deg)", "<f", 408, 4, FLFD.r2d), # wind direction
 ]
 
 def atomParse(fieldList, fileName):

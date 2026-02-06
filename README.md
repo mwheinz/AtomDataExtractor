@@ -58,6 +58,7 @@ Fields are all little-endian.
 | 303 | 1 | byte | Motor State #4 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
 | 328 | 4 | float | altitude in meters. | Yes |
 | 376 | 4 | float | compass heading in radians. | Yes |
+| 408 | 4 | float | wind direction in radians. | Yes |
 | 416 | 4 | float | distance to home, in meters. | Yes |
 | 420 | 4 | integer | latitude of the home point in degrees * 1e7. | Yes |
 | 424 | 4 | integer | longitude of the home point in degrees * 1e7 | Yes |
