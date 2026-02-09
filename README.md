@@ -57,9 +57,13 @@ Fields are all little-endian.
 | 220 | 4 | integer | "dist 1 lat"? Doesn't seem correct for Atom 2.||
 | 224 | 4 | integer | "dist 1 lon"? Doesn't seem correct for Atom 2.||
 | 264 | 4 | float? | Supposed to indicate GPS status. <0 no GPS, 0 GPS ready, >2 GPS in use? Doesn't seem right for Atom 2. ||
+| 296 | 1 | byte | Seems to be related to motor state. ||
 | 297 | 1 | byte | Motor State #1 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
+| 298 | 1 | byte | Seems to be related to motor state. ||
 | 299 | 1 | byte | Motor State #2 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
+| 300 | 1 | byte | Seems to be related to motor state. ||
 | 301 | 1 | byte | Motor State #3 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
+| 302 | 1 | byte | Seems to be related to motor state. ||
 | 303 | 1 | byte | Motor State #4 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
 | 304 | 4 | integer | "dist 2 lat"? Doesn't seem correct for Atom 2.||
 | 308 | 4 | integer | "dist 2 lon"? Doesn't seem correct for Atom 2.||
