@@ -52,10 +52,17 @@ Fields are all little-endian.
 | 111 | 2 | ??? | 2 bytes of data. ||
 | 113 | 2 | ??? | Always zero. ||
 | 115 | 2 | ??? | 2 bytes of data. ||
+| 144 | 4 | integer | controller's latitude? Doesn't seem correct for Atom 2.||
+| 148 | 4 | integer | controller's longitude? Doesn't seem correct for Atom 2.||
+| 220 | 4 | integer | "dist 1 lat"? Doesn't seem correct for Atom 2.||
+| 224 | 4 | integer | "dist 1 lon"? Doesn't seem correct for Atom 2.||
+| 264 | 4 | float? | Supposed to indicate GPS status. <0 no GPS, 0 GPS ready, >2 GPS in use? Doesn't seem right for Atom 2. ||
 | 297 | 1 | byte | Motor State #1 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
 | 299 | 1 | byte | Motor State #2 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
 | 301 | 1 | byte | Motor State #3 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
 | 303 | 1 | byte | Motor State #4 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
+| 304 | 4 | integer | "dist 2 lat"? Doesn't seem correct for Atom 2.||
+| 308 | 4 | integer | "dist 2 lon"? Doesn't seem correct for Atom 2.||
 | 328 | 4 | float | altitude in meters. | Yes |
 | 376 | 4 | float | compass heading in radians. | Yes |
 | 408 | 4 | float | wind direction in radians. | Yes |
