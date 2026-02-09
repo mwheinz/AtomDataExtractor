@@ -106,6 +106,7 @@ class FLFD:
 #
 ATOM2_FORMAT = [
 	# fields listed in the order they will appear in the CSV file.
+	#FLFD("rid", "<i", 0, 4), # Record id.
 	FLFD("utc (ms)", "<Q", 5, 8, FLFD.fixTime), # Absolute time in ms.
 	FLFD("elapsed (ms)", "<Q", 5, 8), # Relative time in ms.
 	FLFD("Flight Counter", "<H", 17, 2), # how many times the drone has flown? It can increase in the middle of a flight...
@@ -120,8 +121,8 @@ ATOM2_FORMAT = [
 	FLFD("alt (m)", "<f", 328, 4, FLFD.fixAlt), # Altitude above controller(?)
 	FLFD("heading (deg)", "<f", 376, 4, FLFD.r2d), # compass heading.
 	FLFD("dist (m)", "<f", 416, 4, FLFD.fixAlt), # Distance to home in meters. Using fixAlt to round the number.
-	FLFD("Home Lat (deg)", "<i", 420, 4, FLFD.fixLatLong), # home latitude * 1e7 Not needed.
-	FLFD("Home Lon (deg)", "<i", 424, 4, FLFD.fixLatLong), # home longitude * 1e7 Not needed.
+	FLFD("Home Lat (deg)", "<i", 420, 4, FLFD.fixLatLong), # home latitude * 1e7
+	FLFD("Home Lon (deg)", "<i", 424, 4, FLFD.fixLatLong), # home longitude * 1e7
 	FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flightMode), # Flight Mode: Video, Normal, Sports.
 	FLFD("Battery V1 (mv)", "<h", 440, 2), # Voltage 1
 	FLFD("Battery V2 2 (mv)", "<h", 442, 2), # Voltage 2
