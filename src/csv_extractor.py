@@ -65,7 +65,7 @@ class FLFD:
 	def droneMode(data) -> str:
 		if data == 0: return "Idle/Off"
 		if data == 1: return "Launching"
-		if data == 2: return "Flight Mode"
+		if data == 2: return "Flying"
 		if data == 3: return "Landing"
 		return f"{data} Unknown"
 
@@ -87,8 +87,15 @@ class FLFD:
 		if data > 0: return "Yes"
 		return "No"
 
+	# These are used when trying to investigate unknown parts of the record.
 	def hexDump(data) -> str:
 		return hex(data)
+
+	def hexDump2(data) -> str:
+		return f"{data:04x}"
+
+	def hexDump8(data) -> str:
+		return f"{data:016x}"	
 
 	def getField(self,record) -> str:
 		data = struct.unpack(self.fmtString,record[self.startPos:self.startPos+self.length])
@@ -106,7 +113,7 @@ class FLFD:
 #
 ATOM2_FORMAT = [
 	# fields listed in the order they will appear in the CSV file.
-	#FLFD("rid", "<i", 0, 4), # Record id.
+	FLFD("rid", "<i", 0, 4), # Record id.
 	FLFD("utc (ms)", "<Q", 5, 8, FLFD.fixTime), # Absolute time in ms.
 	FLFD("elapsed (ms)", "<Q", 5, 8), # Relative time in ms.
 	FLFD("Flight Counter", "<H", 17, 2), # how many times the drone has flown? It can increase in the middle of a flight...
@@ -129,7 +136,6 @@ ATOM2_FORMAT = [
 	FLFD("Battery Current (ma)", "<h", 444, 2, abs), # Current drain.
 	FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celcius.
 	FLFD("Battery Level (%)", "<B", 451, 1), # Current battery charge.
-	FLFD("Drone Mode (text)", "<B", 456, 1, FLFD.droneMode), # 0 = motors off, 1 = grounded/launching, 2 = flying, 3 = landing.
 	FLFD("Positioning Mode (text)", "<B", 457, 1, FLFD.positioningMode), # 3 = GPS, OPTI = 2, Other values unclear.
 	FLFD("Wind (deg)", "<f", 408, 4, FLFD.r2d), # wind direction
 ]
@@ -149,9 +155,14 @@ def atomParse(fieldList, fileName):
 		mwhLogger.critical(f"Unable to create {cname}. Terminating.")
 		sys.exit(-1)
 
+	# These fields require special handling.
+	dm = FLFD("Drone Mode (text)", "<B", 456, 1, FLFD.droneMode) # 0 = motors off, 1 = grounded/launching, 2 = flying, 3 = landing.
+	rth = FLFD("Return to Home", "<B", 429,1) # !0 if RTH is active.
+
 	header=""
 	for flfd in fieldList:
-		header=header+f"{flfd.name}, "
+		header+=f"{flfd.name}, "
+	header+=f"{dm.name}"
 	print(header, file=csvFile)
 
 	with open(fileName, mode="rb") as flightFile:
@@ -175,7 +186,15 @@ def atomParse(fieldList, fileName):
 					eCount += 1
 					break
 				line=line+f"{data}, "
+
 			if error == 0:
+				# We combine these two fields into one.
+				dmode = dm.getField(record)
+				rthome = rth.getField(record)
+				if rthome != 0 and dmode == "Flying":
+					dmode = "RTH"
+				line += f"{dmode}"
+
 				print(line, file=csvFile)
 
 	mwhLogger.info(f"{rCount} valid records in {fileName}. {eCount} bad records in file.")
