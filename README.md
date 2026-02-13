@@ -1,8 +1,11 @@
 # Development notes:
 
-Building:
+## Building:
 
-From the AtomDataExtractor directory, 
+The Toga code is just a skeleton and does nothing. There is no packaging
+for the CLI tool right now, just run it from the directory.
+
+To try and build the Toga package:
 
 ```
 $ python3 -m venv venv
@@ -30,17 +33,20 @@ Fields are all little-endian.
 | Byte: | Length: | Format: | Description: | Correct: |
 |-------|---------|---------|--------------|----------|
 | 0     | 4       | integer | Record Id | Yes |
+| 4     | 1       | byte | always zero. ||
 | 5     | 8       | long long | ms since the drone started(?) | Yes |
-| 13    | 2       | short | S1. Starts as zero but then may change to a value that seems to stay constant for the rest of the log. Values include 0x1e, 0x78. If non-zero it will match S2. | |
-| 15    | 2       | short | S2. Starts as zero but then may change to a value that seems to stay constant for the rest of the log. Values include 0x1e, 0x78. If S1 is non-zero it will match this value. | |
-| 17 | 2 | ushort | How many times the drone has flown? Can increment in the middle of a flight. | |
+| 13    | 2       | short | Starts as zero but occasionally changes to one of a few distinct values. Observed values are 0, 25, 30, 35, 40, 120.||
+| 15    | 2       | short | Starts as zero but then may change to a value that will match field #13. ||
+| 17 | 2 | ushort | How many times the drone has flown? Can increment in the middle of a flight. Slightly less than what the PTD-1 reports. | |
 | 19 | 26 | ??? | Unknown. Values appear to change frequently. | |
-| 45 | 1 | byte | Unknown. Appears to be 0 when there is no GNSS lock and 3 when there is. | |
+| 45 | 1 | byte | GPS Lock. Appears to be 0 when there is no GNSS lock and 3 when there is. |Yes|
 | 46 | 1 | byte | # of GNSS satellites the drone has a lock on. | Yes |
 | 47 | 4 | integer | drone's latitude in ten-millionths of degrees. 0 if unknown. | Yes |
 | 51 | 4 | integer | drone's longitude in ten-millionths of degrees. 0 if unknown. | Yes |
-| 55 | 8 | ??? | Unknown. During a static engines-off test, remained a constant 0x803f, frequently changes during flight. | |
-| 63 | 8 | ??? | Unknown. During a static engines-off test, remained a constant 0xa04000002041, frequently changes during flight. | |
+| 55 | 4 | integer | Unknown. Zero when no satellites found. Non-zero when the # of satellites > 0. Can be negative. Varies over time. Could it be signal strength?||
+| 59 | 4 | float | Unknown. 0 or 1 when no satellites found. Seems to vary between 0 and 1. ||
+| 63 | 4 | float | Unknown. Seems to default to 5, otherwise varies between 0 and 5. ||
+| 67 | 4 | float | Unknown. Seems to default to 10, otherwise varies between 0 and 10. 55-67 seem to vary in related, but not identical, patterns.||
 | 71 | 8 | ??? | Unknown. Frequently changing hex data.||
 | 79 | 2 | ??? | 2 bytes that might be a ushort or might be 2 separate fields. byte 80 seems to usually == 70 or 71. Byte 79 changes more. ||
 | 81 | 6 | ??? | Rapidly changing data ||
@@ -57,19 +63,19 @@ Fields are all little-endian.
 | 220 | 4 | integer | "dist 1 lat"? Doesn't seem correct for Atom 2.||
 | 224 | 4 | integer | "dist 1 lon"? Doesn't seem correct for Atom 2.||
 | 264 | 4 | float? | Supposed to indicate GPS status. <0 no GPS, 0 GPS ready, >2 GPS in use? Doesn't seem right for Atom 2. ||
-| 296 | 1 | byte | Seems to be related to motor state. ||
+| 296 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 297 | 1 | byte | Motor State #1 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
-| 298 | 1 | byte | Seems to be related to motor state. ||
+| 298 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 299 | 1 | byte | Motor State #2 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
-| 300 | 1 | byte | Seems to be related to motor state. ||
+| 300 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 301 | 1 | byte | Motor State #3 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
-| 302 | 1 | byte | Seems to be related to motor state. ||
+| 302 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 303 | 1 | byte | Motor State #4 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
-| 304 | 4 | integer | "dist 2 lat"? Doesn't seem correct for Atom 2.||
-| 308 | 4 | integer | "dist 2 lon"? Doesn't seem correct for Atom 2.||
-| 328 | 4 | float | altitude in meters. | Yes |
+| 304 | 24 | byte | Initially zero, goes non-zero during launch. Goes back to zero when drone has landed. Don't seem to be floats...? ||
+| 328 | 4 | float | altitude above ground, in meters. Take the absolute value before using... | Yes |
 | 376 | 4 | float | compass heading in radians. | Yes |
 | 408 | 4 | float | wind direction in radians. | Yes |
+| 412 | 4 | float | Unknown. Initially zero, goes non-zero during launch. Returns to zero during landing. Observed to range between 0 to 24. Varies much more quickly than distance or altitude. ||
 | 416 | 4 | float | distance to home, in meters. | Yes |
 | 420 | 4 | integer | latitude of the home point in degrees * 1e7. | Yes |
 | 424 | 4 | integer | longitude of the home point in degrees * 1e7 | Yes |
