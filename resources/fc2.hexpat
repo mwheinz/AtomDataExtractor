@@ -59,13 +59,15 @@ struct fc2Record {
     u64     elapsed;
 
     // 13   Initially zero, occasionally changes to one of a few distinct values.
+    //      May be related to the Flight Mode - goes non-zero at the same time
+    //      the initial flight mode goes from video to normal. May change again during flight.
     //      Observed values include 0, 25, 30, 35, 40, and 120.
     u16     u13;
     
     // 15   Zero or, if u13 is non-zero, will equal u13.
     u16     u15;
     
-    // 17   The # of times the drone has flown? Sometimes increments in a single fc2 file? 
+    // 17   The number of times the drone has flown. Imcrements with each landing.
     u16     flightCount;
 
     // 19   Lots of frequently changing data.
@@ -82,14 +84,20 @@ struct fc2Record {
     s32     dronLon;
     
     // 55   goes non-zero when the # of satellites > 0. Some kind of signal strength?
-    s32     u55;
+    s32     gpsQuality;
     
-    // 57   Unknown. Initially either 0 or 1, then varies between 0 and 1.
-    float   u57;
-    // 63   Unknown. Initially 5, then varies between 0 and 5.
-    float   u63;
-    // 67   Unknown. Initially 10, then varies between 0 and 10.
-    float   u67;
+    // 59   Appears to represent the confidence in the drone's position, with
+    //      0.0 being the best and 1.0 being the worst.
+    float   posConfidence1;
+
+    // 63   Initially 5, then varies between 0 and 5. Possibly related
+    //      to the accuracy of the drone's position with 5.0 being poor
+    //      and 0.0 being best.
+    float   horizontalConfidence;
+    // 67   Initially 10, then varies between 0 and 10. Possibly related
+    //      to the accuracy of the drone's position with 10.0 being poor
+    //      and 0.0 being best.
+    float   verticalConfidence;
     
     u8      b71[225];
     
@@ -100,10 +108,19 @@ struct fc2Record {
     u8      m3[2];
     u8      m4[2];
     
-    // 304  Unknown.
-    u8      b304[24];
+    // 304  Distance from the home point in meters.
+    //      posX is probably the position east or west of home.
+    //      posY is probably the position north or south of home.
+    float   posX; 
+    float   posY;
+
+    // 312  Possibly information on the drone's orientation.
+    float   pitch;
+    float   roll;
+    float   pitchRate;
+    float   rollRate;
     
-    // 328  Drone alitude above ground, in meters.
+    // 328  Drone alitude above take off point, in meters.
     float   altitude;
     
     // 332  Unknown.
@@ -112,34 +129,80 @@ struct fc2Record {
     // 376  Drone heading, in radians.
     float   heading;
     
-    // 380  Unknown.
-    u8      b380[28];
+    // 380  Components of velocity?
+    float   deltaX;
+    float   deltaY;
+    float   deltaZ;
+
+    // 392  Ground speed?
+    float   f392;
+    
+    // 396  Sometimes goes non-zero during flight, but not always. Returns to
+    //      zero after landing.
+    float   f396;
+
+    // 400  Appears to be a constant value. Always equals "5050.0"
+    float   f400;
+
+    // 404  Sometimes goes non-zero during flight, but not always. Returns to
+    //      zero after landing. Correlated with altitude?
+    float   f404;
     
     // 408  wind direction, in radians.
     float   wind; 
     
-    // 412  Unknown.
-    float   u412;
+    // 412  Appears to represent how hard the drone motors are working.
+    float   thrust;
     
-    //      Distance to home, in meters.
+    // 416  Distance to home, in meters.
     float   dhome;
     
-    
+    // 420  Lat and lon of the home point, in degrees * 1e7.
     s32     hlat;
     s32     hlon;
-    u8 b9[5];
+
+    // 428  Unknown.
+    u8      b428;
+
+    // 429  Non-zero when return-to-home is activated.
+    u8      rth;
+
+    // 430  Unknown.
+    u8      b430[3];
+
+    // 433  Current flight mode. 7 = low performance ("video"), 8 = normal performance, 9 = high performance ("sport")
     FlightMode flightmode;
-    u8 b10[6];
-    s16 batteryv1;
-    s16 batteryv2;
-    s16 batteryma;
-    s8 btemp;
-    u8 b11[4];
-    u8 batterypct;
-    u8 b12[4];
+
+    // 434  Unknown.
+    u8      b434[6];
+
+    // 440  Battery information. batteryv1, batteryv2 are the voltages output 
+    //      by the battery cells. batteryma is the current output by the
+    //      battery. btemp is the temperature of the battery.
+    //      batterypct is the charge level of the battery.
+    s16     batteryv1;
+    s16     batteryv2;
+    s16     batteryma;
+    s8      btemp;
+
+    // 447  Unknown.
+    u8      b447[4];
+
+    // 451  Battery charge level.
+    u8      batterypct;
+
+    // 452  Unknown.
+    u8      b452[4];
+
+    // 456  The drone operating mode. 0 = motors off, 1 = idle/launching, 
+    //      2 = flying, 3 = landing.
     DroneMode dronemode;
+
+    // 457  The drone positioning mode. 1=attitude, 2=optical, 3=GPS.
     PositioningMode posmode;
-    u8 data[54];
+
+    // 458  Unknown.
+    u8      b458[54];
 };
 
 fc2Record record[std::mem::size() / sizeof(fc2Record)] @ 0x0;

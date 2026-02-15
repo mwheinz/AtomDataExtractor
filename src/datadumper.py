@@ -1,6 +1,6 @@
 #!python3
 '''
-Convert information from an Atom flight log into a Telemetry Overlay CSV
+Exploring the fc2 file format.
 '''
 
 import os
@@ -92,10 +92,16 @@ class FLFD:
         return hex(data)
 
     def _hex_dump2(data) -> str:
-        return f"{data:04x}"
+        return f"0x{data:04x}"
+
+    def _hex_dump4(data) -> str:
+        return f"0x{data:08x}"
 
     def _hex_dump8(data) -> str:
-        return f"{data:016x}"
+        return f"0x{data:016x}"
+
+    def _round2(data):
+        return round(data*100)/100;
 
     def getField(self,record) -> str:
         data = struct.unpack(self.fmt_string,record[self.start_pos:self.start_pos+self.length])
@@ -119,21 +125,46 @@ ATOM2_FORMAT = [
     # fields are in lower case while custom fields are in upper case so that
     # their labels on TO gauges look right.
     FLFD("rid", "<i", 0, 4), # Record id.
-    FLFD("utc (ms)", "<Q", 5, 8, FLFD._fix_time), # Absolute time in ms.
+    FLFD("z4", "<b", 4, 1), # always zero.
     FLFD("elapsed (ms)", "<Q", 5, 8), # Relative time in ms.
+    FLFD("u13", "<H", 13, 2), # unknown.
+    FLFD("u15", "<H", 13, 2), # unknown.
     FLFD("Flight Counter", "<H", 17, 2), 
+    # byte 19. unknown region 26 bytes long.
     FLFD("GPS Lock", "<B", 45, 1, FLFD._gps_lock),
     FLFD("Satellites","<B", 46, 1), # how many sats were visible
     FLFD("lat (deg)", "<i", 47, 4, FLFD._fix_lat_lon), # drone latitude * 1e7
     FLFD("lon (deg)", "<i", 51, 4, FLFD._fix_lat_lon), # drone longitude * 1e7
-    FLFD("Motor 1", "<B", 297, 1, FLFD._motor_state), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
-    FLFD("Motor 2", "<B", 299, 1, FLFD._motor_state), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
-    FLFD("Motor 3", "<B", 301, 1, FLFD._motor_state), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
-    FLFD("Motor 4", "<B", 303, 1, FLFD._motor_state), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+    FLFD("GPS Quality", "<i", 55, 4), # higher is better.
+    FLFD("confidence1", "<f", 59, 4), 
+    FLFD("confidence2", "<f", 63, 4), 
+    FLFD("confidence3", "<f", 67, 4), 
+    # byte 71. unknown region 225 bytes long.
+    FLFD("Motor 1 Data", "<B", 296, 1),
+    FLFD("Motor 1 State", "<B", 297, 1, FLFD._motor_state), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+    FLFD("Motor 2 Data", "<B", 298, 1),
+    FLFD("Motor 2 State", "<B", 299, 1, FLFD._motor_state), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+    FLFD("Motor 3 Data", "<B", 300, 1),
+    FLFD("Motor 3 State", "<B", 301, 1, FLFD._motor_state), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+    FLFD("Motor 4 Data", "<B", 302, 1),
+    FLFD("Motor 4 State", "<B", 303, 1, FLFD._motor_state), # 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high
+    FLFD("Position X (m)", "<f", 304,4, FLFD._round2), 
+    FLFD("Position Y (m)", "<f", 308,4, FLFD._round2),
+    FLFD("Pitch (deg)", "<f", 312, 4, FLFD._round2),
+    FLFD("Roll (deg)", "<f", 316, 4, FLFD._round2),
+    FLFD("Pitch Rate", "<f", 320, 4, FLFD._round2),
+    FLFD("Roll Rate", "<f", 324, 4, FLFD._round2),
     FLFD("alt (m)", "<f", 328, 4, FLFD._fix_alt), # Altitude above controller(?)
     FLFD("heading (deg)", "<f", 376, 4, FLFD._r2d), # compass heading.
+    FLFD("Delta X (m)", "<f", 380,4, FLFD._round2),
+    FLFD("Delta Y (m)", "<f", 384,4, FLFD._round2),
+    FLFD("Delta Z (m)", "<f", 388,4, FLFD._round2),
+    FLFD("Speed (m/s)", "<f", 392,4),
+    FLFD("F396", "<f", 396,4),
+    FLFD("C5050", "<f", 400,4),
+    FLFD("F404", "<f", 404,4),
     FLFD("Wind (deg)", "<f", 408, 4, FLFD._r2d), # wind direction
-    FLFD("Thrust", "<f", 412, 4, FLFD._fix_alt), # Using fix_alt to round the data.
+    FLFD("Thrust", "<f", 412, 4, FLFD._round2), # A unitless representation of how hard the motors are working.
     FLFD("dist (m)", "<f", 416, 4, FLFD._fix_alt), # Distance to home in meters. Using fixAlt to round the number.
     FLFD("Home Lat (deg)", "<i", 420, 4, FLFD._fix_lat_lon), # home latitude * 1e7
     FLFD("Home Lon (deg)", "<i", 424, 4, FLFD._fix_lat_lon), # home longitude * 1e7
