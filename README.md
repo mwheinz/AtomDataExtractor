@@ -49,7 +49,7 @@ Fields are all little-endian.
 | 5 | 8 | long long | ms since the drone started(?) or possibly since the PTD-1 started(?) Can be combined with the file name to generate time stamps for each record, which TO can use. | Yes |
 | 13 | 2 | short | Starts as zero but occasionally changes to one of a few distinct values. Observed values are 0, 25, 30, 35, 40, 120. Initially zero, goes to a non-zero value very early in the log. May occasionally change during flight.||
 | 15 | 2 | short | Starts as zero but then may change to a value that will match field 13. ||
-| 17 | 2 | ushort | How many times the drone has flown? Increments with each take off. Slightly more than what the PTD-1 reports. | Yes |
+| 17 | 2 | ushort | How many times the drone has flown? Increments with each landing. Slightly more than what the PTD-1 reports. | Yes |
 | 19 | 26 | ??? | Unknown. Values appear to change frequently. | |
 | 45 | 1 | byte | GPS Lock. Appears to be 0 when there is no GNSS lock and 3 when there is. |Yes|
 | 46 | 1 | byte | # of GNSS satellites the drone has a lock on. | Yes |
