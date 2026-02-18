@@ -171,12 +171,22 @@ ATOM2_FIELDS = [
     # values. Observed values are 0, 25, 30, 35, 40, 120. Initially zero, goes
     # to a non-zero value very early in the log. May occasionally change
     # during flight.
+    FLFD("u13", "<H", 13, 2, FLFD.hex_dump4),
+
     # (15-16) Either zero or equals field 13.
+    FLFD("u15", "<H", 15, 2, FLFD.hex_dump4),
 
     # (17-18) How many times the drone has landed.
     FLFD("Flight Counter", "<H", 17, 2), # Number of flights.
 
-    # (19-44) Unknown.
+    # (19-44) Internal sensor data?
+    FLFD("Accelerometer X (m/s2)", "<f", 19, 4, FLFD.round2),
+    FLFD("Accelerometer Y (m/s2)", "<f", 23, 4, FLFD.round2),
+    FLFD("Accelerometer Z (m/s2)", "<f", 27, 4, FLFD.round2),
+    FLFD("Gyroscope X (deg/s)", "<f", 31, 4, FLFD.r2d),
+    FLFD("Gyroscope Y (deg/s)", "<f", 35, 4, FLFD.r2d),
+    FLFD("Gyroscope Z (deg/s)", "<f", 39, 4, FLFD.r2d),
+    FLFD("Barometer", "<h", 43, 2),
 
     # GPS data (45-58)
     FLFD("GPS Lock", "<B", 45, 1, FLFD.gps_lock),
@@ -199,7 +209,18 @@ ATOM2_FIELDS = [
     FLFD("Confidence2", "<f", 63, 4, FLFD.round2),
     FLFD("Confidence3", "<f", 67, 4, FLFD.round2),
 
-    # (71-295) Unknown.
+    FLFD("Barometric Pressure (pascals)", "<f", 71, 4),
+
+    # (75-93) Unknown. Probably sensor data.
+    FLFD("u75", "<I", 75, 4, FLFD.hex_dump8),
+    FLFD("u79", "<I", 79, 4, FLFD.hex_dump8),
+    FLFD("u83", "<I", 83, 4, FLFD.hex_dump8),
+    FLFD("Sensor 1", "<h", 87, 2),
+    FLFD("u89", "<h", 89, 2, FLFD.hex_dump4),
+    FLFD("Sensor 2", "<h", 91, 2),
+    FLFD("u93", "<h", 93, 2, FLFD.hex_dump4),
+
+    # (95-295) Unknown.
 
     # Motor states are understood; the data fields are not.
     FLFD("Motor 1 Data", "<B", 296, 1),
@@ -217,10 +238,10 @@ ATOM2_FIELDS = [
     FLFD("Position Y (m)", "<f", 308,4, FLFD.round2),
 
     # (312-327) Unknown. Floating point numbers.
-    FLFD("F312", "<f", 312, 4, FLFD.round2),
-    FLFD("F316", "<f", 316, 4, FLFD.round2),
-    FLFD("F320", "<f", 320, 4, FLFD.round2),
-    FLFD("F324", "<f", 324, 4, FLFD.round2),
+    FLFD("f312", "<f", 312, 4, FLFD.round2),
+    FLFD("f316", "<f", 316, 4, FLFD.round2),
+    FLFD("f320", "<f", 320, 4, FLFD.round2),
+    FLFD("f324", "<f", 324, 4, FLFD.round2),
 
     # Altitude above home point, AKA "Position Z".
     FLFD("alt (m)", "<f", 328, 4, FLFD.fix_alt),
@@ -241,7 +262,7 @@ ATOM2_FIELDS = [
     # FLFD("Speed (m/s)", "<f", 392,4),
 
     # Unknown. Might be some sort of warning/detection field. Usually zero.
-    # FLFD("F396", "<f", 396,4),
+    # FLFD("f396", "<f", 396,4),
 
     # (400-403) Always a constant value of 5050.0. Possibly a format id?
     # FLFD("C5050", "<f", 400,4),
@@ -324,16 +345,31 @@ EXTENDED_DATA = [
     "Confidence1",
     "Confidence2",
     "Confidence3",
+    "Accelerometer X (m/s2)",
+    "Accelerometer Y (m/s2)",
+    "Accelerometer Z (m/s2)",
+    "Gyroscope X (deg/s)",
+    "Gyroscope Y (deg/s)",
+    "Gyroscope Z (deg/s)",
+    "Barometer",
+    "Barometric Pressure (pascals)",
+    "u75",
+    "u79",
+    "u83",
+    "Sensor 1",
+    "u89",
+    "Sensor 2",
+    "u93",
     "Motor 1 Data",
     "Motor 2 Data",
     "Motor 3 Data",
     "Motor 4 Data",
     "Position X (m)",
     "Position Y (m)",
-    "F312",
-    "F316",
-    "F320",
-    "F324",
+    "f312",
+    "f316",
+    "f320",
+    "f324",
     "Velocity X (m/s)",
     "Velocity Y (m/s)",
     "Velocity Z (m/s)",

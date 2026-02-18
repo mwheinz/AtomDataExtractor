@@ -50,7 +50,13 @@ Fields are all little-endian.
 | 13 | 2 | short | Starts as zero but occasionally changes to one of a few distinct values. Observed values are 0, 25, 30, 35, 40, 120. Initially zero, goes to a non-zero value very early in the log. May occasionally change during flight.||
 | 15 | 2 | short | Starts as zero but then may change to a value that will match field 13. ||
 | 17 | 2 | ushort | How many times the drone has flown? Increments with each landing. Slightly more than what the PTD-1 reports. | Yes |
-| 19 | 26 | ??? | Unknown. Values appear to change frequently. | |
+| 19 | 4 | float | Possibly the x-axis accelerometer (m/s2) ||
+| 23 | 4 | float | Possibly the y-axis accelerometer (m/s2) ||
+| 27 | 4 | float | Possibly the z-axis accelerometer (m/s2) ||
+| 31 | 4 | float | Possibly the x-axis reading of the gyroscope. (rads/s) ||
+| 35 | 4 | float | Possibly the y-axis reading of the gyroscope. (rads/s) ||
+| 39 | 4 | float | Possibly the z-axis reading of the gyroscope. (rads/s) ||
+| 43 | 2 | short | Possibly the reading of the internal barometer. Unknown units. ||
 | 45 | 1 | byte | GPS Lock. Appears to be 0 when there is no GNSS lock and 3 when there is. |Yes|
 | 46 | 1 | byte | # of GNSS satellites the drone has a lock on. | Yes |
 | 47 | 4 | integer | drone's latitude in ten-millionths of degrees. 0 if unknown. | Yes |
@@ -59,7 +65,9 @@ Fields are all little-endian.
 | 59 | 4 | float | 0 or 1 when no satellites found. Possibly represents confidence in the GPS position, with 0.0 the best and 1.0 the worst. ||
 | 63 | 4 | float | Possibly related to confidence in the drone's horizontal position, with 5.0 being poor and 0.0 being best. ||
 | 67 | 4 | float | Possibly related to confidence in the drone's vertical position, with 10.0 being poor and 0.0 being best. ||
-| 71 | 225 | ??? | Unknown. ||
+| 71 | 4 | float | Possibly the barometric pressure, in Pascals. ||
+| 75 | 20 | ??? | Unknown. Mix of floats and integers. Possibly raw sensor data. ||
+| 95 | 200 | ??? | Unknown. ||
 | 296 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 297 | 1 | byte | Motor State #1 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
 | 298 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
