@@ -70,8 +70,18 @@ struct fc2Record {
     // 17   The number of times the drone has flown. Imcrements with each landing.
     u16     flightCount;
 
-    // 19   Lots of frequently changing data.
-    u8      b3[26];
+    // 19   The accelerometer.
+    float   accelX;
+    float   accelY;
+    float   accelZ;
+
+    // 31   The gyroscope.
+    float   gyroX;
+    float   gyroY;
+    float   gyroZ;
+
+    // 43   Possibly a barometer reading. Unknown units.
+    s16     barometerRaw;
 
     // 45   Goes from 0 to 3 when the lat/lon is correct? No other values observed.
     GPSLock gpsLock;
@@ -99,7 +109,11 @@ struct fc2Record {
     //      and 0.0 being best.
     float   verticalConfidence;
     
-    u8      b71[225];
+    // 71   Barometric pressure, in Pascals.
+    float   barometer;
+
+    // 74   Unknown region.
+    u8      b74[221];
     
     // 296  m*[1] appears to enumerate the state of a motor.
     //      m*[0] seems to be related but the meaning is unknown.
