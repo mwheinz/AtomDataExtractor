@@ -41,9 +41,18 @@ class FLFD:
         self.scale = scale
 
     @staticmethod
-    def r2d(data) -> float:
+    def radian_heading_to_degrees(data) -> float:
         """radians to decimal degrees."""
         result = round((360 + data * 180/math.pi) % 360, 3)
+        if math.isnan(result):
+            mwhLogger.critical("Bad radian value %s found.", data)
+            sys.exit(-1)
+        return result
+
+    @staticmethod
+    def radians_to_degrees(data) -> float:
+        """radians to decimal degrees."""
+        result = round(data * 180/math.pi, 3)
         if math.isnan(result):
             mwhLogger.critical("Bad radian value %s found.", data)
             sys.exit(-1)
@@ -74,19 +83,19 @@ class FLFD:
     def flight_mode(data) -> str:
         """Convert the flight mode value to a readable string."""
         f_mode = { 7: "Video", 8: "Normal", 9: "Sport"}
-        return f_mode.get(data,f"{data} Unknown")
+        return f_mode.get(data,None)
 
     @staticmethod
     def drone_mode(data) -> str:
         """Convert the drone mode value to a readable string."""
         d_mode = { 0: "Idle/Off", 1: "Launching", 2: "Flying", 3: "Landing"}
-        return d_mode.get(data,f"{data} Unknown")
+        return d_mode.get(data,None)
 
     @staticmethod
     def positioning_mode(data) -> str:
         """Convert the position mode value to a readable string."""
         p_mode = {1: "ATTI", 2: "OPTI", 3: "GPS"}
-        return p_mode .get(data,f"{data} Unknown")
+        return p_mode .get(data,None)
 
     @staticmethod
     def motor_state(data) -> str:
@@ -121,9 +130,9 @@ class FLFD:
         return f"0x{data:016x}"
 
     @staticmethod
-    def round2(data):
+    def round3(data):
         """ Round the value to two digits after the decimal."""
-        return round(data,2)
+        return round(data,3)
 
     def get_field(self,record) -> str:
         """Extract a field from the binary record."""
@@ -180,12 +189,12 @@ ATOM2_FIELDS = [
     FLFD("Flight Counter", "<H", 17, 2), # Number of flights.
 
     # (19-44) Internal sensor data?
-    FLFD("Accelerometer X (m/s2)", "<f", 19, 4, FLFD.round2),
-    FLFD("Accelerometer Y (m/s2)", "<f", 23, 4, FLFD.round2),
-    FLFD("Accelerometer Z (m/s2)", "<f", 27, 4, FLFD.round2),
-    FLFD("Gyroscope X (deg/s)", "<f", 31, 4, FLFD.r2d),
-    FLFD("Gyroscope Y (deg/s)", "<f", 35, 4, FLFD.r2d),
-    FLFD("Gyroscope Z (deg/s)", "<f", 39, 4, FLFD.r2d),
+    FLFD("Accelerometer X (m/s2)", "<f", 19, 4, FLFD.round3),
+    FLFD("Accelerometer Y (m/s2)", "<f", 23, 4, FLFD.round3),
+    FLFD("Accelerometer Z (m/s2)", "<f", 27, 4, FLFD.round3),
+    FLFD("Gyroscope X (deg/s)", "<f", 31, 4, FLFD.radians_to_degrees),
+    FLFD("Gyroscope Y (deg/s)", "<f", 35, 4, FLFD.radians_to_degrees),
+    FLFD("Gyroscope Z (deg/s)", "<f", 39, 4, FLFD.radians_to_degrees),
     FLFD("Barometer", "<h", 43, 2),
 
     # GPS data (45-58)
@@ -205,20 +214,20 @@ ATOM2_FIELDS = [
     #  as the drone progresses from ATTI to OPTI to GPS and drop further as
     #  "GPS Quality" increases. Since the drone never flies far in either
     #  ATTI or OPTI modes, it is possible that this is not entirely correct.
-    FLFD("Confidence1", "<f", 59, 4, FLFD.round2),
-    FLFD("Confidence2", "<f", 63, 4, FLFD.round2),
-    FLFD("Confidence3", "<f", 67, 4, FLFD.round2),
+    FLFD("Confidence1", "<f", 59, 4, FLFD.round3),
+    FLFD("Confidence2", "<f", 63, 4, FLFD.round3),
+    FLFD("Confidence3", "<f", 67, 4, FLFD.round3),
 
-    FLFD("Barometric Pressure (pascals)", "<f", 71, 4),
+    FLFD("Barometric Pressure (pascals)", "<f", 71, 4, FLFD.round3),
 
     # (75-93) Unknown. Probably sensor data.
-    FLFD("u75", "<I", 75, 4, FLFD.hex_dump8),
-    FLFD("u79", "<I", 79, 4, FLFD.hex_dump8),
-    FLFD("u83", "<I", 83, 4, FLFD.hex_dump8),
-    FLFD("Sensor 1", "<h", 87, 2),
-    FLFD("u89", "<h", 89, 2, FLFD.hex_dump4),
-    FLFD("Sensor 2", "<h", 91, 2),
-    FLFD("u93", "<h", 93, 2, FLFD.hex_dump4),
+    #FLFD("u75", "<I", 75, 4, FLFD.hex_dump8),
+    #FLFD("u79", "<I", 79, 4, FLFD.hex_dump8),
+    #FLFD("u83", "<I", 83, 4, FLFD.hex_dump8),
+    #FLFD("Sensor 1", "<h", 87, 2),
+    #FLFD("u89", "<H", 89, 2, FLFD.hex_dump4),
+    #FLFD("Sensor 2", "<h", 91, 2),
+    #FLFD("u93", "<H", 93, 2, FLFD.hex_dump4),
 
     # (95-295) Unknown.
 
@@ -234,25 +243,36 @@ ATOM2_FIELDS = [
 
     # Position and attitude (304-311) - relative to takeoff (home) point.
     # Not yet known if the position is affected by "dynamic home" mode.
-    FLFD("Position X (m)", "<f", 304,4, FLFD.round2),
-    FLFD("Position Y (m)", "<f", 308,4, FLFD.round2),
+    FLFD("Position X (m)", "<f", 304,4, FLFD.round3),
+    FLFD("Position Y (m)", "<f", 308,4, FLFD.round3),
 
     # (312-327) Unknown. Floating point numbers.
-    FLFD("f312", "<f", 312, 4, FLFD.round2),
-    FLFD("f316", "<f", 316, 4, FLFD.round2),
-    FLFD("f320", "<f", 320, 4, FLFD.round2),
-    FLFD("f324", "<f", 324, 4, FLFD.round2),
+    #FLFD("f312", "<f", 312, 4, FLFD.round3),
+    #FLFD("f316", "<f", 316, 4, FLFD.round3),
+    #FLFD("f320", "<f", 320, 4, FLFD.round3),
+    #FLFD("f324", "<f", 324, 4, FLFD.round3),
 
     # Altitude above home point, AKA "Position Z".
     FLFD("alt (m)", "<f", 328, 4, FLFD.fix_alt),
 
-    # Unknown region: 332-375 (44 bytes)
+    # Unknown region: 332-367. All appear to be valid floating point numbers.
+    #FLFD("f332", "<f", 332, 4, FLFD.round3),
+    #FLFD("f336", "<f", 336, 4, FLFD.round3),
+    #FLFD("f340", "<f", 340, 4, FLFD.round3),
+    #FLFD("f344", "<f", 344, 4, FLFD.round3),
+    #FLFD("f348", "<f", 348, 4, FLFD.round3),
+    #FLFD("f352", "<f", 352, 4, FLFD.round3),
+    #FLFD("f356", "<f", 356, 4, FLFD.round3),
+    #FLFD("f360", "<f", 360, 4, FLFD.round3),
+    #FLFD("f364", "<f", 364, 4, FLFD.round3),
 
-    # Heading and velocity (376-395)
-    FLFD("heading (deg)", "<f", 376, 4, FLFD.r2d), # compass heading.
-    FLFD("Velocity X (m/s)", "<f", 380,4, FLFD.round2),
-    FLFD("Velocity Y (m/s)", "<f", 384,4, FLFD.round2),
-    FLFD("Velocity Z (m/s)", "<f", 388,4, FLFD.round2),
+    # orientation and velocity (368-395)
+    FLFD("roll (deg)", "<f", 368, 4, FLFD.radians_to_degrees),
+    FLFD("pitch (deg)", "<f", 372, 4, FLFD.radians_to_degrees),
+    FLFD("heading (deg)", "<f", 376, 4, FLFD.radian_heading_to_degrees),
+    FLFD("Velocity X (m/s)", "<f", 380,4, FLFD.round3),
+    FLFD("Velocity Y (m/s)", "<f", 384,4, FLFD.round3),
+    FLFD("Velocity Z (m/s)", "<f", 388,4, FLFD.round3),
 
     # (392-396) Correlated with drone speed but not perfectly.
     # Consistently 0.25-0.28 m/s larger than sqrt(vx²+vy²+vz²)
@@ -272,13 +292,13 @@ ATOM2_FIELDS = [
     # FLFD("Altitude Metric", "<f", 404,4),
 
     # (408-411) Wind direction in radians.
-    FLFD("Wind (deg)", "<f", 408, 4, FLFD.r2d),
+    FLFD("Wind (deg)", "<f", 408, 4, FLFD.radian_heading_to_degrees),
 
     # (412-415) Appears to represent the total thrust produced by the drone.
-    FLFD("Thrust", "<f", 412, 4, FLFD.round2),
+    FLFD("Thrust", "<f", 412, 4, FLFD.round3),
 
     # (416-417) Distance to takeoff point (home) in meters.
-    FLFD("Distance (m)", "<f", 416, 4, FLFD.round2),
+    FLFD("Distance (m)", "<f", 416, 4, FLFD.round3),
 
     # (420-427) Location of the takeoff/home point. Need to test if this
     # changes when the home point changes.
@@ -329,6 +349,8 @@ BASIC_DATA = [
     "Motor 3 State",
     "Motor 4 State",
     "Thrust",
+    "roll (deg)",
+    "pitch (deg)",
     "heading (deg)",
     "Wind (deg)",
     "Home Lat (deg)",
@@ -353,23 +375,8 @@ EXTENDED_DATA = [
     "Gyroscope Z (deg/s)",
     "Barometer",
     "Barometric Pressure (pascals)",
-    "u75",
-    "u79",
-    "u83",
-    "Sensor 1",
-    "u89",
-    "Sensor 2",
-    "u93",
-    "Motor 1 Data",
-    "Motor 2 Data",
-    "Motor 3 Data",
-    "Motor 4 Data",
     "Position X (m)",
     "Position Y (m)",
-    "f312",
-    "f316",
-    "f320",
-    "f324",
     "Velocity X (m/s)",
     "Velocity Y (m/s)",
     "Velocity Z (m/s)",
@@ -377,6 +384,10 @@ EXTENDED_DATA = [
     "Battery V2 (mv)",
     "Battery Current (ma)",
     "Battery Temp (c)",
+    "Motor 1 Data",
+    "Motor 2 Data",
+    "Motor 3 Data",
+    "Motor 4 Data",
 ]
 
 def atom_parse(file_name, extended=False):
@@ -428,7 +439,7 @@ def atom_parse(file_name, extended=False):
                     try:
                         field_data = field.get_field(data)
                         if field_data is None:
-                            mwhLogger.warning("Illegal value for %s. Skipping.", field.name)
+                            mwhLogger.warning("Illegal value for %s. Skipping record %s.", field.name, record_count)
                             error_count += 1
                             error_flag = True
                             break
@@ -459,7 +470,12 @@ def atom_parse(file_name, extended=False):
 
                 print(line, file=csv_file)
 
-    mwhLogger.info("%s valid records and %s in %s.", record_count, error_count, base_name)
+    mwhLogger.info(
+        "%s valid records and %s invalid record(s) in %s.",
+        record_count,
+        error_count,
+        base_name
+    )
     mwhLogger.info("Report %s complete.", csv_name)
 
 def main() -> None:

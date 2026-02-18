@@ -78,12 +78,11 @@ Fields are all little-endian.
 | 303 | 1 | byte | Motor State #4 3 = off, 4 = idle, 5 = low, 6 = medium, 7 = high | Yes |
 | 304 | 4 | float | How far east or west the drone is from the home point in meters. ||
 | 308 | 4 | float | How far north or south the drone is from the home point in meters. ||
-| 312 | 4 | float | Possibly the drone's pitch? | Unconfirmed |
-| 316 | 4 | float | Possibly the drone's roll? | Unconfirmed |
-| 320 | 4 | float | Possibly the drone's pitch rate? | Unconfirmed |
-| 324 | 4 | float | Possibly the drone's roll rate? | Unconfirmed |
+| 312 | 16 | float | 4 floating point numbers. ||
 | 328 | 4 | float | Altitude above ground, in meters. Take the absolute value before using... | Yes |
-| 332 | 44 | ???? | Unknown. ||
+| 332 | 36 | ???? | Unknown, but appears to be 9 floats. ||
+| 368 | 4 | float | Roll in radians. | 75% sure |
+| 372 | 4 | float | Pitch in radians. | 75% sure |
 | 376 | 4 | float | Compass heading in radians. | Yes |
 | 380 | 4 | float | delta X. Current velocity in the east/west direction. | Unverified |
 | 384 | 4 | float | delta Y. Current velocity in the north/south direction. | Unverified |

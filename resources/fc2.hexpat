@@ -112,8 +112,8 @@ struct fc2Record {
     // 71   Barometric pressure, in Pascals.
     float   barometer;
 
-    // 74   Unknown region.
-    u8      b74[221];
+    // 75   Unknown region.
+    u8      b75[221];
     
     // 296  m*[1] appears to enumerate the state of a motor.
     //      m*[0] seems to be related but the meaning is unknown.
@@ -129,18 +129,20 @@ struct fc2Record {
     float   posY;
 
     // 312  Possibly information on the drone's orientation.
-    float   pitch;
-    float   roll;
-    float   pitchRate;
-    float   rollRate;
+    float   pitchMaybe;
+    float   rollMaybe;
+    float   pitchRateMaybe;
+    float   rollRateMaybe;
     
     // 328  Drone alitude above take off point, in meters.
     float   altitude;
     
-    // 332  Unknown.
-    u8      b332[44];
+    // 332  Unknown, but appears to be 9 floats.
+    u8      b332[36];
     
-    // 376  Drone heading, in radians.
+    // 368  Drone roll, pitch, and heading, in radians.
+    float   roll;
+    float   pitch; 
     float   heading;
     
     // 380  Components of velocity?
