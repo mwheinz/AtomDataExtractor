@@ -267,8 +267,8 @@ ATOM2_FIELDS = [
     #FLFD("f364", "<f", 364, 4, FLFD.round3),
 
     # orientation and velocity (368-395)
-    FLFD("roll (deg)", "<f", 368, 4, FLFD.radians_to_degrees),
-    FLFD("pitch (deg)", "<f", 372, 4, FLFD.radians_to_degrees),
+    FLFD("bank (deg)", "<f", 368, 4, FLFD.radians_to_degrees),
+    FLFD("pitch angle (deg)", "<f", 372, 4, FLFD.radians_to_degrees),
     FLFD("heading (deg)", "<f", 376, 4, FLFD.radian_heading_to_degrees),
     FLFD("Velocity X (m/s)", "<f", 380,4, FLFD.round3),
     FLFD("Velocity Y (m/s)", "<f", 384,4, FLFD.round3),
@@ -349,8 +349,8 @@ BASIC_DATA = [
     "Motor 3 State",
     "Motor 4 State",
     "Thrust",
-    "roll (deg)",
-    "pitch (deg)",
+    "bank (deg)",
+    "pitch angle (deg)",
     "heading (deg)",
     "Wind (deg)",
     "Home Lat (deg)",
