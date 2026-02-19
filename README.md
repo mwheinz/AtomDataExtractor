@@ -93,7 +93,7 @@ Fields are all little-endian.
 | 404 | 4 | float | Air speed? Correlated with altitude? | Unverified |
 | 408 | 4 | float | Wind direction in radians. | Yes |
 | 412 | 4 | float | Related to total thrust? Goes non-zero during launch, drops to zero when all 4 motors are idle.| Unconfirmed. |
-| 416 | 4 | float | Distance to home, in meters. | Yes |
+| 416 | 4 | float | 2D Distance to home, in meters. | Yes |
 | 420 | 4 | integer | Latitude of the home point in degrees * 1e7. | Yes |
 | 424 | 4 | integer | Longitude of the home point in degrees * 1e7 | Yes |
 | 428 | 1 | byte | Unknown. ||

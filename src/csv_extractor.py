@@ -1,6 +1,9 @@
 #!python3
 '''
 Convert information from an Atom-2 flight log into a Telemetry Overlay CSV
+
+TODO: Add code to specify the time stamp as an argument.
+TODO: Add code to specify the output file name as an argument.
 '''
 
 import os
@@ -10,10 +13,22 @@ import sys
 import struct
 import math
 import datetime
+import csv
 import mwhlogging
-from mwhlogging import mwhLogger
+from mwhlogging import MWHLogger
 
-time_stamp: float
+my_logger = MWHLogger("csv_extractor")
+
+# This is a hack - we need to extract the start time of the data from the
+# file name - but it needs to be used inside code that can't see the value
+# unless it is passed globally.
+time_stamp: float = None
+
+class BadData(Exception):
+    """
+    Baby's first exception...
+    Used to indicate when an FLFD field fails to parse.
+    """
 
 class FLFD:
     """
@@ -31,7 +46,7 @@ class FLFD:
     length
             The number of bytes in the field.
     scale
-            Either a floating point multiplier or a conversion function.
+            An optional conversion or formatting function.
     """
     def __init__(self, name, fmt_string, start_pos, length, scale=None):
         self.name = name
@@ -45,8 +60,7 @@ class FLFD:
         """radians to decimal degrees."""
         result = round((360 + data * 180/math.pi) % 360, 3)
         if math.isnan(result):
-            mwhLogger.critical("Bad radian value %s found.", data)
-            sys.exit(-1)
+            raise BadData(f"Bad radian value {data!r}.", data)
         return result
 
     @staticmethod
@@ -54,8 +68,7 @@ class FLFD:
         """radians to decimal degrees."""
         result = round(data * 180/math.pi, 3)
         if math.isnan(result):
-            mwhLogger.critical("Bad radian value %s found.", data)
-            sys.exit(-1)
+            raise BadData(f"Bad radian value {data!r}.", data)
         return result
 
     @staticmethod
@@ -89,19 +102,28 @@ class FLFD:
     def drone_mode(data) -> str:
         """Convert the drone mode value to a readable string."""
         d_mode = { 0: "Idle/Off", 1: "Launching", 2: "Flying", 3: "Landing"}
-        return d_mode.get(data,None)
+        value = d_mode.get(data,None)
+        if value is None:
+            raise BadData(f"\"{data}\" is not a valid drone mode.")
+        return value
 
     @staticmethod
     def positioning_mode(data) -> str:
         """Convert the position mode value to a readable string."""
         p_mode = {1: "ATTI", 2: "OPTI", 3: "GPS"}
-        return p_mode .get(data,None)
+        value = p_mode.get(data,None)
+        if value is None:
+            raise BadData(f"\"{data}\" is not a valid positioning mode.")
+        return value
 
     @staticmethod
     def motor_state(data) -> str:
         """Convert the motor state value to a readable string."""
         m_state = {3: "Off", 4: "Idle", 5: "Low", 6: "Medium", 7: "High"}
-        return m_state.get(data, f"{data} Unknown")
+        value = m_state.get(data,None)
+        if value is None:
+            raise BadData(f"\"{data}\" is not a valid motor state.")
+        return value
 
     @staticmethod
     def gps_lock(data) -> str:
@@ -140,14 +162,11 @@ class FLFD:
             self.fmt_string,
             record[self.start_pos:self.start_pos+self.length]
         )
-        if data == ():
+        if not data:
             return None
         data = data[0]
 
-        # Apply the scaling or conversion function, if provided.
-        if isinstance(self.scale,(float,int)):
-            data = data * self.scale
-        elif self.scale is not None:
+        if self.scale is not None:
             data = self.scale(data)
         return data
 
@@ -170,7 +189,7 @@ ATOM2_FIELDS = [
 
     # (4) Always zero.
 
-    # (5-8) elapsed time since logging began, in ms.
+    # (5-12) elapsed time since logging began, in ms.
     # We extract this twice, once as the relative time, once as the absolute
     # time, which is required by Telemetry Overlay.
     FLFD("utc (ms)", "<Q", 5, 8, FLFD.fix_time), # Absolute time in ms.
@@ -279,7 +298,7 @@ ATOM2_FIELDS = [
     # Unlikely to be ground speed because that would be less than
     # the 3d speed of the drone. Can't be air speed because the
     # drone does not have an air speed indicator.
-    # FLFD("Speed (m/s)", "<f", 392,4),
+    FLFD("speed (m/s)", "<f", 392,4, FLFD.round3),
 
     # Unknown. Might be some sort of warning/detection field. Usually zero.
     # FLFD("f396", "<f", 396,4),
@@ -297,8 +316,8 @@ ATOM2_FIELDS = [
     # (412-415) Appears to represent the total thrust produced by the drone.
     FLFD("Thrust", "<f", 412, 4, FLFD.round3),
 
-    # (416-417) Distance to takeoff point (home) in meters.
-    FLFD("Distance (m)", "<f", 416, 4, FLFD.round3),
+    # (416-417) Ground distance to takeoff point (home) in meters.
+    FLFD("distance (m)", "<f", 416, 4, FLFD.round3),
 
     # (420-427) Location of the takeoff/home point. Need to test if this
     # changes when the home point changes.
@@ -321,7 +340,7 @@ ATOM2_FIELDS = [
     FLFD("Battery V1 (mv)", "<h", 440, 2), # Voltage 1
     FLFD("Battery V2 (mv)", "<h", 442, 2), # Voltage 2
     FLFD("Battery Current (ma)", "<h", 444, 2, abs), # Current drain.
-    FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celcius.
+    FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celsius.
     FLFD("Battery Level (%)", "<B", 451, 1), # Current battery charge.
 
     # Unknown (452-455)
@@ -343,7 +362,7 @@ BASIC_DATA = [
     "lat (deg)",
     "lon (deg)",
     "alt (m)",
-    "Distance (m)",
+    "Distance (m)", # 2d distance from fc2 data.
     "Motor 1 State",
     "Motor 2 State",
     "Motor 3 State",
@@ -380,6 +399,7 @@ EXTENDED_DATA = [
     "Velocity X (m/s)",
     "Velocity Y (m/s)",
     "Velocity Z (m/s)",
+    "Speed (m/s)", # from the fc2 file.
     "Battery V1 (mv)",
     "Battery V2 (mv)",
     "Battery Current (ma)",
@@ -390,13 +410,61 @@ EXTENDED_DATA = [
     "Motor 4 Data",
 ]
 
-def atom_parse(file_name, extended=False):
+VALIDATION_DATA = [
+    "2d Derived Distance (m)", # 2d distance, derived from position and altitude.
+    "3d Derived Distance (m)", # 3d distance, derived from position and altitude.
+    "Derived Speed (m/s)", # Derived from the velocities.
+]
+
+def is_valid_latlon(lat, lon) -> bool:
+    """
+    Some simple validation of some GPS coordinates.
+
+    Duh.
+    """
+    if lat is None or lon is None or lat == "" or lon == "":
+        return False
+    # Non-finite?
+    if not (math.isfinite(lat) and math.isfinite(lon)):
+        return False
+    # Range
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return False
+    return True
+
+def derived_fields(record, validation):
+    """
+    Adds calculated fields or modifies existing fields.
+    """
+
+    # Merge the rth flag and the drone mode.
+    if record["RTH"] != 0 and record["Drone Mode (text)"] == "Flying":
+        record["Drone Mode (text)"] = "RTH"
+
+    if validation:
+        record["2d Derived Distance (m)"] = round(math.sqrt(
+                record["Position X (m)"]**2 +
+                record["Position Y (m)"]**2
+            ), 3)
+        record["3d Derived Distance (m)"] = round(math.sqrt(
+                record["Position X (m)"]**2 +
+                record["Position Y (m)"]**2 +
+                record["alt (m)"]**2
+            ), 3)
+        record["Derived Speed (m/s)"] = round(math.sqrt(
+                record["Velocity X (m/s)"]**2 +
+                record["Velocity Y (m/s)"]**2 +
+                record["Velocity Z (m/s)"]**2
+            ), 3)
+
+def atom_parse(file_name, extended=False, validation=False):
     """
     Parse Atom2 flight log and export to CSV.
 
     Args:
         file_name: Path to .fc2 file
         extended: Include the extended fields in the csv file.
+        validation: Adds some calculated fields to compare against data pulled from the file.
     """
 
     global time_stamp
@@ -410,73 +478,82 @@ def atom_parse(file_name, extended=False):
             "%Y%m%d%H%M%S"
         ).timestamp() * 1000
     except ValueError:
-        mwhLogger.warning("Could not parse timestamp from filename: %s", base_name)
+        my_logger.warning("Could not parse timestamp from filename: %s", base_name)
         sys.exit(-1)
 
     csv_name = f"{base_name}.csv"
-    mwhLogger.debug("Creating %s", csv_name)
+    my_logger.debug("Creating %s", csv_name)
     with open(csv_name, mode="w", encoding="utf-8") as csv_file:
-        line=", ".join(field for field in BASIC_DATA)
-        if extended:
-            line+=", "+", ".join(field for field in EXTENDED_DATA)
+        writer = csv.writer(csv_file)
+        header = BASIC_DATA + \
+            (EXTENDED_DATA if extended else []) + \
+            (VALIDATION_DATA if validation else [])
 
-        print(line, file=csv_file)
+        writer.writerow(header)
 
         with open(file_name, mode="rb") as flight_file:
             record_count = 0
             error_count = 0
 
             while True:
+                record_count += 1
                 data = flight_file.read(ATOM_RECORD_LEN)
-                if len(data) < 512:
+                if len(data) == 0:
+                    break
+                if len(data) < ATOM_RECORD_LEN:
+                    my_logger.warning("Record %s truncated.", record_count)
                     break
 
-                record_count += 1
-
                 record = {}
-                error_flag = False
-                for field in ATOM2_FIELDS:
-                    try:
+                try:
+                    for field in ATOM2_FIELDS:
                         field_data = field.get_field(data)
                         if field_data is None:
-                            mwhLogger.warning("Illegal value for %s. Skipping record %s.", field.name, record_count)
-                            error_count += 1
-                            error_flag = True
-                            break
+                            raise BadData(f"Illegal value for {field.name}")
                         record[field.name] = field_data
-                    except struct.error as e:
-                        mwhLogger.error(
-                            "Record %s: Struct error in %s: %s",
-                            record_count,
-                            field.name,
-                            e
-                        )
-                        error_count += 1
-                        error_flag = True
-                        break
-                if error_flag:
+                except (struct.error, BadData) as e:
+                    my_logger.error(
+                        "Skipping record %s due to error %s",
+                        record_count,
+                        e
+                    )
+                    error_count += 1
                     continue
 
-                # Merge the rth flag and the drone mode.
-                if record["RTH"] != 0 and record["Drone Mode (text)"] == "Flying":
-                    record["Drone Mode (text)"] = "RTH"
+                # Validation and derived fields follow.
 
-                line=""
-                for field in BASIC_DATA:
-                    line+=f"{record[field]}, "
-                if extended:
-                    for field in EXTENDED_DATA:
-                        line+=f"{record[field]}, "
+                # GPS coordinates can be wildly wrong if the drone hasn't
+                # achieved a lock yet.
+                if record["GPS Lock"] != "Yes" and (
+                    record["lat (deg)"] != "" or
+                    record["lon (deg)"] != ""):
+                    record["lat (deg)"] = ""
+                    record["lon (deg)"] = ""
+                    my_logger.debug(
+                        "Suppressing GPS data before GPS lock in record %s",
+                        record_count
+                    )
+                if record["GPS Lock"] == "Yes" and not is_valid_latlon(record["lat (deg)"],
+                                     record["lon (deg)"]):
+                    my_logger.warning(
+                        "Skipping record %s due to invalid GPS data.",
+                        record_count
+                    )
+                    error_count += 1
+                    continue
 
-                print(line, file=csv_file)
+                derived_fields(record, validation)
 
-    mwhLogger.info(
+                row = [record.get(field,"") for field in header]
+                writer.writerow(row)
+
+    my_logger.info(
         "%s valid records and %s invalid record(s) in %s.",
         record_count,
         error_count,
         base_name
     )
-    mwhLogger.info("Report %s complete.", csv_name)
+    my_logger.info("Report %s complete.", csv_name)
 
 def main() -> None:
     """ This is the main program. Duh."""
@@ -498,9 +575,22 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "-L","--logfile",
+        type=str,
+        default=None,
+        help="Redirect logging output to a file."
+    )
+
+    parser.add_argument(
         "-x","--extended",
         action="store_true",
         help="Include extended fields"
+    )
+
+    parser.add_argument(
+        "-v","--validation",
+        action="store_true",
+        help="Calcuate some additional fields to compare against the raw data."
     )
 
     parser.add_argument(
@@ -517,20 +607,21 @@ def main() -> None:
         mwhlogging.INFO,
         mwhlogging.DEBUG
     ]
-    mwhLogger.setLevel(log_levels[args.log])
+
+    my_logger.configure_logging(log_levels[args.log], args.logfile)
 
     print("Atom 2 Flight Log to CSV Converter.")
 
     for f in args.files:
         _, extension = os.path.splitext(f)
         if not os.path.exists(f):
-            mwhLogger.error("%s does not exist.", f)
+            my_logger.error("%s does not exist.", f)
             sys.exit(-1)
         elif extension == ".fc2":
-            mwhLogger.info("Parsing %s", f)
-            atom_parse(f, extended=args.extended)
+            my_logger.info("Parsing %s", f)
+            atom_parse(f, extended=args.extended, validation=args.validation)
         else:
-            mwhLogger.info("%s appears to be an unsupported file type.", f)
+            my_logger.info("%s appears to be an unsupported file type.", f)
             sys.exit(-1)
 
 if __name__ == '__main__':
