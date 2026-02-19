@@ -471,6 +471,7 @@ def atom_parse(file_name, extended=False, validation=False):
 
     # Extract timestamp from filename
     base_name, _ = os.path.splitext(os.path.basename(file_name))
+    directory = os.path.dirname(file_name)
 
     try:
         time_stamp = datetime.datetime.strptime(
@@ -481,7 +482,7 @@ def atom_parse(file_name, extended=False, validation=False):
         my_logger.warning("Could not parse timestamp from filename: %s", base_name)
         sys.exit(-1)
 
-    csv_name = f"{base_name}.csv"
+    csv_name = os.path.join(directory,f"{base_name}.csv")
     my_logger.debug("Creating %s", csv_name)
     with open(csv_name, mode="w", encoding="utf-8") as csv_file:
         writer = csv.writer(csv_file)
@@ -551,7 +552,7 @@ def atom_parse(file_name, extended=False, validation=False):
         "%s valid records and %s invalid record(s) in %s.",
         record_count,
         error_count,
-        base_name
+        file_name
     )
     my_logger.info("Report %s complete.", csv_name)
 
