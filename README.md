@@ -46,7 +46,7 @@ Fields are all little-endian.
 |-------|---------|---------|--------------|----------|
 | 0 | 4 | integer | Record Id | Yes |
 | 4 | 1 | byte | always zero. ||
-| 5 | 8 | long long | ms since the drone started(?) or possibly since the PTD-1 started(?) Can be combined with the file name to generate time stamps for each record, which TO can use. | Yes |
+| 5 | 8 | long long | micro seconds since the drone started(?) or possibly since the PTD-1 started(?) Can be combined with the file name to generate time stamps for each record, which TO can use. | Yes |
 | 13 | 2 | short | Starts as zero but occasionally changes to one of a few distinct values. Observed values are 0, 25, 30, 35, 40, 120. Initially zero, goes to a non-zero value very early in the log. May occasionally change during flight.||
 | 15 | 2 | short | Starts as zero but then may change to a value that will match field 13. ||
 | 17 | 2 | ushort | How many times the drone has flown? Increments with each landing. Slightly more than what the PTD-1 reports. | Yes |
@@ -81,30 +81,36 @@ Fields are all little-endian.
 | 312 | 16 | float | 4 floating point numbers. ||
 | 328 | 4 | float | Altitude above ground, in meters. Take the absolute value before using... | Yes |
 | 332 | 36 | ???? | Unknown, but appears to be 9 floats. ||
-| 368 | 4 | float | Roll in radians. | 75% sure |
-| 372 | 4 | float | Pitch in radians. | 75% sure |
-| 376 | 4 | float | Compass heading in radians. | Yes |
+| 368 | 4 | float | Roll in radians. | Yes | 
+| 372 | 4 | float | Pitch in radians. | Yes | 
+| 376 | 4 | float | Compass heading in radians. (yaw) | Yes |
 | 380 | 4 | float | delta X. Current velocity in the east/west direction. | Unverified |
 | 384 | 4 | float | delta Y. Current velocity in the north/south direction. | Unverified |
 | 388 | 4 | float | delta Z. Current velocity in the up/down direction. | Unverified |
-| 392 | 4 | float | Ground speed? | Unverified | 
+| 392 | 4 | float | Ground speed? Doesn't exactly match a calculated 2D or 3D speed from dX, dY, dZ. | | 
 | 396 | 4 | float | Unknown. ||
-| 400 | 4 | float | Appears to be a constant. ||
+| 400 | 4 | float | Appears to be a constant. Always equals 5050.0 ||
 | 404 | 4 | float | Air speed? Correlated with altitude? | Unverified |
 | 408 | 4 | float | Wind direction in radians. | Yes |
 | 412 | 4 | float | Related to total thrust? Goes non-zero during launch, drops to zero when all 4 motors are idle.| Unconfirmed. |
 | 416 | 4 | float | 2D Distance to home, in meters. | Yes |
 | 420 | 4 | integer | Latitude of the home point in degrees * 1e7. | Yes |
 | 424 | 4 | integer | Longitude of the home point in degrees * 1e7 | Yes |
-| 428 | 1 | byte | Unknown. ||
+| 428 | 1 | byte | Appears to duplicate #456. ||
 | 429 | 1 | byte | Non-zero if Return-to-Home is active. | Yes |
-| 430 | 3 | byte | Unknown. ||
+| 430 | 1 | byte | Appears to duplicate #457. ||
+| 431 | 1 | byte | Unknown. May be related to GPS signal quality? ||
+| 432 | 1 | byte | Unknown. May be related to GPS signal quality? ||
 | 433 | 1 | byte | Flight mode 7 = video, 8 = normal, 9 = sport | Yes |
-| 434 | 6 | byte | Unknown. ||
+| 434 | 4 | byte | Unknown. ||
+| 438 | 1 | byte | Appears to be flags, almost always equals 4 or 12, one log had a value of 36. ||
+| 439 | 1 | byte | Almost always zero. In two flights the value changed to 128. ||
 | 440 | 2 | short | Battery voltage #1 (mv?) | Yes |
 | 442 | 2 | short | Battery voltage #2 (mv?) | Yes |
 | 444 | 2 | short | Battery current (ma) | Yes |
 | 446 | 1 | byte | Battery Temp (celsius) | Yes |
 | 451 | 1 | byte | Battery Level (%) | Yes |
+| 452 | 2 | short | Seems to be corrolated with battery current and thrust. ||
+| 454 | 2 | short | Seems to be corrolated with battery current and thrust. ||
 | 456 | 1 | byte | Drone mode 0 = motors off, 1 = idle/launching, 2 = flying, 3 = landing | Yes |
 | 457 | 1 | byte | Positioning mode. 3 = GPS, 2 = Optical, 1 = Attitude(?) | 75% sure |

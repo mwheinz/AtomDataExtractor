@@ -1,9 +1,6 @@
 #!python3
 '''
 Convert information from an Atom-2 flight log into a Telemetry Overlay CSV
-
-TODO: Add code to specify the time stamp as an argument.
-TODO: Add code to specify the output file name as an argument.
 '''
 
 import os
@@ -189,25 +186,25 @@ ATOM2_FIELDS = [
 
     # (4) Always zero.
 
-    # (5-12) elapsed time since logging began, in ms.
+    # (5-12) elapsed time since logging began, in microseconds.
     # We extract this twice, once as the relative time, once as the absolute
     # time, which is required by Telemetry Overlay.
     FLFD("utc (ms)", "<Q", 5, 8, FLFD.fix_time), # Absolute time in ms.
-    FLFD("elapsed (ms)", "<Q", 5, 8), # Relative time in ms.
+    FLFD("elapsed (us)", "<Q", 5, 8), # Relative time in microseconds.
 
     # (13-14) Starts as zero but occasionally changes to one of a few distinct
     # values. Observed values are 0, 25, 30, 35, 40, 120. Initially zero, goes
     # to a non-zero value very early in the log. May occasionally change
     # during flight.
-    FLFD("u13", "<H", 13, 2, FLFD.hex_dump4),
+    #FLFD("u13", "<H", 13, 2, FLFD.hex_dump4),
 
     # (15-16) Either zero or equals field 13.
-    FLFD("u15", "<H", 15, 2, FLFD.hex_dump4),
+    #FLFD("u15", "<H", 15, 2, FLFD.hex_dump4),
 
     # (17-18) How many times the drone has landed.
     FLFD("Flight Counter", "<H", 17, 2), # Number of flights.
 
-    # (19-44) Internal sensor data?
+    # (19-44) IMU sensor data
     FLFD("Accelerometer X (m/s2)", "<f", 19, 4, FLFD.round3),
     FLFD("Accelerometer Y (m/s2)", "<f", 23, 4, FLFD.round3),
     FLFD("Accelerometer Z (m/s2)", "<f", 27, 4, FLFD.round3),
@@ -232,10 +229,10 @@ ATOM2_FIELDS = [
     #  Note that the correlation here is that these values get lower
     #  as the drone progresses from ATTI to OPTI to GPS and drop further as
     #  "GPS Quality" increases. Since the drone never flies far in either
-    #  ATTI or OPTI modes, it is possible that this is not entirely correct.
-    FLFD("Confidence1", "<f", 59, 4, FLFD.round3),
-    FLFD("Confidence2", "<f", 63, 4, FLFD.round3),
-    FLFD("Confidence3", "<f", 67, 4, FLFD.round3),
+    #  ATTI or OPTI modes, it is possible that this is not correct.
+    #FLFD("Confidence1", "<f", 59, 4, FLFD.round3),
+    #FLFD("Confidence2", "<f", 63, 4, FLFD.round3),
+    #FLFD("Confidence3", "<f", 67, 4, FLFD.round3),
 
     FLFD("Barometric Pressure (pascals)", "<f", 71, 4, FLFD.round3),
 
@@ -300,7 +297,7 @@ ATOM2_FIELDS = [
     # drone does not have an air speed indicator.
     FLFD("speed (m/s)", "<f", 392,4, FLFD.round3),
 
-    # Unknown. Might be some sort of warning/detection field. Usually zero.
+    # Unknown.
     # FLFD("f396", "<f", 396,4),
 
     # (400-403) Always a constant value of 5050.0. Possibly a format id?
@@ -308,7 +305,7 @@ ATOM2_FIELDS = [
 
     # (404-407) Altitude-related metric? Increases with altitude but not linearly.
     # Possibly a GPS altitude, barometric error, or secondary altitude source.
-    # FLFD("Altitude Metric", "<f", 404,4),
+    # FLFD("f404", "<f", 404,4),
 
     # (408-411) Wind direction in radians.
     FLFD("Wind (deg)", "<f", 408, 4, FLFD.radian_heading_to_degrees),
@@ -324,17 +321,30 @@ ATOM2_FIELDS = [
     FLFD("Home Lat (deg)", "<i", 420, 4, FLFD.fix_lat_lon), # home latitude * 1e7
     FLFD("Home Lon (deg)", "<i", 424, 4, FLFD.fix_lat_lon), # home longitude * 1e7
 
-    # (428) Unknown.
+    # (428) Appears to duplicate the drone mode.
+    # FLFD("u428", "<B", 428, 1, FLFD.drone_mode),
 
     # (429) Flag that indicates return-to-home has been activated.
     FLFD("RTH", "<B", 429, 1),
 
-    # (430-432) Unknown.
+    # Appears to duplicate positioning mode. 1 = ATTI, 2 = OPTI, 3 = GPS.
+    #FLFD("u430", "<B", 430, 1),
+
+    # (431-432) Unknown. May be related to GPS signal quality.
+    # FLFD("u431", "<B", 431, 1),
+    # FLFD("u432", "<B", 432, 1),
 
     # (433) Enumerated flight mode.
     FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flight_mode),
 
     # (434-439) Unknown.
+    # FLFD("i434", "<i", 434, 4),
+
+    # (438) Almost always either 4 or 12, but occasionally 36 is seen.
+    # 0x00000010, 0x00000110, or 0x00100100
+    # FLFD("u438", "<B", 438, 1),
+    # (439) Almost always zero, in a few flights changed to 128.
+    # FLFD("u439", "<B", 439, 1),
 
     # (440-451) Battery related fields.
     FLFD("Battery V1 (mv)", "<h", 440, 2), # Voltage 1
@@ -343,7 +353,11 @@ ATOM2_FIELDS = [
     FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celsius.
     FLFD("Battery Level (%)", "<B", 451, 1), # Current battery charge.
 
-    # Unknown (452-455)
+    # These seem to corrolate with battery current and thrust.
+    # (452-453) Seems to wander between 41 through 46 over time. Mostly 44.
+    # FLFD("h452", "<H", 452, 2),
+    # (454-455) Seems to be either 0, 256, or 512. 256 is most common.
+    # FLFD("h454", "<H", 454, 2),
 
     FLFD("Drone Mode (text)", "<B", 456, 1, FLFD.drone_mode),
     FLFD("Positioning Mode (text)", "<B", 457, 1, FLFD.positioning_mode),
@@ -355,14 +369,14 @@ ATOM2_FIELDS = [
 BASIC_DATA = [
     "rid",
     "utc (ms)",
-    "elapsed (ms)",
+    "elapsed (us)",
     "Flight Counter",
     "GPS Lock",
     "Satellites",
     "lat (deg)",
     "lon (deg)",
     "alt (m)",
-    "Distance (m)", # 2d distance from fc2 data.
+    "distance (m)", # 2d distance from fc2 data.
     "Motor 1 State",
     "Motor 2 State",
     "Motor 3 State",
@@ -383,9 +397,6 @@ BASIC_DATA = [
 """ These fields are only used in the extended report and may not be correct. """
 EXTENDED_DATA = [
     "GPS Quality",
-    "Confidence1",
-    "Confidence2",
-    "Confidence3",
     "Accelerometer X (m/s2)",
     "Accelerometer Y (m/s2)",
     "Accelerometer Z (m/s2)",
@@ -457,7 +468,7 @@ def derived_fields(record, validation):
                 record["Velocity Z (m/s)"]**2
             ), 3)
 
-def atom_parse(file_name, extended=False, validation=False):
+def atom_parse(file_name, extended=False, validation=False, destination=None):
     """
     Parse Atom2 flight log and export to CSV.
 
@@ -471,7 +482,7 @@ def atom_parse(file_name, extended=False, validation=False):
 
     # Extract timestamp from filename
     base_name, _ = os.path.splitext(os.path.basename(file_name))
-    directory = os.path.dirname(file_name)
+    directory = (destination if destination is not None else os.path.dirname(file_name))
 
     try:
         time_stamp = datetime.datetime.strptime(
@@ -568,6 +579,13 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "-D","--destination",
+        type=str,
+        default=None,
+        help="The directory to write the CSV files to. Defaults to the directory the telemetry file is in."
+    )
+
+    parser.add_argument(
         "-l","--log",
         type=int,
         choices=[0, 1, 2, 3],
@@ -620,7 +638,7 @@ def main() -> None:
             sys.exit(-1)
         elif extension == ".fc2":
             my_logger.info("Parsing %s", f)
-            atom_parse(f, extended=args.extended, validation=args.validation)
+            atom_parse(f, extended=args.extended, validation=args.validation, destination=args.destination)
         else:
             my_logger.info("%s appears to be an unsupported file type.", f)
             sys.exit(-1)
