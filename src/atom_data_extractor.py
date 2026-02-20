@@ -572,8 +572,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Extract telemetry from Potensic Atom 2 flight logs (.fc2)",
         epilog=(
-            "Based on reverse engineering by Michael Heinz, Koen Aerts, and Rob Pitt. "
-            "See README.md for detailed field documentation."
+            "Written by Michael Heinz. Based on work done by Michael Heinz, Koen Aerts,\n"
+            "and Rob Pritt. See README.md for detailed field documentation."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
