@@ -65,7 +65,7 @@ class MWHLogger(logging.Logger):
         self.propagate = False   # keep logs from duplicating through root
 
 
-    def configure_logging(self, level: int = INFO, log_file: str | None = None) -> None:
+    def configure_logging(self, level: int = INFO, log_file: str = None) -> None:
         """
         Adjust the log level and optionally switches from console output to 
         outputting plain text to a rotating log file.
