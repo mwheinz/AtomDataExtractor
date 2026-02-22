@@ -18,7 +18,7 @@ This app would not exist if Koen Aerts and Rob Pitt hadn't already written the [
 
 ## Requirements
 1. At this time, AtomDataExtractor only supports the Atom-2 drone. It could support other Atom models if someone provides me with sample data logs from them or, even better, does the leg work to document another model and submits it as an issue or a pull request.
-2. AtomDataExtractor requires python3 and has been tested with Python 3.14.3, but it should work with earlier versions as well. It does not require any other packages.
+2. AtomDataExtractor requires python3 and has been tested with Python 3.9.2 and 3.14.3, but it should work with other versions as well. It does not require any other packages.
 3. You don't need anything else if all you want to do is look at the telemetry data from your drone, but if you want to use this app to make cool videos, you're going to need [Telemetry Overlay](https://goprotelemetryextractor.com). 
 
 ## Installation
@@ -40,7 +40,7 @@ At this point, AtomDataExtractor is a command-line tool. If you know your way ar
 3. Navigate to the /Android/data/com.ipotensic.atom/files/FlightLog directory. As above, find the date you are interested in, open that subdirectory and copy the ".fc2" files onto your computer.
 
 ## Getting Videos From Your Atom 2 Drone
-I highly recommend popping the SD card out of your drone, putting it in your computer and copying it that way. Much faster than using Smart Transfer. If you do use Smart Transfer to copy video and photos from your drone to your PTD-1 or phone, use the same process you use for getting the ".fc2" files off your controller.
+I highly recommend popping the SD card out of your drone, putting it in your computer and copying it that way. Much faster than using Smart Transfer. If you do use Smart Transfer to copy video and photos from your drone to your tablet or phone, use the same process you use for getting the ".fc2" files off your controller.
 
 ## Running AtomDataExtractor
 Once you have the data file you want to convert, open your terminal or shell, and run atom_data_extractor.py on it. The easiest way is to just type "atom_data_extractor.py <my fc2 file>". This will generate a CSV file in the same directory as the fc2 file. For example:
@@ -54,7 +54,7 @@ Atom 2 Flight Log to CSV Converter.
 ```
 Once you have the CSV file, you can look inside with an app like Numbers, Excel, or Google Sheets.
 
-You can also generate additional information, if you like, change the destination of the CSV files, or specify more than one file to convert. Here's the full help text for atom_data_extractor.py:
+You can also generate additional information if you like, or change the destination of the CSV files, or specify more than one file to convert. Here's the full help text for atom_data_extractor.py:
 ```
 $» atom_data_extractor.py -h
 usage: atom_data_extractor.py [-h] [-D DESTINATION] [-l {0,1,2,3}]
@@ -169,7 +169,7 @@ Fields are all little-endian.
 | 308 | 4 | float | How far north or south the drone is from the home point in meters. ||
 | 312 | 16 | float | 4 floating point numbers. ||
 | 328 | 4 | float | Altitude above ground, in meters. Take the absolute value before using... | Yes |
-| 332 | 36 | ???? | Unknown, but appears to be 9 floats. ||
+| 332 | 36 | float | Unknown, but appears to be 9 floats. ||
 | 368 | 4 | float | Roll in radians. | Yes | 
 | 372 | 4 | float | Pitch in radians. | Yes | 
 | 376 | 4 | float | Compass heading in radians. (yaw) | Yes |
