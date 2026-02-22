@@ -1,6 +1,12 @@
 #!python3
 '''
 Convert information from an Atom-2 flight log into a Telemetry Overlay CSV
+
+TODO: Add a mode that replaces errors with blank data instead of skipping the
+      record.
+
+TODO: Do a test to try and corrolate camera modes with fc2 data. Could be
+      done without even flying...
 '''
 
 import os
@@ -93,7 +99,10 @@ class FLFD:
     def flight_mode(data) -> str:
         """Convert the flight mode value to a readable string."""
         f_mode = { 7: "Video", 8: "Normal", 9: "Sport"}
-        return f_mode.get(data,None)
+        value = f_mode.get(data,None)
+        if value is None:
+            raise BadData(f"\"{data}\" is not a valid positioning mode.")
+        return value
 
     @staticmethod
     def drone_mode(data) -> str:
@@ -129,24 +138,28 @@ class FLFD:
 
     # These are used when trying to investigate unknown parts of the record.
     @staticmethod
+    def bin_dump(data) -> str:
+        """Convert an arbitrary value to a 1-byte binary number."""
+        return f"\"0b{data:08b}\""
+
+    @staticmethod
     def hex_dump(data) -> str:
-        """Convert an arbitrary value to a hexadecimal number."""
-        return hex(data)
+        """Convert an arbitrary value to a 1-byte hexadecimal number."""
+        return f"\"0x{data:02x}\""
 
     @staticmethod
     def hex_dump2(data) -> str:
-        """Convert an arbitrary value to a 2 digit hexadecimal number."""
-        return f"0x{data:04x}"
+        """Convert an arbitrary value to a 2-byte hexadecimal number."""
+        return f"\"0x{data:04x}\""
 
     @staticmethod
     def hex_dump4(data) -> str:
-        """Convert an arbitrary value to a 4 digit hexadecimal number."""
-        return f"0x{data:08x}"
+        """Convert an arbitrary value to a 4-byte hexadecimal number."""
+        return f"\"0x{data:08x}\""
 
-    @staticmethod
     def hex_dump8(data) -> str:
-        """Convert an arbitrary value to a 8 digit hexadecimal number."""
-        return f"0x{data:016x}"
+        """Convert an arbitrary value to a 8-byte hexadecimal number."""
+        return f"\"0x{data:08x}\""
 
     @staticmethod
     def round3(data):
@@ -337,8 +350,16 @@ ATOM2_FIELDS = [
     # (433) Enumerated flight mode.
     FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flight_mode),
 
-    # (434-439) Unknown.
-    # FLFD("i434", "<i", 434, 4),
+    # Possible camera settings?
+    # (439) Always zero?
+    # FLFD("u434", "<B", 434, 1)
+    # (u435) Flags? Enumerated? Varies, but just a few discrete values in each log file.
+    # FLFD("u435", "<B", 435, 1),
+    # Flags or enumerated? Varies, but just a few discrete values in each log file.
+    # High nibble is always F.
+    # FLFD("u436", "<B", 436, 1),
+    # Flags or enumerated? Varies, but just a few discrete values in each log file.
+    # FLFD("u437", "<B", 437, 1),
 
     # (438) Almost always either 4 or 12, but occasionally 36 is seen.
     # 0x00000010, 0x00000110, or 0x00100100
@@ -353,16 +374,35 @@ ATOM2_FIELDS = [
     FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celsius.
     FLFD("Battery Level (%)", "<B", 451, 1), # Current battery charge.
 
-    # These seem to corrolate with battery current and thrust.
-    # (452-453) Seems to wander between 41 through 46 over time. Mostly 44.
-    # FLFD("h452", "<H", 452, 2),
-    # (454-455) Seems to be either 0, 256, or 512. 256 is most common.
-    # FLFD("h454", "<H", 454, 2),
+    # Could some of these be associated with the camera mode?
+    # Photo (single, 8k, brk, burst)/
+    # Video/
+    # Pano (pano-wide, pano-tall, wide-and-tall, spherical)
+    #
+    # Also - shutter speed and iso...
+    #
+    # (452) Always zero?
+    # FLFD("h452", "<B", 452, 1),
+    # (453) zero or one of a small range of values between 0x28 and 0x2e
+    # FLFD("h453", "<B", 453, 1),
+    # (454) Almost always zero. In exactly one flight took a value of 1 part
+    # way through.
+    # FLFD("h454", "<B", 454, 1),
+    # (455) Progresses from 0 to 2 in every flight recording. Couldn't
+    # correlate to known flight events.
+    # FLFD("h455", "<B", 455, 1),
 
     FLFD("Drone Mode (text)", "<B", 456, 1, FLFD.drone_mode),
     FLFD("Positioning Mode (text)", "<B", 457, 1, FLFD.positioning_mode),
 
-    # (458-511) Unknown.
+    # (458-461) Float. across all test flights ranged from 0.00 to 14.99.
+    # Median was 4.38, average was 4.11.
+    # FLFD("u458", "<f", 458, 4, FLFD.round3),
+    # (462-463) Generally a small integer (less than 1000). No known
+    # corrolation with in-flight events.
+    # FLFD("u462", "<h", 462, 2),
+    # Varies between -1800 and 1800.
+    # FLFD("u464", "<h", 464, 2),
 ]
 
 """ The list of fields to include in the basic report. """
