@@ -141,10 +141,10 @@ Fields are all little-endian.
 | 17 | 2 | ushort | How many times the drone has flown? Increments with each landing. Slightly more than what the PTD-1 reports. | ✓ |
 | 428 | 1 | byte | Drone mode 0 = motors off, 1 = idle/launching, 2 = flying, 3 = landing | ✓ |
 | 429 | 1 | byte | Non-zero if Return-to-Home is active. | ✓ |
-| 430 | 1 | byte | Positioning mode. 3 = GPS, 2 = Optical, 1 = Attitude(?) | ✓ |
+| 430 | 1 | byte | Positioning mode. 3 = GPS, 2 = Optical, 1 = Attitude | ✓ |
 | 433 | 1 | byte | Flight mode 7 = video, 8 = normal, 9 = sport | ✓ |
-| 456 | 1 | byte | Drone mode 0 = motors off, 1 = idle/launching, 2 = flying, 3 = landing | ✓ |
-| 457 | 1 | byte | Positioning mode. 3 = GPS, 2 = Optical, 1 = Attitude(?) | 75%|
+| 456 | 1 | byte | Drone mode 2: 0 = idle or motors off, 1 = launching, 2 = flying, 3 = landing - Sometimes takes longer to enter landing mode than #428 | ✓ |
+| 457 | 1 | byte | Positioning mode 2: 3 = GPS, 2 = Optical, 1 = Attitude - Sometimes goes back to opti mode while #430 stays in GPS mode. | ✓ |
 
 ###  Inertial Measurement Unit
 | Byte: | Length: | Format: | Description: | Correct: |
@@ -179,9 +179,6 @@ Fields are all little-endian.
 ###  Velocity
 | Byte: | Length: | Format: | Description: | Correct: |
 |-------|---------|---------|--------------|----------|
-| 380 | 4 | float | delta X. (m/s) Current velocity in the east/west direction. | 75% |
-| 384 | 4 | float | delta Y. (m/s) Current velocity in the north/south direction. | 75% |
-| 388 | 4 | float | delta Z. (m/s) Current velocity in the up/down direction. | 75% |
 | 392 | 4 | float | Ground speed? Doesn't exactly match a calculated 2D or 3D speed from dX, dY, dZ. | | 
 | 404 | 4 | float | Estimate of wind speed? | 75% |
 | 408 | 4 | float | Wind direction in radians. | ✓ |
@@ -221,7 +218,6 @@ Fields are all little-endian.
 |-------|---------|---------|--------------|----------|
 | 455 | 1 | byte | Ranges from 0-2. Seems to be related to battery temp. Need to test in warmer weather. ||
 | 462 | 2 | short | RC signal quality? Corrolated with distance? ||
-| 473 | 1 | byte | Ranges from 0-100. Corrolated with distance? Signal Quality? ||
 
 ###  Unknown
 | Byte: | Length: | Format: | Description: | Correct: |
@@ -240,7 +236,10 @@ Fields are all little-endian.
 | 300 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 302 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 312 | 16 | float | 4 floating point numbers. ||
-| 332 | 36 | float | Unknown, but appears to be 9 floats. ||
+| 332 | 36 | float | 9 floating point numbers. All go non-zero during launch, don't go to zero till the motors are turned off.||
+| 380 | 4 | float | Used to think this was delta X. (m/s) Does not match movement of the GNSS position or drone video. ||
+| 384 | 4 | float | Used to think this was delta Y. (m/s) Does not match movement of the GNSS position or drone video. ||
+| 388 | 4 | float | Used to think this was delta Z. (m/s) Does not match movement of the GNSS position or drone video. ||
 | 396 | 4 | float | Unknown. ||
 | 400 | 4 | float | Appears to be a constant. Always equals 5050.0 ||
 | 431 | 1 | byte | Unknown. May indicate a landing is in progress? ||
@@ -259,4 +258,5 @@ Fields are all little-endian.
 | 468 | 2 | short | Constant. ASCII "PF" ||
 | 470 | 2 | ???? | Unknown. ||
 | 472 | 1 | byte | Always 3. ||
+| 473 | 1 | byte | Ranges from 0-100. ||
 | 482 | 30 | ???? | Unknown. ||

@@ -87,6 +87,11 @@ class FLFD:
         return abs(round(data,3))
 
     @staticmethod
+    def fix_hdop(data) -> float:
+        """Scale the HDOP value."""
+        return data/100.0
+
+    @staticmethod
     def fix_time(data) -> str:
         """Convert the relative timestamp to an absolute timestamp."""
         #global time_stamp
@@ -166,6 +171,11 @@ class FLFD:
         """ Round the value to two digits after the decimal."""
         return round(data,3)
 
+    @staticmethod
+    def rc_quality(data):
+        """ Scale the RC quality field to 0-100. """
+        return data/35
+
     def get_field(self,record) -> str:
         """Extract a field from the binary record."""
         data = struct.unpack(
@@ -183,41 +193,33 @@ class FLFD:
 ATOM_RECORD_LEN = 512
 
 """
-Field definitions for an Atom2 log.
-NOTE: fields that are used in derived fields are omitted.
+Field definitions for an Atom2 log. Omits fields that are not needed.
 
-    * Fields listed in the order they will appear in the CSV file. Not really
-      necessary but useful for this analysis.
+    * For a list of all fields and their descriptions see README.md.
+
     * Capitalization is inconsistent because Telemetry Overlay requires certain
       specific field names in order to understand some fields. So, "standard"
-      fields are in lower case while custom fields are in upper case so that
+      fields are in lower case while custom fields are capitalized so that
       their labels on TO gauges look right.
 """
 ATOM2_FIELDS = [
+
+    #
+    # Basic Data
+    # 
     # (0-3) Record id.
     FLFD("rid", "<i", 0, 4),
-
-    # (4) Always zero.
-
-    # (5-12) elapsed time since logging began, in microseconds.
-    # We extract this twice, once as the relative time, once as the absolute
-    # time, which is required by Telemetry Overlay.
     FLFD("utc (ms)", "<Q", 5, 8, FLFD.fix_time), # Absolute time in ms.
     FLFD("elapsed (us)", "<Q", 5, 8), # Relative time in microseconds.
-
-    # (13-14) Starts as zero but occasionally changes to one of a few distinct
-    # values. Observed values are 0, 25, 30, 35, 40, 120. Initially zero, goes
-    # to a non-zero value very early in the log. May occasionally change
-    # during flight.
-    #FLFD("u13", "<H", 13, 2, FLFD.hex_dump4),
-
-    # (15-16) Either zero or equals field 13.
-    #FLFD("u15", "<H", 15, 2, FLFD.hex_dump4),
-
-    # (17-18) How many times the drone has landed.
     FLFD("Flight Counter", "<H", 17, 2), # Number of flights.
+    FLFD("Drone Mode (text)", "<B", 428, 1, FLFD.drone_mode),
+    FLFD("RTH", "<B", 429, 1),
+    FLFD("Positioning Mode (text)", "<B", 430, 1, FLFD.positioning_mode),
+    FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flight_mode),
 
-    # (19-44) IMU sensor data
+    #
+    # Inertial Measurement Unit
+    #
     FLFD("Accelerometer X (m/s2)", "<f", 19, 4, FLFD.round3),
     FLFD("Accelerometer Y (m/s2)", "<f", 23, 4, FLFD.round3),
     FLFD("Accelerometer Z (m/s2)", "<f", 27, 4, FLFD.round3),
@@ -226,184 +228,69 @@ ATOM2_FIELDS = [
     FLFD("Gyroscope Z (deg/s)", "<f", 39, 4, FLFD.radians_to_degrees),
     FLFD("Barometer", "<h", 43, 2),
 
-    # GPS data (45-58)
+    #
+    # GNSS & Positioning Data
+    #
     FLFD("GPS Lock", "<B", 45, 1, FLFD.gps_lock),
     FLFD("Satellites","<B", 46, 1),
     FLFD("lat (deg)", "<i", 47, 4, FLFD.fix_lat_lon),
     FLFD("lon (deg)", "<i", 51, 4, FLFD.fix_lat_lon),
-    FLFD("GPS Quality", "<i", 55, 4),
-
-    # Position uncertainty estimates (59-70)
-    # These vary by positioning mode:
-    #  ATTI (IMU only): Conf2=5.0m, Conf3=10.0m
-    #  OPTI (optical):  Conf2=4.0m, Conf3=8.0m
-    #  GPS:             Conf2=0.35m, Conf3=0.47m
-    #
-    #  Note that the correlation here is that these values get lower
-    #  as the drone progresses from ATTI to OPTI to GPS and drop further as
-    #  "GPS Quality" increases. Since the drone never flies far in either
-    #  ATTI or OPTI modes, it is possible that this is not correct.
-    #FLFD("Confidence1", "<f", 59, 4, FLFD.round3),
-    #FLFD("Confidence2", "<f", 63, 4, FLFD.round3),
-    #FLFD("Confidence3", "<f", 67, 4, FLFD.round3),
-
-    FLFD("Barometric Pressure (pascals)", "<f", 71, 4, FLFD.round3),
-
-    # (75-93) Unknown. Probably sensor data.
-    #FLFD("u75", "<I", 75, 4, FLFD.hex_dump8),
-    #FLFD("u79", "<I", 79, 4, FLFD.hex_dump8),
-    #FLFD("u83", "<I", 83, 4, FLFD.hex_dump8),
-    #FLFD("Sensor 1", "<h", 87, 2),
-    #FLFD("u89", "<H", 89, 2, FLFD.hex_dump4),
-    #FLFD("Sensor 2", "<h", 91, 2),
-    #FLFD("u93", "<H", 93, 2, FLFD.hex_dump4),
-
-    # (95-295) Unknown.
-
-    # Motor states are understood; the data fields are not.
-    FLFD("Motor 1 Data", "<B", 296, 1),
-    FLFD("Motor 1 State", "<B", 297, 1, FLFD.motor_state),
-    FLFD("Motor 2 Data", "<B", 298, 1),
-    FLFD("Motor 2 State", "<B", 299, 1, FLFD.motor_state),
-    FLFD("Motor 3 Data", "<B", 300, 1),
-    FLFD("Motor 3 State", "<B", 301, 1, FLFD.motor_state),
-    FLFD("Motor 4 Data", "<B", 302, 1),
-    FLFD("Motor 4 State", "<B", 303, 1, FLFD.motor_state),
-
-    # Position and attitude (304-311) - relative to takeoff (home) point.
-    # Not yet known if the position is affected by "dynamic home" mode.
+    FLFD("Air Pressure (pascals)", "<f", 71, 4, FLFD.round3),
+    FLFD("HDOP", "<h", 75, 2),
     FLFD("Position X (m)", "<f", 304,4, FLFD.round3),
     FLFD("Position Y (m)", "<f", 308,4, FLFD.round3),
-
-    # (312-327) Unknown. Floating point numbers.
-    #FLFD("f312", "<f", 312, 4, FLFD.round3),
-    #FLFD("f316", "<f", 316, 4, FLFD.round3),
-    #FLFD("f320", "<f", 320, 4, FLFD.round3),
-    #FLFD("f324", "<f", 324, 4, FLFD.round3),
-
-    # Altitude above home point, AKA "Position Z".
     FLFD("alt (m)", "<f", 328, 4, FLFD.fix_alt),
-
-    # Unknown region: 332-367. All appear to be valid floating point numbers.
-    #FLFD("f332", "<f", 332, 4, FLFD.round3),
-    #FLFD("f336", "<f", 336, 4, FLFD.round3),
-    #FLFD("f340", "<f", 340, 4, FLFD.round3),
-    #FLFD("f344", "<f", 344, 4, FLFD.round3),
-    #FLFD("f348", "<f", 348, 4, FLFD.round3),
-    #FLFD("f352", "<f", 352, 4, FLFD.round3),
-    #FLFD("f356", "<f", 356, 4, FLFD.round3),
-    #FLFD("f360", "<f", 360, 4, FLFD.round3),
-    #FLFD("f364", "<f", 364, 4, FLFD.round3),
-
-    # orientation and velocity (368-395)
     FLFD("bank (deg)", "<f", 368, 4, FLFD.radians_to_degrees),
     FLFD("pitch angle (deg)", "<f", 372, 4, FLFD.radians_to_degrees),
     FLFD("heading (deg)", "<f", 376, 4, FLFD.radian_heading_to_degrees),
-    FLFD("Velocity X (m/s)", "<f", 380,4, FLFD.round3),
-    FLFD("Velocity Y (m/s)", "<f", 384,4, FLFD.round3),
-    FLFD("Velocity Z (m/s)", "<f", 388,4, FLFD.round3),
-
-    # (392-396) Correlated with drone speed but not perfectly.
-    # Consistently 0.25-0.28 m/s larger than sqrt(vx²+vy²+vz²)
-    # Unlikely to be ground speed because that would be less than
-    # the 3d speed of the drone. Can't be air speed because the
-    # drone does not have an air speed indicator.
-    FLFD("speed (m/s)", "<f", 392,4, FLFD.round3),
-
-    # Unknown.
-    # FLFD("f396", "<f", 396,4),
-
-    # (400-403) Always a constant value of 5050.0. Possibly a format id?
-    # FLFD("C5050", "<f", 400,4),
-
-    # (404-407) Altitude-related metric? Increases with altitude but not linearly.
-    # Possibly a GPS altitude, barometric error, or secondary altitude source.
-    # FLFD("f404", "<f", 404,4),
-
-    # (408-411) Wind direction in radians.
-    FLFD("Wind (deg)", "<f", 408, 4, FLFD.radian_heading_to_degrees),
-
-    # (412-415) Appears to represent the total thrust produced by the drone.
-    FLFD("Thrust", "<f", 412, 4, FLFD.round3),
-
-    # (416-417) Ground distance to takeoff point (home) in meters.
     FLFD("distance (m)", "<f", 416, 4, FLFD.round3),
+    FLFD("Home Lat (deg)", "<i", 420, 4, FLFD.fix_lat_lon),
+    FLFD("Home Lon (deg)", "<i", 424, 4, FLFD.fix_lat_lon),
 
-    # (420-427) Location of the takeoff/home point. Need to test if this
-    # changes when the home point changes.
-    FLFD("Home Lat (deg)", "<i", 420, 4, FLFD.fix_lat_lon), # home latitude * 1e7
-    FLFD("Home Lon (deg)", "<i", 424, 4, FLFD.fix_lat_lon), # home longitude * 1e7
-
-    # (428) Appears to duplicate the drone mode.
-    # FLFD("u428", "<B", 428, 1, FLFD.drone_mode),
-
-    # (429) Flag that indicates return-to-home has been activated.
-    FLFD("RTH", "<B", 429, 1),
-
-    # Appears to duplicate positioning mode. 1 = ATTI, 2 = OPTI, 3 = GPS.
-    #FLFD("u430", "<B", 430, 1),
-
-    # (431-432) Unknown. May be related to GPS signal quality.
-    # FLFD("u431", "<B", 431, 1),
-    # FLFD("u432", "<B", 432, 1),
-
-    # (433) Enumerated flight mode.
-    FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flight_mode),
-
-    # Possible camera settings?
-    # (439) Always zero?
-    # FLFD("u434", "<B", 434, 1)
-    # (u435) Flags? Enumerated? Varies, but just a few discrete values in each log file.
-    # FLFD("u435", "<B", 435, 1),
-    # Flags or enumerated? Varies, but just a few discrete values in each log file.
-    # High nibble is always F.
-    # FLFD("u436", "<B", 436, 1),
-    # Flags or enumerated? Varies, but just a few discrete values in each log file.
-    # FLFD("u437", "<B", 437, 1),
-
-    # (438) Almost always either 4 or 12, but occasionally 36 is seen.
-    # 0x00000010, 0x00000110, or 0x00100100
-    # FLFD("u438", "<B", 438, 1),
-    # (439) Almost always zero, in a few flights changed to 128.
-    # FLFD("u439", "<B", 439, 1),
-
-    # (440-451) Battery related fields.
-    FLFD("Battery V1 (mv)", "<h", 440, 2), # Voltage 1
-    FLFD("Battery V2 (mv)", "<h", 442, 2), # Voltage 2
-    FLFD("Battery Current (ma)", "<h", 444, 2, abs), # Current drain.
-    FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celsius.
-    FLFD("Battery Level (%)", "<B", 451, 1), # Current battery charge.
-
-    # Could some of these be associated with the camera mode?
-    # Photo (single, 8k, brk, burst)/
-    # Video/
-    # Pano (pano-wide, pano-tall, wide-and-tall, spherical)
     #
-    # Also - shutter speed and iso...
+    # Velocity
     #
-    # (452) Always zero?
-    # FLFD("h452", "<B", 452, 1),
-    # (453) zero or one of a small range of values between 0x28 and 0x2e
-    # FLFD("h453", "<B", 453, 1),
-    # (454) Almost always zero. In exactly one flight took a value of 1 part
-    # way through.
-    # FLFD("h454", "<B", 454, 1),
-    # (455) Progresses from 0 to 2 in every flight recording. Couldn't
-    # correlate to known flight events.
-    # FLFD("h455", "<B", 455, 1),
+    FLFD("speed (m/s)", "<f", 392,4, FLFD.round3),
+    FLFD("Wind Speed (m/s)", "<f", 404, 4, FLFD.round3),
+    FLFD("Wind (deg)", "<f", 408, 4, FLFD.radian_heading_to_degrees),
+    FLFD("Thrust", "<f", 412, 4, FLFD.round3),
+    FLFD("Wind Speed 2 (m/s)", "<f", 458, 4, FLFD.round3),
 
-    FLFD("Drone Mode (text)", "<B", 456, 1, FLFD.drone_mode),
-    FLFD("Positioning Mode (text)", "<B", 457, 1, FLFD.positioning_mode),
+    # 
+    # Compass
+    #
+    FLFD("Magnetometer X", "<h", 79, 2),
+    FLFD("Magnetometer Y", "<h", 83, 2),
 
-    # (458-461) Float. across all test flights ranged from 0.00 to 14.99.
-    # Median was 4.38, average was 4.11.
-    # FLFD("u458", "<f", 458, 4, FLFD.round3),
-    # (462-463) Generally a small integer (less than 1000). No known
-    # corrolation with in-flight events.
-    # FLFD("u462", "<h", 462, 2),
-    # Varies between -1800 and 1800.
-    # FLFD("u464", "<h", 464, 2),
+    #
+    # Motor
+    #
+    FLFD("Motor 1 State", "<B", 297, 1, FLFD.motor_state),
+    FLFD("Motor 2 State", "<B", 299, 1, FLFD.motor_state),
+    FLFD("Motor 3 State", "<B", 301, 1, FLFD.motor_state),
+    FLFD("Motor 4 State", "<B", 303, 1, FLFD.motor_state),
+    FLFD("Motor 1 RPM", "<H", 474, 2),
+    FLFD("Motor 2 RPM", "<H", 476, 2),
+    FLFD("Motor 3 RPM", "<H", 478, 2),
+    FLFD("Motor 4 RPM", "<H", 480, 2),
+
+
+    #
+    # Battery related fields.
+    #
+    FLFD("Battery V1 (mv)", "<h", 440, 2),
+    FLFD("Battery V2 (mv)", "<h", 442, 2),
+    FLFD("Battery Current (ma)", "<h", 444, 2, abs),
+    FLFD("Battery Temp (c)", "<B", 446, 1),
+    FLFD("Battery Level (%)", "<B", 451, 1),
+
+    #
+    # Fields that are being tested.
+    #
+    FLFD("Battery State", "<b", 455, 1),
+    FLFD("RC Signal", "<h", 462, 2), 
 ]
+
 
 """ The list of fields to include in the basic report. """
 BASIC_DATA = [
@@ -411,32 +298,45 @@ BASIC_DATA = [
     "utc (ms)",
     "elapsed (us)",
     "Flight Counter",
+    "Drone Mode (text)",
+    "Positioning Mode (text)",
+    "Flight Mode (text)",
+
     "GPS Lock",
     "Satellites",
     "lat (deg)",
     "lon (deg)",
     "alt (m)",
-    "distance (m)", # 2d distance from fc2 data.
+    "bank (deg)",
+    "pitch angle (deg)",
+    "heading (deg)",
+    "distance (m)",
+    "Home Lat (deg)",
+    "Home Lon (deg)",
+
+    "speed (m/s)",
+    "Wind Speed (m/s)",
+    "Wind (deg)",
+    "Thrust",
+
     "Motor 1 State",
     "Motor 2 State",
     "Motor 3 State",
     "Motor 4 State",
-    "Thrust",
-    "bank (deg)",
-    "pitch angle (deg)",
-    "heading (deg)",
-    "Wind (deg)",
-    "Home Lat (deg)",
-    "Home Lon (deg)",
+    "Motor 1 RPM",
+    "Motor 2 RPM",
+    "Motor 3 RPM",
+    "Motor 4 RPM",
+
     "Battery Level (%)",
-    "Positioning Mode (text)",
-    "Flight Mode (text)",
-    "Drone Mode (text)",
+
+    "RC Signal",
 ]
 
-""" These fields are only used in the extended report and may not be correct. """
+""" These fields are only used in the extended report. """
 EXTENDED_DATA = [
-    "GPS Quality",
+    "HDOP",
+
     "Accelerometer X (m/s2)",
     "Accelerometer Y (m/s2)",
     "Accelerometer Z (m/s2)",
@@ -444,27 +344,26 @@ EXTENDED_DATA = [
     "Gyroscope Y (deg/s)",
     "Gyroscope Z (deg/s)",
     "Barometer",
-    "Barometric Pressure (pascals)",
+    "Air Pressure (pascals)",
+
+    "Magnetometer X",
+    "Magnetometer Y",
+
     "Position X (m)",
     "Position Y (m)",
-    "Velocity X (m/s)",
-    "Velocity Y (m/s)",
-    "Velocity Z (m/s)",
-    "Speed (m/s)", # from the fc2 file.
+    "Wind Speed 2 (m/s)",
+
     "Battery V1 (mv)",
     "Battery V2 (mv)",
     "Battery Current (ma)",
     "Battery Temp (c)",
-    "Motor 1 Data",
-    "Motor 2 Data",
-    "Motor 3 Data",
-    "Motor 4 Data",
+    "Battery State",
 ]
 
+""" These are derived from data in the file in order to compare results. """
 VALIDATION_DATA = [
     "2d Derived Distance (m)", # 2d distance, derived from position and altitude.
     "3d Derived Distance (m)", # 3d distance, derived from position and altitude.
-    "Derived Speed (m/s)", # Derived from the velocities.
 ]
 
 def is_valid_latlon(lat, lon) -> bool:
@@ -485,7 +384,8 @@ def is_valid_latlon(lat, lon) -> bool:
 
 def derived_fields(record, validation):
     """
-    Adds calculated fields or modifies existing fields.
+    Adds calculated fields or modifies existing fields based on
+    other information.
     """
 
     # Merge the rth flag and the drone mode.
@@ -501,11 +401,6 @@ def derived_fields(record, validation):
                 record["Position X (m)"]**2 +
                 record["Position Y (m)"]**2 +
                 record["alt (m)"]**2
-            ), 3)
-        record["Derived Speed (m/s)"] = round(math.sqrt(
-                record["Velocity X (m/s)"]**2 +
-                record["Velocity Y (m/s)"]**2 +
-                record["Velocity Z (m/s)"]**2
             ), 3)
 
 def atom_parse(file_name, extended=False, validation=False, destination=None):
@@ -563,14 +458,23 @@ def atom_parse(file_name, extended=False, validation=False, destination=None):
                         if field_data is None:
                             raise BadData(f"Illegal value for {field.name}")
                         record[field.name] = field_data
-                except (struct.error, BadData) as e:
-                    my_logger.error(
+                except BadData as e:
+                    my_logger.warning(
                         "Skipping record %s due to error %s",
                         record_count,
                         e
                     )
                     error_count += 1
                     continue
+                except struct.error as e:
+                    my_logger.critical(
+                        "Bad field %s due to error %s",
+                        field.name,
+                        e
+                    )
+                    sys.exit(-1)
+
+
 
                 # Validation and derived fields follow.
 
@@ -605,7 +509,7 @@ def atom_parse(file_name, extended=False, validation=False, destination=None):
         error_count,
         file_name
     )
-    my_logger.info("Report %s complete.", csv_name)
+    print(f"Report {csv_name} complete.")
 
 def main() -> None:
     """ This is the main program. Duh."""

@@ -260,22 +260,19 @@ ATOM2_FIELDS = [
 
     # (81-82) Unknown.
     # FLFD("u81", "<h", 81, 2),
-    # (83-83) Raw magnetometer Y component?
+    # (83-84) Raw magnetometer Y component?
     FLFD("Magnetometer Y", "<h", 83, 2),
 
-    # (85-86) Unknown.
-    # FLFD("u85", "<h", 85, 2),
-
-    # (87-295) Unknown.
+    # (85-295) Unknown.
 
     # Motor states are understood; the data fields are not.
-    FLFD("Motor 1 Data", "<B", 296, 1),
+    # FLFD("Motor 1 Data", "<B", 296, 1),
     FLFD("Motor 1 State", "<B", 297, 1, FLFD.motor_state),
-    FLFD("Motor 2 Data", "<B", 298, 1),
+    # FLFD("Motor 2 Data", "<B", 298, 1),
     FLFD("Motor 2 State", "<B", 299, 1, FLFD.motor_state),
-    FLFD("Motor 3 Data", "<B", 300, 1),
+    # FLFD("Motor 3 Data", "<B", 300, 1),
     FLFD("Motor 3 State", "<B", 301, 1, FLFD.motor_state),
-    FLFD("Motor 4 Data", "<B", 302, 1),
+    # FLFD("Motor 4 Data", "<B", 302, 1),
     FLFD("Motor 4 State", "<B", 303, 1, FLFD.motor_state),
 
     # Position and attitude (304-311) - relative to takeoff (home) point.
@@ -325,7 +322,7 @@ ATOM2_FIELDS = [
     # FLFD("C5050", "<f", 400,4),
 
     # (404-407) Closely related to u458 - possibly an estimate of wind speed?
-    # FLFD("u404", "<f", 404,4),
+    FLFD("Wind Speed (m/s)", "<f", 404, 4, FLFD.round3),
 
     # (408-411) Wind direction in radians.
     FLFD("Wind (deg)", "<f", 408, 4, FLFD.radian_heading_to_degrees),
@@ -361,7 +358,6 @@ ATOM2_FIELDS = [
     # (433) Enumerated flight mode.
     FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flight_mode),
 
-    # Possible camera settings?
     # (434) Always zero?
     # FLFD("u434", "<B", 434, 1),
 
@@ -389,13 +385,6 @@ ATOM2_FIELDS = [
     FLFD("Battery Temp (c)", "<B", 446, 1), # Temperature in Celsius.
     FLFD("Battery Level (%)", "<B", 451, 1), # Current battery charge.
 
-    # Could some of these be associated with the camera mode? 
-    # Photo (single, 8k, brk, burst)/
-    # Video/
-    # Pano (pano-wide, pano-tall, wide-and-tall, spherical)
-    #
-    # Also - shutter speed and iso...
-    #
     # (452) zero or one of a small range of values between 0x28 and 0x2e
     # Appears to be strongly corrolated with speed, battery current, and flight
     # states: 41 = Idle/Off, 42/43 = launching, 44-46 = flying, returning, landing?
@@ -439,7 +428,7 @@ ATOM2_FIELDS = [
     # (472) Always 3.
     # FLFD("u472", "<b", 472, 1),
 
-    # (473) Video signal quality %?
+    # (473) Video signal quality %???
     FLFD("Video Signal Quality (%)", "<b", 473, 1),
 
     # (474-480) Possibly the RPM of the motors.
