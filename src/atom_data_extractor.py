@@ -533,7 +533,7 @@ def main() -> None:
         "-l","--log",
         type=int,
         choices=[0, 1, 2, 3],
-        default=2,
+        default=0,
         help="Set log level. 0=error, 1=warning, 2=info, 3=debug."
     )
 
