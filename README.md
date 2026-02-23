@@ -231,12 +231,20 @@ Fields are all little-endian.
 | 77 | 2 | short | Unknown. ||
 | 81 | 2 | short | Unknown. ||
 | 85 | 210 | ??? | Unknown. Still Unexplored. ||
+| 85 | 8 | ??? | Changes rapidly even when motors are off. ||
+| 93 | 4 | ??? | Goes non-zero during launch. Changes rapidly. ||
+| 97 | 12 | ??? | Changes rapidly even when motors are off. ||
+| 109 | 2 | ??? | Always zero. ||
+| 111 | 2 | ??? | Usually zero, but some files have non-zero values here. ||
 | 296 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 298 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 300 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 302 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
-| 312 | 16 | float | 4 floating point numbers. ||
-| 332 | 36 | float | 9 floating point numbers. All go non-zero during launch, don't go to zero till the motors are turned off.||
+| 312 | 4 | float | Velocity N/S (negative is north) (m/s) | ✓ |
+| 316 | 4 | float | Velocity E/W (negative is east) (m/s) | ✓ |
+| 320 | 8 | float | two floats. ||
+| 332 | 4 | float | Velocity U/D (negative is up) (m/s) | ✓ |
+| 336 | 36 | float | 8 floating point numbers. All go non-zero during launch, don't go to zero till the motors are turned off.||
 | 380 | 4 | float | Used to think this was delta X. (m/s) Does not match movement of the GNSS position or drone video. ||
 | 384 | 4 | float | Used to think this was delta Y. (m/s) Does not match movement of the GNSS position or drone video. ||
 | 388 | 4 | float | Used to think this was delta Z. (m/s) Does not match movement of the GNSS position or drone video. ||

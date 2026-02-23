@@ -247,7 +247,7 @@ ATOM2_FIELDS = [
     FLFD("f63", "<f", 63, 4, FLFD.round3),
     FLFD("f67", "<f", 67, 4, FLFD.round3),
 
-    FLFD("Barometric Pressure (pascals)", "<f", 71, 4, FLFD.round3),
+    FLFD("Air Pressure (pascals)", "<f", 71, 4, FLFD.round3),
 
     # (75-76) HDOP * 100
     FLFD("HDOP", "<h", 75, 2, FLFD.fix_hdop),
@@ -265,17 +265,18 @@ ATOM2_FIELDS = [
     FLFD("Magnetometer Y", "<h", 83, 2),
 
     # (85-295) Unknown.
-    FLFD("u85", "<I", 85, 4, FLFD.hex_dump8),
-    FLFD("u89", "<I", 89, 4, FLFD.hex_dump8),
-    FLFD("u93", "<I", 93, 4, FLFD.hex_dump8),
-    FLFD("u97", "<I", 97, 4, FLFD.hex_dump8),
-    FLFD("u101", "<I", 101, 4, FLFD.hex_dump8),
-    FLFD("u105", "<I", 105, 4, FLFD.hex_dump8),
-    FLFD("u109", "<I", 109, 4, FLFD.hex_dump8),
-    FLFD("u113", "<I", 113, 4, FLFD.hex_dump8),
-    FLFD("u117", "<I", 117, 4, FLFD.hex_dump8),
-    FLFD("u121", "<I", 121, 4, FLFD.hex_dump8),
-    FLFD("u125", "<I", 125, 4, FLFD.hex_dump8),
+    FLFD("u85", "<I", 85, 4, FLFD.hex_dump4),
+    FLFD("u89", "<I", 89, 4, FLFD.hex_dump4),
+    FLFD("u93", "<I", 93, 4, FLFD.hex_dump4),
+    FLFD("u97", "<I", 97, 4, FLFD.hex_dump4),
+    FLFD("u101", "<I", 101, 4, FLFD.hex_dump4),
+    FLFD("u105", "<I", 105, 4, FLFD.hex_dump4),
+    FLFD("u109", "<H", 109, 2, FLFD.hex_dump2),
+    FLFD("u111", "<H", 111, 2, FLFD.hex_dump2),
+    FLFD("u113", "<I", 113, 4, FLFD.hex_dump4),
+    FLFD("u117", "<I", 117, 4, FLFD.hex_dump4),
+    FLFD("u121", "<I", 121, 4, FLFD.hex_dump4),
+    FLFD("u125", "<I", 125, 4, FLFD.hex_dump4),
 
     # Motor states are understood; the data fields are not.
     FLFD("Motor 1 Data", "<B", 296, 1),
@@ -293,24 +294,24 @@ ATOM2_FIELDS = [
     FLFD("Position Y (m)", "<f", 308,4, FLFD.round3),
 
     # (312-327) Unknown. Floating point numbers.
-    FLFD("u312", "<f", 312, 4, FLFD.round3),
-    FLFD("u316", "<f", 316, 4, FLFD.round3),
+    FLFD("delta Y (m/s)", "<f", 312, 4, FLFD.round3),
+    FLFD("delta X (m/s)", "<f", 316, 4, FLFD.round3),
     FLFD("u320", "<f", 320, 4, FLFD.round3),
     FLFD("u324", "<f", 324, 4, FLFD.round3),
 
     # Altitude above home point, AKA "Position Z".
     FLFD("alt (m)", "<f", 328, 4, FLFD.fix_alt),
 
-    # Unknown region: 332-367. All appear to be valid floating point numbers.
-     FLFD("u332", "<f", 332, 4, FLFD.round3),
-     FLFD("u336", "<f", 336, 4, FLFD.round3),
-     FLFD("u340", "<f", 340, 4, FLFD.round3),
-     FLFD("u344", "<f", 344, 4, FLFD.round3),
-     FLFD("u348", "<f", 348, 4, FLFD.round3),
-     FLFD("u352", "<f", 352, 4, FLFD.round3),
-     FLFD("u356", "<f", 356, 4, FLFD.round3),
-     FLFD("u360", "<f", 360, 4, FLFD.round3),
-     FLFD("u364", "<f", 364, 4, FLFD.round3),
+    FLFD("delta Z (m/s)", "<f", 332, 4, FLFD.round3),
+    # Unknown region: 336-367. All appear to be valid floating point numbers.
+    FLFD("u336", "<f", 336, 4, FLFD.round3),
+    FLFD("u340", "<f", 340, 4, FLFD.round3),
+    FLFD("u344", "<f", 344, 4, FLFD.round3),
+    FLFD("u348", "<f", 348, 4, FLFD.round3),
+    FLFD("u352", "<f", 352, 4, FLFD.round3),
+    FLFD("u356", "<f", 356, 4, FLFD.round3),
+    FLFD("u360", "<f", 360, 4, FLFD.round3),
+    FLFD("u364", "<f", 364, 4, FLFD.round3),
 
     # orientation and velocity (368-395)
     FLFD("bank (deg)", "<f", 368, 4, FLFD.radians_to_degrees),
@@ -414,7 +415,7 @@ ATOM2_FIELDS = [
 
     # (455) Ranges from 0 to 2. Claude indicates a corrolation with battery
     # temperature.
-    FLFD("u455", "<B", 455, 1),
+    FLFD("Battery State", "<B", 455, 1),
 
     FLFD("Drone Mode 2 (text)", "<B", 456, 1, FLFD.drone_mode),
     FLFD("Positioning Mode 2 (text)", "<B", 457, 1, FLFD.positioning_mode),

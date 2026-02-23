@@ -250,6 +250,9 @@ ATOM2_FIELDS = [
     #
     # Velocity
     #
+    FLFD("delta Y (m/s)", "<f", 312, 4, FLFD.round3),
+    FLFD("delta X (m/s)", "<f", 316, 4, FLFD.round3),
+    FLFD("delta Z (m/s)", "<f", 332, 4, FLFD.round3),
     FLFD("speed (m/s)", "<f", 392,4, FLFD.round3),
     FLFD("Wind Speed (m/s)", "<f", 404, 4, FLFD.round3),
     FLFD("Wind (deg)", "<f", 408, 4, FLFD.radian_heading_to_degrees),
@@ -349,6 +352,9 @@ EXTENDED_DATA = [
     "Magnetometer X",
     "Magnetometer Y",
 
+    "delta Y (m/s)",
+    "delta X (m/s)",
+    "delta Z (m/s)",
     "Position X (m)",
     "Position Y (m)",
     "Wind Speed 2 (m/s)",
@@ -364,6 +370,8 @@ EXTENDED_DATA = [
 VALIDATION_DATA = [
     "2d Derived Distance (m)", # 2d distance, derived from position and altitude.
     "3d Derived Distance (m)", # 3d distance, derived from position and altitude.
+    "2d Derived Speed (m/s)", # derived from delta X and delta Y.
+    "3d Derived Speed (m/s)", # derived from delta X, Y, Z.
 ]
 
 def is_valid_latlon(lat, lon) -> bool:
@@ -401,6 +409,16 @@ def derived_fields(record, validation):
                 record["Position X (m)"]**2 +
                 record["Position Y (m)"]**2 +
                 record["alt (m)"]**2
+            ), 3)
+
+        record["2d Derived Speed (m/s)"] = round(math.sqrt(
+                record["delta X (m/s)"]**2 +
+                record["delta Y (m/s)"]**2
+            ), 3)
+        record["3d Derived Speed (m/s)"] = round(math.sqrt(
+                record["delta X (m/s)"]**2 +
+                record["delta Y (m/s)"]**2 +
+                record["delta Z (m/s)"]**2
             ), 3)
 
 def atom_parse(file_name, extended=False, validation=False, destination=None):
