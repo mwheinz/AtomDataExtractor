@@ -28,7 +28,10 @@ To build the GUI version, start in the main AtomDataExtractor directory:
 ```
 $ python3 -m venv ade-venv
 $ source ade-venv/bin/activate
-$ pip install tkinter
+$ pip install tk
+```
+(on Ubuntu you may need `sudo apt install python3-tk` instead.)
+```
 $ pip install pyinstaller
 $ cd src
 $ ./build.sh
