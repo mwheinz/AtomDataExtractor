@@ -385,7 +385,11 @@ class AtomConverterApp:
 
         # Snapshot options
         out_dir = self.output_dir_var.get().strip()
-        if out_dir and not Path(out_dir).is_dir():
+        if out_dir is None or out_dir == "":
+            messagebox.showerror("Bad Output Dir",
+                                  "Please select an output folder.")
+            return
+        if not Path(out_dir).is_dir():
             messagebox.showerror("Bad Output Dir",
                                   f"Output folder does not exist:\n{out_dir}")
             return
@@ -394,9 +398,9 @@ class AtomConverterApp:
         validation = self.validation_var.get()
         log_level_str = self.log_level_var.get()
         log_level_int = LOG_LEVEL_MAP.get(log_level_str, 1)
-        files = list(self.file_list)
-
         logger.configure_logging(level=log_level_int)
+
+        files = list(self.file_list)
 
         # Persist prefs
         self.prefs["output_dir"] = out_dir
@@ -426,15 +430,15 @@ class AtomConverterApp:
         """Background worker — do NOT touch tkinter widgets directly."""
         success_count = 0
         fail_count = 0
-        last_out_dir = None
+        last_out_dir = out_dir
 
         for i, f in enumerate(files):
             try:
-                csv_path = safe_atom2_parser(
+                safe_atom2_parser(
                     f,
                     extended=extended,
                     validation=validation,
-                    destination=out_dir if out_dir else None,
+                    destination=out_dir,
                 )
                 success_count += 1
             except Exception as e:

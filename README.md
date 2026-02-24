@@ -21,8 +21,19 @@ This app would not exist if Koen Aerts and Rob Pitt hadn't already written the [
 2. AtomDataExtractor requires python3 and has been tested with Python 3.9.2 and 3.14.3, but it should work with other versions as well. It does not require any other packages.
 3. You don't need anything else if all you want to do is look at the telemetry data from your drone, but if you want to use this app to make cool videos, you're going to need [Telemetry Overlay](https://goprotelemetryextractor.com). 
 
-## Installation
-At this point, AtomDataExtractor can be used via a command line tool or a GUI app. If you know your way around MacOS Terminal, or Windows Shell, or the Linux terminal app of your choice, download the latest release from [github](https://github.com/mwheinz/AtomDataExtractor) and add AtomDataExtractor/src to your command path, or run the build.sh script to create the GUI version. 
+## Building
+At this point, AtomDataExtractor can be used via a command line tool or a GUI app. If you know your way around MacOS Terminal, or Windows Shell, or the Linux terminal app of your choice, download the latest release from [github](https://github.com/mwheinz/AtomDataExtractor) and add AtomDataExtractor/src to your command path, to use the CLI version. 
+
+To build the GUI version, start in the main AtomDataExtractor directory:
+```
+$ python3 -m venv ade-venv
+$ source ade-venv/bin/activate
+$ pip install tkinter
+$ pip install pyinstaller
+$ cd src
+$ ./build.sh
+```
+The final executable should be in the AtomDataExtractor/src/dist directory.
 
 ## Getting Telemetry Data From Your Atom 2 Drone
 ### PTD-1 Controller with SD card
