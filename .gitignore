@@ -3,4 +3,7 @@
 *csv
 logs/**
 src/__pycache__/**
+src/build/**
+src/dist/**
+src/*spec
 data/**

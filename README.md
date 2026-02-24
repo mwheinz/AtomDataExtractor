@@ -22,7 +22,7 @@ This app would not exist if Koen Aerts and Rob Pitt hadn't already written the [
 3. You don't need anything else if all you want to do is look at the telemetry data from your drone, but if you want to use this app to make cool videos, you're going to need [Telemetry Overlay](https://goprotelemetryextractor.com). 
 
 ## Installation
-At this point, AtomDataExtractor is a command-line tool. If you know your way around MacOS Terminal, or Windows Shell, or the Linux terminal app of your choice, download the latest release from [github](https://github.com/mwheinz/AtomDataExtractor) and add AtomDataExtractor/src to your command path. 
+At this point, AtomDataExtractor can be used via a command line tool or a GUI app. If you know your way around MacOS Terminal, or Windows Shell, or the Linux terminal app of your choice, download the latest release from [github](https://github.com/mwheinz/AtomDataExtractor) and add AtomDataExtractor/src to your command path, or run the build.sh script to create the GUI version. 
 
 ## Getting Telemetry Data From Your Atom 2 Drone
 ### PTD-1 Controller with SD card
@@ -101,22 +101,17 @@ Note: If you have multiple videos associated with a single CSV file, I recommend
 ## Participating in this project
 I am always looking for contributions! If you are interested, check out the [github project](https://github.com/mwheinz/AtomDataExtractor) and get cracking!
 ## Building:
-The Toga code is just a skeleton and does nothing. There is no packaging for the CLI tool right now, just run it from the directory.
-
-To try and build the Toga package:
+To try and build the GUI app:
 
 ```
 $ python3 -m venv venv
 $ source venv/bin/activate
-$ cd atomdataviewer
-$ briefcase build
+$ cd src
+$ pyinstaller --onedir --windowed ade.py
 ```
 
-## Briefcase & Toga:
-https://beeware.org/
-
 ## Telemetry Overlay Documentation:
-TO isn't exactly rushing to provide documentation, either, but they do have a bit on how the CSV file should be formatted in the [Telemetry Overlay Manual](https://goprotelemetryextractor.com/docs/telemetry-overlay-manual.pdf)
+[Telemetry Overlay Manual](https://goprotelemetryextractor.com/docs/telemetry-overlay-manual.pdf)
 
 ## FC2 data file format:
 1. Potensic doesn't want people reverse engineering the log file formats for their drones.

@@ -64,16 +64,38 @@ class MWHLogger(logging.Logger):
         self.setLevel(INFO)      # default; caller can change with configure_logging()
         self.propagate = False   # keep logs from duplicating through root
 
+        self.file_handle = None
 
-    def configure_logging(self, level: int = INFO, log_file: str = None) -> None:
+    def configure_logging(self, level: int = None, log_file: str = None, file_handle = None) -> None:
         """
         Adjust the log level and optionally switches from console output to 
         outputting plain text to a rotating log file.
         """
 
-        self.setLevel(level)
+        if level:
+            self.setLevel(level)
+            if self.handler is not None:
+                self.setLevel(self.level)
 
-        if log_file:
+
+        if file_handle:
+            self.file_handle = file_handle
+            if self.handler is not None:
+                self.removeHandler(self.handler)
+
+            # Lazy import to avoid overhead when not used
+            from logging import StreamHandler
+            fh = StreamHandler(file_handle)
+            # File logs should be plain (no color), include module/line
+            file_fmt = logging.Formatter(
+                fmt="%(asctime)s %(levelname)-8s %(name)s:%(lineno)-4d %(message)s",
+                datefmt="%H:%M:%S"
+            )
+            fh.setFormatter(file_fmt)
+            fh.setLevel(self.level)
+            self.addHandler(fh)
+            self.handler=fh
+        elif log_file:
             if self.handler is not None:
                 self.removeHandler(self.handler)
 
@@ -86,6 +108,9 @@ class MWHLogger(logging.Logger):
                 datefmt="%H:%M:%S"
             )
             fh.setFormatter(file_fmt)
-            fh.setLevel(level)
+            fh.setLevel(self.level)
             self.addHandler(fh)
             self.handler=fh
+
+    def print(self, msg):
+        print(msg, file=self.file_handle)
