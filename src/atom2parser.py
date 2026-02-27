@@ -198,7 +198,7 @@ ATOM2_FIELDS = [
     FLFD("elapsed (us)", "<Q", 5, 8), # Relative time in microseconds.
     FLFD("Flight Counter", "<H", 17, 2), # Number of flights.
     FLFD("Drone Mode (text)", "<B", 428, 1, FLFD.drone_mode),
-    FLFD("RTH", "<B", 429, 1),
+    FLFD("Auto", "<B", 429, 1),
     FLFD("Positioning Mode (text)", "<B", 430, 1, FLFD.positioning_mode),
     FLFD("Flight Mode (text)", "<B", 433, 1, FLFD.flight_mode),
 
@@ -340,6 +340,7 @@ EXTENDED_DATA = [
     "Battery Current (ma)",
     "Battery Temp (c)",
     "Battery State",
+    "Auto",
 ]
 
 """ These are derived from data in the file in order to compare results. """
@@ -373,8 +374,14 @@ def derived_fields(record, validation):
     """
 
     # Merge the rth flag and the drone mode.
-    if record["RTH"] != 0 and record["Drone Mode (text)"] == "Flying":
-        record["Drone Mode (text)"] = "RTH"
+    if record["Auto"] > 0: 
+        if record["Drone Mode (text)"] == "Flying":
+            if record["Auto"] == 1:
+                record["Drone Mode (text)"] = "RTH"
+            elif record["Auto"] == 6:
+                record["Drone Mode (text)"] = "Auto"
+            else:
+                record["Drone Mode (text)"] = "???"
 
     if validation:
         record["2d Derived Distance (m)"] = round(math.sqrt(

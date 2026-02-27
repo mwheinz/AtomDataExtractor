@@ -372,8 +372,8 @@ ATOM2_FIELDS = [
     # 2 = flying, 3 = landing.
     FLFD("Drone Mode (text)", "<B", 428, 1, FLFD.drone_mode),
 
-    # (429) Flag that indicates return-to-home has been activated.
-    FLFD("RTH", "<B", 429, 1),
+    # (429) 1 = RTH. 6 = an AI mode is active.
+    FLFD("Auto", "<B", 429, 1),
 
     # (430) Enumeration of the positioning mode. 1 = ATTI, 2 = OPTI, 3 = GPS.
     FLFD("Positioning Mode (text)", "<B", 430, 1, FLFD.positioning_mode),
