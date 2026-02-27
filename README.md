@@ -127,6 +127,9 @@ $ pyinstaller --onedir --windowed ade.py
 ## Open issues
 TODO: Add a toggle to ade to have csv files written to the same
 directory the fc2 files came from.
+TODO: The "RTH" field may actually mean "AI control". Needs more
+testing, but evidence shows that using AI shots toggles the RTH
+field.
 
 ## Telemetry Overlay Documentation:
 [Telemetry Overlay Manual](https://goprotelemetryextractor.com/docs/telemetry-overlay-manual.pdf)
