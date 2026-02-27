@@ -317,7 +317,7 @@ class AtomConverterApp:
                 return
             except Exception:
                 pass
-        self.root.geometry("800x600")
+        self.root.geometry("640x480")
 
     def _save_geometry(self):
         self.prefs["window_geometry"] = self.root.geometry()
