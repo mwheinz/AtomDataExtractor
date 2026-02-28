@@ -339,7 +339,6 @@ EXTENDED_DATA = [
     "Battery V2 (mv)",
     "Battery Current (ma)",
     "Battery Temp (c)",
-    "Battery State",
     "Auto",
 ]
 
@@ -349,6 +348,7 @@ VALIDATION_DATA = [
     "3d Derived Distance (m)", # 3d distance, derived from position and altitude.
     "2d Derived Speed (m/s)", # derived from delta X and delta Y.
     "3d Derived Speed (m/s)", # derived from delta X, Y, Z.
+    "Date/Time", # derived from elapsed.
 ]
 
 def is_valid_latlon(lat, lon) -> bool:
@@ -403,6 +403,8 @@ def derived_fields(record, validation):
                 record["delta Y (m/s)"]**2 +
                 record["delta Z (m/s)"]**2
             ), 3)
+        record["Date/Time"] = datetime.datetime.utcfromtimestamp(record["utc (ms)"]/1000)
+    
 
 def atom2_parser(file_name, logger: mwhlogging.MWHLogger, extended=False, validation=False, destination=None):
     """
