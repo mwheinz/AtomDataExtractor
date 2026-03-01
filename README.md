@@ -229,6 +229,14 @@ Fields are all little-endian.
 | 446 | 1 | byte | Battery Temp (celsius) | ✓ |
 | 451 | 1 | byte | Battery Level (%) | ✓ |
 
+### Thumb Sticks
+| Byte: | Length: | Format: | Description: | Correct: |
+|-------|---------|---------|--------------|----------|
+| 89 | 4 | float | "Elevator" - Negative numbers tell the drone to climb. Positive tell it to descend. | ✓ |
+| 93 | 4 | float | "Rudder" - Positive values tell the drone to rotate clockwise. Negative tell it to rotate counter clockwise. | ✓ |
+| 97 | 4 | float | "Throttle" - Negative values move the drone forward, positive move it backward. | ✓ |
+| 101 | 4 | float | "Aileron" - Positive shifts the drone to the right, negative shifts it to the left. | ✓ |
+
 ###  Experimental
 | Byte: | Length: | Format: | Description: | Correct: |
 |-------|---------|---------|--------------|----------|
@@ -246,10 +254,7 @@ Fields are all little-endian.
 | 67 | 4 | float | Possibly related to confidence in the drone's vertical position, with 10.0 being poor and 0.0 being best. ||
 | 77 | 2 | short | Unknown. ||
 | 81 | 2 | short | Unknown. ||
-| 85 | 210 | ??? | Unknown. Still Unexplored. ||
-| 85 | 8 | ??? | Changes rapidly even when motors are off. ||
-| 93 | 4 | ??? | Goes non-zero during launch. Changes rapidly. ||
-| 97 | 12 | ??? | Changes rapidly even when motors are off. ||
+| 85 | 88 | ??? | Unknown. ||
 | 109 | 2 | ??? | Always zero. ||
 | 111 | 2 | ??? | Usually zero, but some files have non-zero values here. ||
 | 296 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
