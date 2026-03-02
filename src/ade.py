@@ -219,7 +219,7 @@ class AtomConverterApp:
         ttk.Button(frame, text="Browse…",
                    command=self._browse_output_dir).grid(row=0, column=2, sticky="w")
 
-        ttk.Label(frame, text="(Leave blank to save next to each input file)",
+        ttk.Label(frame, text="(Specify where the CSV files should be saved.)",
                   foreground="gray").grid(row=1, column=1, sticky="w", pady=(2, 6))
 
         # Checkboxes
