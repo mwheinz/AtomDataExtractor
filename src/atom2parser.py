@@ -161,6 +161,16 @@ class FLFD:
         """ Scale the RC quality field to 0-100. """
         return data/35
 
+    @staticmethod
+    def rc_stick_scale(data):
+        """ Scale the RC stick fields to 0-2048. """
+        return round(data*1024.0+1024.0,3)
+
+    @staticmethod
+    def rc_neg_stick_scale(data):
+        """ Scale the RC stick fields to 0-2048. """
+        return round(data*-1024.0+1024.0,3)
+
     def get_field(self,record) -> str:
         """Extract a field from the binary record."""
         data = struct.unpack(
@@ -270,6 +280,15 @@ ATOM2_FIELDS = [
     FLFD("Battery Current (ma)", "<h", 444, 2, abs),
     FLFD("Battery Temp (c)", "<B", 446, 1),
     FLFD("Battery Level (%)", "<B", 451, 1),
+
+    #
+    # Controls. Raw values range frrom -1.0 to 1.0 but that Telemetry Overlay
+    # requires them to be scaled 0-2048.
+    #
+    FLFD("rc elevator","<f",89,4, FLFD.rc_neg_stick_scale),
+    FLFD("rc rudder","<f",93,4, FLFD.rc_stick_scale),
+    FLFD("rc throttle","<f",97,4, FLFD.rc_neg_stick_scale),
+    FLFD("rc aileron","<f",101,4, FLFD.rc_stick_scale),
 ]
 
 
@@ -310,6 +329,11 @@ BASIC_DATA = [
     "Motor 4 RPM",
 
     "Battery Level (%)",
+
+    "rc elevator",
+    "rc rudder",
+    "rc throttle",
+    "rc aileron",
 ]
 
 """ These fields are only used in the extended report. """
@@ -377,11 +401,14 @@ def derived_fields(record, validation):
     if record["Auto"] > 0: 
         if record["Drone Mode (text)"] == "Flying":
             if record["Auto"] == 1:
-                record["Drone Mode (text)"] = "RTH"
+                record["Drone Mode (text)"] = "Autopilot: RTH"
             elif record["Auto"] == 6:
-                record["Drone Mode (text)"] = "Auto"
+                record["Drone Mode (text)"] = "Autopilot"
             else:
                 record["Drone Mode (text)"] = "???"
+        elif record["Drone Mode (text)"] == "Launching":
+            if record["Auto"] > 0:
+                record["Drone Mode (text)"] = "Autopilot: Launch"
 
     if validation:
         record["2d Derived Distance (m)"] = round(math.sqrt(
