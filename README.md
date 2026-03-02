@@ -56,7 +56,8 @@ The final executable should be in the AtomDataExtractor/src/dist directory.
 ## Getting Videos From Your Atom 2 Drone
 I highly recommend popping the SD card out of your drone, putting it in your computer and copying it that way. Much faster than using Smart Transfer. If you do use Smart Transfer to copy video and photos from your drone to your tablet or phone, use the same process you use for getting the ".fc2" files off your controller.
 
-## Running AtomDataExtractor
+## Running Atom Data Extractor
+### From the command line
 Once you have the data file you want to convert, open your terminal or shell, and run atom_data_extractor.py on it. The easiest way is to just type "atom_data_extractor.py <my fc2 file>". This will generate a CSV file in the same directory as the fc2 file. For example:
 ```
 $» atom_data_extractor.py /home/mwheinz/fc2data/20260219162209-142-VZFM-Android-r254-FC.fc2
@@ -95,6 +96,10 @@ options:
 Written by Michael Heinz. Based on work done by Michael Heinz, Koen Aerts,
 and Rob Pitt. See README.md for detailed field documentation.
 ```
+
+### From the GUI
+![ADE on MacOS](resources/ade-screenshot.png)
+The GUI is a simple front end that takes all the same options as the command line, but it doesn't currently support automatically writing the CSV files back to the same directory the FC2 files came from. Click on "Add Files" to select the fc2 files you would like to convert and use Output folder to specify where to put the CSV files. Click "Convert All" to start conversion.
 
 ### A Note on Error Handling and Data Validation
 In the example above, atom_data_extractor.py reported an error in one record. Any record that has data that AtomDataExtractor does not understand will be skipped and ignored - it will not appear in the CSV file. This helps prevent problems with Telemetry Overlay's processing of the data. In addition, GPS coordinates that don't appear valid will be "suppressed" - they will be replaced with empty fields in the CSV file. This will happen if the data appears to be outside the valid range for latitude and longitude or if the drone is reporting GPS coordinates before it says it has a GPS lock. Again, this helps prevent problems when the data is fed to Telemetry Overlay.
