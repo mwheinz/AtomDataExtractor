@@ -285,9 +285,9 @@ ATOM2_FIELDS = [
     # Controls. Raw values range frrom -1.0 to 1.0 but that Telemetry Overlay
     # requires them to be scaled 0-2048.
     #
-    FLFD("rc elevator","<f",89,4, FLFD.rc_neg_stick_scale),
+    FLFD("rc throttle","<f",89,4, FLFD.rc_neg_stick_scale),
     FLFD("rc rudder","<f",93,4, FLFD.rc_stick_scale),
-    FLFD("rc throttle","<f",97,4, FLFD.rc_neg_stick_scale),
+    FLFD("rc elevator","<f",97,4, FLFD.rc_neg_stick_scale),
     FLFD("rc aileron","<f",101,4, FLFD.rc_stick_scale),
 ]
 
