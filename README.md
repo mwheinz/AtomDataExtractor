@@ -129,11 +129,6 @@ $ cd src
 $ pyinstaller --onedir --windowed ade.py
 ```
 
-## Open issues
-TODO: Add a toggle to ade to have csv files written to the same
-directory the fc2 files came from.
-TODO: Maybe add a selector that rearranges the thumbstick data so TO displays them in the desired operating mode. This isn't perfect since it might mean, for example, that the field labeled "elevator" is actually "throttle", etc..
-
 ## Telemetry Overlay Documentation:
 [Telemetry Overlay Manual](https://goprotelemetryextractor.com/docs/telemetry-overlay-manual.pdf)
 
