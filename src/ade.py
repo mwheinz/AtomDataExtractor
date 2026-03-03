@@ -28,13 +28,15 @@ from adeversion import _version
 # ---------------------------------------------------------------------------
 PREFS_FILE = Path.home() / ".atom_extractor_prefs.json"
 
+DEFAULT_GEOMETRY="800x600"
+
 DEFAULT_PREFS = {
     "output_dir": "", # empty → same dir as input file
     "extended": False,
     "validation": False,
     "last_input_dir": str(Path.home()),
     "last_output_dir": str(Path.home()),
-    "window_geometry": "",
+    "window_geometry": DEFAULT_GEOMETRY,
     "log_level": "Debug",
 }
 
@@ -314,10 +316,13 @@ class AtomConverterApp:
         if geom:
             try:
                 self.root.geometry(geom)
-                return
             except Exception:
-                pass
-        self.root.geometry("640x480")
+                self.root.geometry(DEFAULT_GEOMETRY)
+        else:
+            self.root.geometry(DEFAULT_GEOMETRY)
+
+        self.root.update_idletasks()
+        self.root.resizable(True,True)
 
     def _save_geometry(self):
         self.prefs["window_geometry"] = self.root.geometry()
