@@ -230,9 +230,9 @@ Fields are all little-endian.
 ### Thumb Sticks
 | Byte: | Length: | Format: | Description: | Correct: |
 |-------|---------|---------|--------------|----------|
-| 89 | 4 | float | "Elevator" - Negative numbers tell the drone to climb. Positive tell it to descend. | ✓ |
+| 89 | 4 | float | "Throttle" - Negative numbers tell the drone to climb. Positive tell it to descend. | ✓ |
 | 93 | 4 | float | "Rudder" - Positive values tell the drone to rotate clockwise. Negative tell it to rotate counter clockwise. | ✓ |
-| 97 | 4 | float | "Throttle" - Negative values move the drone forward, positive move it backward. | ✓ |
+| 97 | 4 | float | "Elevator" - Negative values move the drone forward, positive move it backward. | ✓ |
 | 101 | 4 | float | "Aileron" - Positive shifts the drone to the right, negative shifts it to the left. | ✓ |
 
 ###  Experimental
