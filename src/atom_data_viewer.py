@@ -13,15 +13,54 @@ import re
 import datetime
 import threading
 import time
+import json
+from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import tkintermapview
 from PIL import Image, ImageDraw, ImageTk
 from adeversion import _version
 from atom2parser import BadData, atom2_parser, is_valid_latlon
+import mwhlogging
 from mwhlogging import MWHLogger
 
-my_logger = MWHLogger("csv_extractor")
+my_logger = MWHLogger("atom_data_viewer")
+my_logger.setLevel(mwhlogging.DEBUG)
+
+PREFS_FILE = Path.home() / ".atom_data_viewer.json"
+
+DEFAULT_PREFS= {
+    "window_geometry": "1200x800",
+    "log_level": "Debug",
+}
+
+LOG_LEVEL_MAP = {
+    "Error": mwhlogging.ERROR,
+    "Warning": mwhlogging.WARNING,
+    "Info": mwhlogging.INFO,
+    "Debug": mwhlogging.DEBUG,
+}
+
+def load_prefs() -> dict:
+    try:
+        if PREFS_FILE.exists():
+            with open(PREFS_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            prefs = DEFAULT_PREFS.copy()
+            prefs.update(saved)
+            return prefs
+    except Exception as e:
+        my_logger.error(f"Failed to load the saved preferences.\n{e}")
+        pass
+    return DEFAULT_PREFS.copy()
+
+def save_prefs(prefs: dict) -> None:
+    try:
+        with open(PREFS_FILE, "w", encoding="utf-8") as f:
+            json.dump(prefs, f, indent=2)
+    except Exception as e:
+        my_logger.error(f"Failed to save the preferences.\n{e}")
+        pass
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Colour / font palette
@@ -36,6 +75,8 @@ TEXT        = "#e6edf3"
 SUBTEXT     = "#8b949e"
 BORDER      = "#30363d"
 GAUGE_BG    = "#0d1117"
+
+PATH        = "#30363d"
 
 FONT_MONO   = ("Courier New", 10)
 FONT_LABEL  = ("Segoe UI", 9)
@@ -238,8 +279,9 @@ class StickDisplay(tk.Canvas):
 class BarGauge(tk.Canvas):
     """Vertical bar gauge (e.g. battery, satellites)."""
 
-    def __init__(self, parent, label, min_val, max_val,
-                 unit="", size_w=50, size_h=90, **kw):
+    def __init__(self, parent, label="", min_val=0, max_val=10,
+                 unit="", size_w=50, size_h=90, warn_low=False,
+                 warn_high=False, **kw):
         super().__init__(parent, width=size_w, height=size_h,
                          bg=GAUGE_BG, highlightthickness=0, **kw)
         self.label   = label
@@ -249,6 +291,8 @@ class BarGauge(tk.Canvas):
         self.size_w  = size_w
         self.size_h  = size_h
         self.value   = min_val
+        self.warn_low = warn_low
+        self.warn_high = warn_high
         self._draw()
 
     def _draw(self):
@@ -269,7 +313,11 @@ class BarGauge(tk.Canvas):
         pct = (self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
         pct = max(0.0, min(1.0, pct))
 
-        color = ACCENT2 if pct > 0.2 else DANGER
+        color = ACCENT2
+        if self.warn_low is not False and pct <= self.warn_low:
+            color = DANGER
+        if self.warn_high is not False and pct >= self.warn_high:
+            color = DANGER
 
         fill_top = bar_bot - pct * bar_h
         if pct > 0:
@@ -327,10 +375,19 @@ class DroneViewer(tk.Tk):
 
     def __init__(self):
         super().__init__()
+
+        self.prefs = load_prefs()
+
         self.configure(menu=tk.Menu(self))
         self.title("Atom 2 Flight Log Viewer")
         self.configure(bg=BG)
         self.minsize(1100, 720)
+
+        my_logger.setLevel(LOG_LEVEL_MAP[self.prefs.get("log_level", "Debug")])
+        
+        geometry = self.prefs.get("window_geometry", "1280x800")
+        my_logger.debug(f"Set window Geometry to {geometry}")
+        self.geometry(geometry)
 
         # ── State ─────────────────────────────────────────────────────────
         self.records: list[dict] = []
@@ -360,16 +417,31 @@ class DroneViewer(tk.Tk):
             "Written by Michael Heinz.\n"
             "Based on work by Michael Heinz, Koen Aerts, and Rob Pritt."
         )
+
+    def _on_close(self):
+        my_logger.debug("Quitting.")
+        self.prefs["window_geometry"] = self.geometry()
+        save_prefs(self.prefs)
+        self.quit()
+
     def _build_ui(self):
+
+        my_logger.debug("Building the UI")
+
+        self.option_add('*tearOff', False)
+        self.configure(menu=tk.Menu(self))
         menubar = tk.Menu(self)
         self.configure(menu=menubar)
 
         file_menu = tk.Menu(menubar)
         menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Open FC2…", command=self._open_file)
+        file_menu.add_command(label="Open FC2", command=self._open_file)
         file_menu.add_separator()
         file_menu.add_command(label="About", command=self._show_about)
-        file_menu.add_command(label="Quit", command=self.quit)
+        file_menu.add_command(label="Quit", command=self._on_close)
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.createcommand("tk::mac::Quit", self._on_close)
 
         # ── Top bar ───────────────────────────────────────────────────────
         top = tk.Frame(self, bg=PANEL_BG, pady=6)
@@ -403,7 +475,9 @@ class DroneViewer(tk.Tk):
         self.map_widget = tkintermapview.TkinterMapView(
             map_frame, corner_radius=0)
         self.map_widget.pack(fill=tk.BOTH, expand=True)
-        self.map_widget.set_zoom(16)
+
+        # Disable the scroll wheel, it doesn't seem to work correctly.
+        self.map_widget.canvas.unbind("<MouseWheel>")
 
         # Right: gauges + controls
         right = tk.Frame(main, bg=BG, width=340)
@@ -433,7 +507,7 @@ class DroneViewer(tk.Tk):
         arc_row.pack(fill=tk.X, padx=6, pady=(6, 0))
 
         # TODO: Need the maximum values for these to adjust gauges.
-        self.gauge_speed  = ArcGauge(arc_row, "SPEED",   0, 25, " m/s", size=110)
+        self.gauge_speed  = ArcGauge(arc_row, "SPEED",   0, 10, " kph", size=110)
         self.gauge_alt    = ArcGauge(arc_row, "ALT",     0, 120, " m",  size=110)
         self.gauge_dist   = ArcGauge(arc_row, "DIST",    0, 500, " m",  size=110)
 
@@ -444,29 +518,29 @@ class DroneViewer(tk.Tk):
         mid_row = tk.Frame(parent, bg=BG)
         mid_row.pack(fill=tk.X, padx=6, pady=4)
 
-        self.gauge_compass = CompassGauge(mid_row, size=120)
+        self.gauge_compass = CompassGauge(mid_row, size=110)
         self.gauge_compass.pack(side=tk.LEFT, padx=(0, 8))
 
         bars = tk.Frame(mid_row, bg=BG)
         bars.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        self.bar_battery = BarGauge(bars, "BATT",   0, 100, "%", 52, 90)
-        self.bar_sats    = BarGauge(bars, "SATS",   0, 20,  "",  52, 90)
-        self.bar_wind    = BarGauge(bars, "WIND", 0, 15, " m/s", 52, 90)
-        self.bar_thrust  = BarGauge(bars, "THRST",  0, 1,   "",  52, 90)
+        self.bar_battery = BarGauge(bars, label="BATT", max_val=100, unit="%", size_w=36, size_h=110, warn_low=0.3)
+        self.bar_sats    = BarGauge(bars, label="SATS", max_val=30,  size_w=36, size_h=110)
+        self.bar_wind    = BarGauge(bars, label="WIND", max_val=15, unit=" m/s", size_w=36, size_h=110, warn_high=0.8)
+        self.bar_thrust  = BarGauge(bars, label="THRST",max_val=10, size_w=36, size_h=110, warn_high=0.8)
 
         for b in (self.bar_battery, self.bar_sats, self.bar_wind, self.bar_thrust):
             b.pack(side=tk.LEFT, padx=2)
 
         # ── Section: RC Sticks ────────────────────────────────────────────
         tk.Label(parent, text="CONTROLLER", bg=BG, fg=SUBTEXT,
-                 font=("Segoe UI", 7, "bold")).pack(anchor="w", padx=8)
+                 font=FONT_SMALL).pack(anchor="c", padx=8)
 
         sticks_row = tk.Frame(parent, bg=BG)
         sticks_row.pack(fill=tk.X, padx=6, pady=2)
 
-        self.stick_left  = StickDisplay(sticks_row, "LEFT (Thr/Yaw)",  size=106)
-        self.stick_right = StickDisplay(sticks_row, "RIGHT (Pit/Rol)", size=106)
+        self.stick_left  = StickDisplay(sticks_row, "LEFT (Thr/Yaw)",  size=110)
+        self.stick_right = StickDisplay(sticks_row, "RIGHT (Pit/Rol)", size=110)
         self.stick_left.pack(side=tk.LEFT, padx=(0, 4))
         self.stick_right.pack(side=tk.LEFT)
 
@@ -475,10 +549,16 @@ class DroneViewer(tk.Tk):
         info_frame.pack(fill=tk.X, padx=6, pady=4)
 
         self.info = InfoPanel(info_frame, [
-            "Drone Mode", "Pos Mode", "Flight Mode",
-            "GPS Lock", "Motor State",
-            "Heading", "Bank", "Pitch",
-            "Wind Dir", "Record #", "Elapsed"
+            "Drone Mode",
+            "Flight Mode",
+            "Pos Mode",
+            "GPS Lock",
+            "Heading",
+            "Bank",
+            "Pitch",
+            "Wind Dir",
+            "Record #",
+            "Elapsed"
         ])
         self.info.pack(fill=tk.X)
 
@@ -506,11 +586,11 @@ class DroneViewer(tk.Tk):
                              cursor="hand2", activebackground=BORDER,
                              activeforeground=TEXT, bd=1)
 
-        self._btn_rw    = btn("⏮", self._go_start)
+        self._btn_rw    = btn("⏮️", self._go_start)
         self._btn_back  = btn("⏪", self._step_back)
-        self._btn_play  = btn("▶", self._toggle_play, ACCENT, BG)
+        self._btn_play  = btn("▶️", self._toggle_play, ACCENT, BG)
         self._btn_fwd   = btn("⏩", self._step_fwd)
-        self._btn_ff    = btn("⏭", self._go_end)
+        self._btn_ff    = btn("⏭️", self._go_end)
 
         for b in (self._btn_rw, self._btn_back, self._btn_play,
                   self._btn_fwd, self._btn_ff):
@@ -573,7 +653,7 @@ class DroneViewer(tk.Tk):
                 "No valid GPS records found in this file.")
             return
 
-        self.records     = records
+        self.records     = [r for r in records if r.get("GPS Lock") == "Yes"]
         self.current_idx = 0
 
         # Slider range
@@ -583,21 +663,44 @@ class DroneViewer(tk.Tk):
         # Draw full path on map
         self._draw_map_path()
 
-        # Centre map on first point
-        lat0 = records[0]["lat (deg)"]
-        lon0 = records[0]["lon (deg)"]
-        self.map_widget.set_position(lat0, lon0)
-        self.map_widget.set_zoom(17)
+        range = [r["alt (m)"] for r in records if r.get("alt (m)") != ""]
+        self.max_alt = max(range)
 
-        self._file_label.configure(
-            text=os.path.basename(path))
+        range = [r["Thrust"] for r in records if r.get("Thrust") != ""]
+        self.max_thrust = max(range)
+
+        range = [r["3d Derived Speed (m/s)"] for r in records if r.get("3d Derived Speed (m/s)") != ""]
+        #range = [r["speed (m/s)"] for r in records if r.get("speed (m/s)") != ""]
+        self.max_speed = max(range)
+
+        range = [r["distance (m)"] for r in records if r.get("distance (m)") != ""]
+        self.max_distance = max(range)
+
+        range = [r["Wind Speed (m/s)"] for r in records if r.get("Wind Speed (m/s)") != ""]
+        self.max_wind = max(range)
+
+        self.bar_thrust.max_val = self.max_thrust
+        self.gauge_speed.max_val = self.max_speed
+        self.bar_wind.max_val = self.max_wind
+
+        range = [r["lat (deg)"] for r in records if r.get("lat (deg)") != ""]
+        self.min_lat = min(range)
+        self.max_lat = max(range)
+        range = [r["lon (deg)"] for r in records if r.get("lon (deg)") != ""]
+        self.min_lon = min(range)
+        self.max_lon = max(range)
+
+        # Centre map on first point
+        my_logger.debug(f"Map bounding box: ({self.max_lat},{self.min_lon}), ({self.min_lat},{self.max_lon})")
+        self.map_widget.fit_bounding_box((self.max_lat, self.min_lon), (self.min_lat, self.max_lon))
+
+        self._file_label.configure(text=os.path.basename(path))
         self._set_status(f"Loaded {len(records)} GPS records.")
         self._update_display(0)
 
     # ── Map drawing ───────────────────────────────────────────────────────
 
     def _draw_map_path(self):
-        """Draw the complete flight path as a faint line."""
         if self._path_line:
             self._path_line.delete()
             self._path_line = None
@@ -605,7 +708,7 @@ class DroneViewer(tk.Tk):
         coords = [(r["lat (deg)"], r["lon (deg)"]) for r in self.records]
         if len(coords) >= 2:
             self._path_line = self.map_widget.set_path(
-                coords, color="#30363d", width=4)
+                coords, color=PATH, width=4)
 
     #
     # Icons for the map
@@ -690,7 +793,8 @@ class DroneViewer(tk.Tk):
         r = self.records[idx]
 
         # Gauges
-        self.gauge_speed.set_value(r.get("speed (m/s)", 0))
+        self.gauge_speed.set_value(r.get("3d Derived Speed (m/s)", 0)*3.6)
+        #self.gauge_speed.set_value(r.get("speed (m/s)", 0)*3.6)
         self.gauge_alt.set_value(r.get("alt (m)", 0))
         self.gauge_dist.set_value(r.get("distance (m)", 0))
         self.gauge_compass.set_value(r.get("heading (deg)", 0))
@@ -698,7 +802,7 @@ class DroneViewer(tk.Tk):
         self.bar_battery.set_value(r.get("Battery Level (%)", 0))
         self.bar_sats.set_value(r.get("Satellites", 0))
         self.bar_wind.set_value(r.get("Wind Speed (m/s)", 0))
-        self.bar_thrust.set_value(min(1.0, max(0.0, r.get("Thrust", 0))))
+        self.bar_thrust.set_value(max(0.0, r.get("Thrust", 0)))
 
         # RC Sticks
         # Left stick: throttle (Y) + rudder/yaw (X)
@@ -721,7 +825,6 @@ class DroneViewer(tk.Tk):
         self.info.update_field("Pos Mode",    r.get("Positioning Mode (text)", "—"))
         self.info.update_field("Flight Mode", r.get("Flight Mode (text)", "—"))
         self.info.update_field("GPS Lock",    r.get("GPS Lock", "—"))
-        self.info.update_field("Motor State", r.get("Motor 1 State", "—"))
         self.info.update_field("Heading",     f"{r.get('heading (deg)', 0):.1f}°")
         self.info.update_field("Bank",        f"{r.get('bank (deg)', 0):.1f}°")
         self.info.update_field("Pitch",       f"{r.get('pitch angle (deg)', 0):.1f}°")
@@ -809,11 +912,6 @@ class DroneViewer(tk.Tk):
     def _set_status(self, msg: str):
         self._status_var.set(msg)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Entry point
-# ─────────────────────────────────────────────────────────────────────────────
-
 def main():
     # Allow an fc2 file to be passed as a command-line argument
     app = DroneViewer()
@@ -824,7 +922,6 @@ def main():
             app.after(200, lambda: app._load_file(path))
 
     app.mainloop()
-
 
 if __name__ == "__main__":
     main()
