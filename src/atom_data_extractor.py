@@ -11,11 +11,32 @@ TODO: Do a test to try and corrolate camera modes with fc2 data. Could be
 
 import os
 import argparse
+import csv
 import mwhlogging
 from mwhlogging import MWHLogger
-from atom2parser import BadData, atom2_parser
+from atom2parser import BadData, atom2_parser, BASIC_DATA, EXTENDED_DATA, VALIDATION_DATA
 
 my_logger = MWHLogger("csv_extractor")
+
+def write_csv(file_name, records, extended=False, validation=False, destination=None):
+    """ Convert a list of parsed records into a CSV file. """
+    base_name, _ = os.path.splitext(os.path.basename(file_name))
+    directory = (destination if destination is not None else os.path.dirname(file_name))
+
+    csv_name = os.path.join(directory, f"{base_name}.csv")
+    my_logger.debug("Creating %s", csv_name)
+
+    with open(csv_name, mode="w", encoding="utf-8") as csv_file:
+        writer = csv.writer(csv_file)
+        header = BASIC_DATA + \
+            (EXTENDED_DATA if extended else []) + \
+            (VALIDATION_DATA if validation else [])
+        writer.writerow(header)
+
+        for record in records:
+            row = [record.get(field,"") for field in header]
+            writer.writerow(row)
+    my_logger.print(f"{csv_name} complete.")
 
 def main() -> None:
     """ This is the main program. Duh."""
@@ -88,7 +109,12 @@ def main() -> None:
             sys.exit(-1)
         elif extension == ".fc2":
             my_logger.info("Parsing %s", f)
-            atom2_parser(f, my_logger, extended=args.extended, validation=args.validation, destination=args.destination)
+            records = atom2_parser(f, my_logger)
+            if records is not None:
+                write_csv(f, records,
+                          extended=args.extended,
+                          validation=args.validation,
+                          destination=args.destination)
         else:
             my_logger.info("%s appears to be an unsupported file type.", f)
             sys.exit(-1)

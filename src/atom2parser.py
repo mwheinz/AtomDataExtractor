@@ -4,13 +4,95 @@ import struct
 import re
 import math
 import datetime
-import csv
-import mwhlogging
+from logging import Logger
 
 # This is a hack - we need to extract the start time of the data from the
 # file name - but it needs to be used inside code that can't see the value
 # unless it is passed globally.
 time_stamp: float = None
+
+""" The list of fields to include in the basic report. """
+BASIC_DATA = [
+    "rid",
+    "utc (ms)",
+    "elapsed (us)",
+    "Flight Counter",
+    "Drone Mode (text)",
+    "Positioning Mode (text)",
+    "Flight Mode (text)",
+
+    "GPS Lock",
+    "Satellites",
+    "lat (deg)",
+    "lon (deg)",
+    "alt (m)",
+    "bank (deg)",
+    "pitch angle (deg)",
+    "heading (deg)",
+    "distance (m)",
+    "Home Lat (deg)",
+    "Home Lon (deg)",
+
+    "speed (m/s)",
+    "Wind Speed (m/s)",
+    "Wind (deg)",
+    "Thrust",
+
+    "Motor 1 State",
+    "Motor 2 State",
+    "Motor 3 State",
+    "Motor 4 State",
+    "Motor 1 RPM",
+    "Motor 2 RPM",
+    "Motor 3 RPM",
+    "Motor 4 RPM",
+
+    "Battery Level (%)",
+
+    "rc elevator",
+    "rc rudder",
+    "rc throttle",
+    "rc aileron",
+]
+
+""" These fields are only used in the extended report. """
+EXTENDED_DATA = [
+    "HDOP",
+
+    "Accelerometer X (m/s2)",
+    "Accelerometer Y (m/s2)",
+    "Accelerometer Z (m/s2)",
+    "Gyroscope X (deg/s)",
+    "Gyroscope Y (deg/s)",
+    "Gyroscope Z (deg/s)",
+    "Barometer",
+    "Air Pressure (pascals)",
+
+    "Magnetometer X",
+    "Magnetometer Y",
+
+    "delta Y (m/s)",
+    "delta X (m/s)",
+    "delta Z (m/s)",
+    "Position X (m)",
+    "Position Y (m)",
+    "Wind Speed 2 (m/s)",
+
+    "Battery V1 (mv)",
+    "Battery V2 (mv)",
+    "Battery Current (ma)",
+    "Battery Temp (c)",
+    "Auto",
+]
+
+""" These are derived from data in the file in order to compare results. """
+VALIDATION_DATA = [
+    "2d Derived Distance (m)", # 2d distance, derived from position and altitude.
+    "3d Derived Distance (m)", # 3d distance, derived from position and altitude.
+    "2d Derived Speed (m/s)", # derived from delta X and delta Y.
+    "3d Derived Speed (m/s)", # derived from delta X, Y, Z.
+    "Date/Time", # derived from elapsed.
+]
 
 class BadData(Exception):
     """
@@ -292,89 +374,6 @@ ATOM2_FIELDS = [
 ]
 
 
-""" The list of fields to include in the basic report. """
-BASIC_DATA = [
-    "rid",
-    "utc (ms)",
-    "elapsed (us)",
-    "Flight Counter",
-    "Drone Mode (text)",
-    "Positioning Mode (text)",
-    "Flight Mode (text)",
-
-    "GPS Lock",
-    "Satellites",
-    "lat (deg)",
-    "lon (deg)",
-    "alt (m)",
-    "bank (deg)",
-    "pitch angle (deg)",
-    "heading (deg)",
-    "distance (m)",
-    "Home Lat (deg)",
-    "Home Lon (deg)",
-
-    "speed (m/s)",
-    "Wind Speed (m/s)",
-    "Wind (deg)",
-    "Thrust",
-
-    "Motor 1 State",
-    "Motor 2 State",
-    "Motor 3 State",
-    "Motor 4 State",
-    "Motor 1 RPM",
-    "Motor 2 RPM",
-    "Motor 3 RPM",
-    "Motor 4 RPM",
-
-    "Battery Level (%)",
-
-    "rc elevator",
-    "rc rudder",
-    "rc throttle",
-    "rc aileron",
-]
-
-""" These fields are only used in the extended report. """
-EXTENDED_DATA = [
-    "HDOP",
-
-    "Accelerometer X (m/s2)",
-    "Accelerometer Y (m/s2)",
-    "Accelerometer Z (m/s2)",
-    "Gyroscope X (deg/s)",
-    "Gyroscope Y (deg/s)",
-    "Gyroscope Z (deg/s)",
-    "Barometer",
-    "Air Pressure (pascals)",
-
-    "Magnetometer X",
-    "Magnetometer Y",
-
-    "delta Y (m/s)",
-    "delta X (m/s)",
-    "delta Z (m/s)",
-    "Position X (m)",
-    "Position Y (m)",
-    "Wind Speed 2 (m/s)",
-
-    "Battery V1 (mv)",
-    "Battery V2 (mv)",
-    "Battery Current (ma)",
-    "Battery Temp (c)",
-    "Auto",
-]
-
-""" These are derived from data in the file in order to compare results. """
-VALIDATION_DATA = [
-    "2d Derived Distance (m)", # 2d distance, derived from position and altitude.
-    "3d Derived Distance (m)", # 3d distance, derived from position and altitude.
-    "2d Derived Speed (m/s)", # derived from delta X and delta Y.
-    "3d Derived Speed (m/s)", # derived from delta X, Y, Z.
-    "Date/Time", # derived from elapsed.
-]
-
 def is_valid_latlon(lat, lon) -> bool:
     """
     Some simple validation of some GPS coordinates.
@@ -391,7 +390,7 @@ def is_valid_latlon(lat, lon) -> bool:
         return False
     return True
 
-def derived_fields(record, validation):
+def derived_fields(record):
     """
     Adds calculated fields or modifies existing fields based on
     other information.
@@ -410,44 +409,40 @@ def derived_fields(record, validation):
             if record["Auto"] > 0:
                 record["Drone Mode (text)"] = "Autopilot: Launch"
 
-    if validation:
-        record["2d Derived Distance (m)"] = round(math.sqrt(
-                record["Position X (m)"]**2 +
-                record["Position Y (m)"]**2
-            ), 3)
-        record["3d Derived Distance (m)"] = round(math.sqrt(
-                record["Position X (m)"]**2 +
-                record["Position Y (m)"]**2 +
-                record["alt (m)"]**2
-            ), 3)
+    record["2d Derived Distance (m)"] = round(math.sqrt(
+            record["Position X (m)"]**2 +
+            record["Position Y (m)"]**2
+        ), 3)
+    record["3d Derived Distance (m)"] = round(math.sqrt(
+            record["Position X (m)"]**2 +
+            record["Position Y (m)"]**2 +
+            record["alt (m)"]**2
+        ), 3)
 
-        record["2d Derived Speed (m/s)"] = round(math.sqrt(
-                record["delta X (m/s)"]**2 +
-                record["delta Y (m/s)"]**2
-            ), 3)
-        record["3d Derived Speed (m/s)"] = round(math.sqrt(
-                record["delta X (m/s)"]**2 +
-                record["delta Y (m/s)"]**2 +
-                record["delta Z (m/s)"]**2
-            ), 3)
-        record["Date/Time"] = datetime.datetime.utcfromtimestamp(record["utc (ms)"]/1000)
-    
+    record["2d Derived Speed (m/s)"] = round(math.sqrt(
+            record["delta X (m/s)"]**2 +
+            record["delta Y (m/s)"]**2
+        ), 3)
+    record["3d Derived Speed (m/s)"] = round(math.sqrt(
+            record["delta X (m/s)"]**2 +
+            record["delta Y (m/s)"]**2 +
+            record["delta Z (m/s)"]**2
+        ), 3)
+    record["Date/Time"] = datetime.datetime.utcfromtimestamp(record["utc (ms)"]/1000)
 
-def atom2_parser(file_name, logger: mwhlogging.MWHLogger, extended=False, validation=False, destination=None):
+def atom2_parser(file_name, logger: Logger) -> list[dict]:
     """
-    Parse Atom2 flight log and export to CSV.
+    Parse Atom2 flight log and return a list of flight log records.
 
     Args:
         file_name: Path to .fc2 file
-        extended: Include the extended fields in the csv file.
-        validation: Adds some calculated fields to compare against data pulled from the file.
+        logger: a running instance of the Logger class.
     """
 
     global time_stamp
 
     # Extract timestamp from filename
     base_name, _ = os.path.splitext(os.path.basename(file_name))
-    directory = (destination if destination is not None else os.path.dirname(file_name))
 
     try:
         time_stamp = datetime.datetime.strptime(
@@ -458,80 +453,71 @@ def atom2_parser(file_name, logger: mwhlogging.MWHLogger, extended=False, valida
         logger.critical("Could not parse timestamp from filename: %s", base_name)
         raise
 
-    csv_name = os.path.join(directory,f"{base_name}.csv")
-    logger.debug("Creating %s", csv_name)
-    with open(csv_name, mode="w", encoding="utf-8") as csv_file:
-        writer = csv.writer(csv_file)
-        header = BASIC_DATA + \
-            (EXTENDED_DATA if extended else []) + \
-            (VALIDATION_DATA if validation else [])
+    with open(file_name, mode="rb") as flight_file:
+        record_count = 0
+        error_count = 0
 
-        writer.writerow(header)
+        records = []
 
-        with open(file_name, mode="rb") as flight_file:
-            record_count = 0
-            error_count = 0
+        while True:
+            record_count += 1
+            data = flight_file.read(ATOM_RECORD_LEN)
+            if len(data) == 0:
+                break
+            if len(data) < ATOM_RECORD_LEN:
+                logger.warning("Record %s truncated.", record_count)
+                break
 
-            while True:
-                record_count += 1
-                data = flight_file.read(ATOM_RECORD_LEN)
-                if len(data) == 0:
-                    break
-                if len(data) < ATOM_RECORD_LEN:
-                    logger.warning("Record %s truncated.", record_count)
-                    break
+            record = {}
+            try:
+                for field in ATOM2_FIELDS:
+                    field_data = field.get_field(data)
+                    if field_data is None:
+                        raise BadData(f"Illegal value for {field.name}")
+                    record[field.name] = field_data
+            except BadData as e:
+                logger.warning(
+                    "Skipping record %s due to error %s",
+                    record_count,
+                    e
+                )
+                error_count += 1
+                continue
+            except struct.error as e:
+                logger.critical(
+                    "Bad field %s due to error %s",
+                    field.name,
+                    e
+                )
+                raise
 
-                record = {}
-                try:
-                    for field in ATOM2_FIELDS:
-                        field_data = field.get_field(data)
-                        if field_data is None:
-                            raise BadData(f"Illegal value for {field.name}")
-                        record[field.name] = field_data
-                except BadData as e:
-                    logger.warning(
-                        "Skipping record %s due to error %s",
-                        record_count,
-                        e
-                    )
-                    error_count += 1
-                    continue
-                except struct.error as e:
-                    logger.critical(
-                        "Bad field %s due to error %s",
-                        field.name,
-                        e
-                    )
-                    raise
+            # Validation and derived fields follow.
 
-                # Validation and derived fields follow.
+            # GPS coordinates can be wildly wrong if the drone hasn't
+            # achieved a lock yet.
+            if record["GPS Lock"] != "Yes" and (
+                record["lat (deg)"] != "" or
+                record["lon (deg)"] != ""):
+                record["lat (deg)"] = ""
+                record["lon (deg)"] = ""
+                logger.debug(
+                    "Suppressing GPS data before GPS lock in record %s",
+                    record_count
+                )
+                error_count += 1
+                continue
+            if record["GPS Lock"] == "Yes" and not is_valid_latlon(record["lat (deg)"],
+                                    record["lon (deg)"]):
+                logger.warning(
+                    "Skipping record %s due to invalid GPS data.",
+                    record_count
+                )
+                error_count += 1
+                continue
 
-                # GPS coordinates can be wildly wrong if the drone hasn't
-                # achieved a lock yet.
-                if record["GPS Lock"] != "Yes" and (
-                    record["lat (deg)"] != "" or
-                    record["lon (deg)"] != ""):
-                    record["lat (deg)"] = ""
-                    record["lon (deg)"] = ""
-                    logger.debug(
-                        "Suppressing GPS data before GPS lock in record %s",
-                        record_count
-                    )
-                    error_count += 1
-                    continue
-                if record["GPS Lock"] == "Yes" and not is_valid_latlon(record["lat (deg)"],
-                                     record["lon (deg)"]):
-                    logger.warning(
-                        "Skipping record %s due to invalid GPS data.",
-                        record_count
-                    )
-                    error_count += 1
-                    continue
+            derived_fields(record)
 
-                derived_fields(record, validation)
-
-                row = [record.get(field,"") for field in header]
-                writer.writerow(row)
+            records.append(record)
 
     logger.info(
         "%s valid records and %s invalid record(s) in %s.",
@@ -539,4 +525,4 @@ def atom2_parser(file_name, logger: mwhlogging.MWHLogger, extended=False, valida
         error_count,
         file_name
     )
-    logger.print(f"{csv_name} complete.")
+    return records

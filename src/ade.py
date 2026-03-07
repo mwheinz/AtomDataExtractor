@@ -16,11 +16,12 @@ import subprocess
 import queue
 import datetime
 import traceback
+import csv
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import mwhlogging
-from atom2parser import atom2_parser, BadData
+from atom2parser import atom2_parser, BadData, BASIC_DATA, EXTENDED_DATA, VALIDATION_DATA
 from adeversion import _version
 
 # ---------------------------------------------------------------------------
@@ -76,6 +77,29 @@ log_queue: queue.Queue = queue.Queue()
 def log(msg: str) -> None:
     log_queue.put(msg)
 
+def write_csv(file_name, records, extended=False, validation=False, destination=None):
+    """ Convert a list of parsed records into a CSV file. """
+
+    global logger
+
+    base_name, _ = os.path.splitext(os.path.basename(file_name))
+    directory = (destination if destination is not None else os.path.dirname(file_name))
+
+    csv_name = os.path.join(directory, f"{base_name}.csv")
+    logger.debug("Creating %s", csv_name)
+
+    with open(csv_name, mode="w", encoding="utf-8") as csv_file:
+        writer = csv.writer(csv_file)
+        header = BASIC_DATA + \
+            (EXTENDED_DATA if extended else []) + \
+            (VALIDATION_DATA if validation else [])
+        writer.writerow(header)
+
+        for record in records:
+            row = [record.get(field,"") for field in header]
+            writer.writerow(row)
+    logger.print(f"{csv_name} complete.")
+
 # ---------------------------------------------------------------------------
 # Patched atom2_parser that redirects print() into the log queue and raises
 # exceptions instead of calling sys.exit().
@@ -93,13 +117,11 @@ def safe_atom2_parser(file_name: str, extended: bool, validation: bool,
     buf = io.StringIO()
     logger.configure_logging(file_handle = buf)
 
-    atom2_parser(
-        file_name,
-        logger,
+    records = atom2_parser(file_name, logger)
+    write_csv(file_name, records, 
         extended=extended,
         validation=validation,
-        destination=destination if destination else None,
-    )
+        destination=destination if destination else None)
 
     # Relay any captured prints to the log.
     for line in buf.getvalue().splitlines():
