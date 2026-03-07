@@ -566,7 +566,7 @@ class AtomConverterApp:
     def _show_about(self):
         messagebox.showinfo(
             "About",
-            "Atom 2 Flight Log Converter\n"
+            "Atom 2 Data Extractor\n"
             f"Version {_version}\n\n"
             "Converts Potensic Atom 2 flight logs (.fc2) to CSV.\n\n"
             "Written by Michael Heinz.\n"
