@@ -83,9 +83,20 @@ BORDER_COLOR    = "#30363d"
 
 PATH_COLOR      = "#30363d"
 
-LABEL_FONT      = ("Helvetica", 10)
-TITLE_FONT      = ("Helvetica", 13, "bold")
-SMALL_FONT      = ("Helvetica", 8)
+PLATFORM_SYSTEM = platform.system()
+
+if PLATFORM_SYSTEM == "Linux":
+    LABEL_FONT      = ("Liberation", 10)
+    TITLE_FONT      = ("Times", 13, "bold")
+    SMALL_FONT      = ("Liberation", 8)
+elif PLATFORM_SYSTEM == "Darwin":
+    LABEL_FONT      = ("Helvetica Neue", 10)
+    TITLE_FONT      = ("Times", 13, "bold")
+    SMALL_FONT      = ("Helvetica Neue", 8)
+else:
+    LABEL_FONT      = ("Helvetica", 10)
+    TITLE_FONT      = ("Times", 13, "bold")
+    SMALL_FONT      = ("Helvetica", 8)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Canvas-based gauge widgets
@@ -408,8 +419,6 @@ class DroneViewer(tk.Tk):
         self._home_marker        = None
         self._played_path        = []         # coords shown so far
 
-        self._system = platform.system()
-
         self._build_ui()
         self._apply_styles()
 
@@ -596,7 +605,7 @@ class DroneViewer(tk.Tk):
                              cursor="hand2", activebackground=BORDER_COLOR,
                              activeforeground=color, bd=1)
 
-        if self._system == "Darwin":
+        if PLATFORM_SYSTEM == "Darwin":
             self._btn_rw    = btn("⏮️", self._go_start)
             self._btn_back  = btn("⏪", self._step_back)
             self._btn_play  = btn("▶️", self._toggle_play)
@@ -875,7 +884,7 @@ class DroneViewer(tk.Tk):
         if self.current_idx >= len(self.records) - 1:
             self.current_idx = 0
         self.playing = True
-        if self._system == "Darwin":
+        if PLATFORM_SYSTEM == "Darwin":
             self._btn_play.configure(text="⏸️", bg=WARN_COLOR, fg=CANVAS_BG)
         else:
             self._btn_play.configure(text="||", bg=WARN_COLOR, fg=CANVAS_BG)
