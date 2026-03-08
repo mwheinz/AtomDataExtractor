@@ -618,9 +618,6 @@ class DroneViewer(tk.Tk):
         speed_row = tk.Frame(ctrl, bg=PANEL_BG)
         speed_row.pack(pady=(4, 2))
 
-        tk.Label(speed_row, text="Speed:", bg=PANEL_BG, fg=SUBTEXT_COLOR,
-                 font=LABEL_FONT).pack(side=tk.LEFT, padx=(8, 4))
-
         self._speed_var = tk.StringVar(value="1×")
         speeds = ["1×", "2×", "4×", "8×", "16×"]
         for i, label in enumerate(speeds):
