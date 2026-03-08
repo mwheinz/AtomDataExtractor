@@ -14,6 +14,7 @@ import datetime
 import threading
 import time
 import json
+import platform
 from pathlib import Path
 import tkinter as tk
 import tkinter.font as tkf
@@ -82,10 +83,9 @@ BORDER_COLOR    = "#30363d"
 
 PATH_COLOR      = "#30363d"
 
-FONT_MONO       = ("Courier New", 10)
-FONT_LABEL      = ("Helvetica", 10)
-FONT_TITLE      = ("Helvetica", 13, "bold")
-FONT_SMALL      = ("Helvetica", 8)
+LABEL_FONT      = ("Helvetica", 10)
+TITLE_FONT      = ("Helvetica", 13, "bold")
+SMALL_FONT      = ("Helvetica", 8)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Canvas-based gauge widgets
@@ -119,7 +119,7 @@ class CompassGauge(tk.Canvas):
             ly = cy + (r - 14) * math.sin(rad)
             color = DANGER_COLOR if label == "N" else SUBTEXT_COLOR
             self.create_text(lx, ly, text=label, fill=color,
-                             font=FONT_SMALL)
+                             font=SMALL_FONT)
 
         # Tick marks
         for i in range(36):
@@ -146,7 +146,7 @@ class CompassGauge(tk.Canvas):
 
         # Value text
         self.create_text(cx, s - 8, text=f"{self.heading:.1f}°",
-                         fill=TEXT_COLOR, font=FONT_SMALL)
+                         fill=TEXT_COLOR, font=SMALL_FONT)
 
     def set_value(self, heading: float):
         self.heading = heading % 360
@@ -214,13 +214,13 @@ class ArcGauge(tk.Canvas):
         # Label
         self.create_text(cx, cy - r * 0.5,
                          text=self.label, fill=SUBTEXT_COLOR,
-                         font=FONT_SMALL)
+                         font=SMALL_FONT)
 
         # Value
         val_text = f"{self.value:.1f}{self.unit}"
         self.create_text(cx, cy - 10,
                          text=val_text, fill=TEXT_COLOR,
-                         font=FONT_LABEL)
+                         font=LABEL_FONT)
 
     def set_value(self, value: float):
         self.value = value
@@ -271,7 +271,7 @@ class StickDisplay(tk.Canvas):
 
         # Label
         self.create_text(mid, s - 5, text=self.label,
-                         fill=SUBTEXT_COLOR, font=FONT_SMALL)
+                         fill=SUBTEXT_COLOR, font=SMALL_FONT)
 
     def set_values(self, x_val: float, y_val: float):
         self.x_val = x_val
@@ -330,12 +330,12 @@ class BarGauge(tk.Canvas):
 
         # Label
         self.create_text(w / 2, 9, text=self.label,
-                         fill=SUBTEXT_COLOR, font=FONT_SMALL)
+                         fill=SUBTEXT_COLOR, font=SMALL_FONT)
 
         # Value
         self.create_text(w / 2, h - 10,
                          text=f"{self.value:.0f}{self.unit}",
-                         fill=TEXT_COLOR, font=FONT_SMALL)
+                         fill=TEXT_COLOR, font=SMALL_FONT)
 
     def set_value(self, value: float):
         self.value = value
@@ -356,11 +356,11 @@ class InfoPanel(tk.Frame):
             row = i // 2
             col = (i % 2) * 2
             tk.Label(self, text=name + ":", bg=PANEL_BG, fg=SUBTEXT_COLOR,
-                     font=FONT_LABEL, anchor="w").grid(
+                     font=LABEL_FONT, anchor="w").grid(
                 row=row, column=col, sticky="w", padx=(6, 2), pady=1)
             var = tk.StringVar(value="—")
             tk.Label(self, textvariable=var, bg=PANEL_BG, fg=TEXT_COLOR,
-                     font=FONT_LABEL, anchor="w").grid(
+                     font=LABEL_FONT, anchor="w").grid(
                 row=row, column=col+1, sticky="w", padx=(2, 6), pady=1)
             self._vars[name] = var
 
@@ -408,6 +408,8 @@ class DroneViewer(tk.Tk):
         self._home_marker        = None
         self._played_path        = []         # coords shown so far
 
+        self._system = platform.system()
+
         self._build_ui()
         self._apply_styles()
 
@@ -454,17 +456,17 @@ class DroneViewer(tk.Tk):
 
         tk.Label(top, text="✈  ATOM 2 FLIGHT VIEWER",
                  bg=PANEL_BG, fg=ACCENT_COLOR,
-                 font=FONT_TITLE).pack(side=tk.LEFT, padx=16)
+                 font=TITLE_FONT).pack(side=tk.LEFT, padx=16)
 
         self._file_label = tk.Label(top, text="No file loaded",
                                     bg=PANEL_BG, fg=SUBTEXT_COLOR,
-                                    font=FONT_TITLE)
+                                    font=TITLE_FONT)
         self._file_label.pack(side=tk.LEFT, padx=8)
 
         open_btn = tk.Button(top, text="Open FC2…",
                              command=self._open_file,
                              bg=ACCENT_COLOR, fg=CANVAS_BG, relief=tk.FLAT,
-                             font=FONT_LABEL,
+                             font=LABEL_FONT,
                              padx=10, pady=2, cursor="hand2")
         open_btn.pack(side=tk.RIGHT, padx=16)
 
@@ -498,11 +500,11 @@ class DroneViewer(tk.Tk):
 
         self._status_var = tk.StringVar(value="Ready. Open an FC2 file to begin.")
         tk.Label(bot, textvariable=self._status_var,
-                 bg=PANEL_BG, fg=SUBTEXT_COLOR, font=FONT_SMALL).pack(side=tk.LEFT, padx=10)
+                 bg=PANEL_BG, fg=SUBTEXT_COLOR, font=SMALL_FONT).pack(side=tk.LEFT, padx=10)
 
         self._progress_var = tk.StringVar(value="0 / 0")
         tk.Label(bot, textvariable=self._progress_var,
-                 bg=PANEL_BG, fg=SUBTEXT_COLOR, font=FONT_SMALL).pack(side=tk.RIGHT, padx=10)
+                 bg=PANEL_BG, fg=SUBTEXT_COLOR, font=SMALL_FONT).pack(side=tk.RIGHT, padx=10)
 
     def _build_gauges(self, parent):
         """Build the entire right-side gauge panel."""
@@ -563,7 +565,7 @@ class DroneViewer(tk.Tk):
         sticks_frame.pack(padx=6, pady=6)
 
         tk.Label(sticks_frame, text="CONTROLLER", bg=CANVAS_BG, fg=SUBTEXT_COLOR,
-                 font=FONT_SMALL).pack(padx=8)
+                 font=SMALL_FONT).pack(padx=8)
 
         self.stick_left  = StickDisplay(sticks_frame, "Throttle & Yaw",  size=110)
         self.stick_right = StickDisplay(sticks_frame, "Pitch & Bank", size=110)
@@ -590,15 +592,23 @@ class DroneViewer(tk.Tk):
         def btn(text, cmd, color=PANEL_BG, fg=TEXT_COLOR):
             return tk.Button(btn_row, text=text, command=cmd,
                              bg=color, fg=fg, relief=tk.FLAT,
-                             font=FONT_LABEL,
+                             font=LABEL_FONT,
                              cursor="hand2", activebackground=BORDER_COLOR,
                              activeforeground=color, bd=1)
 
-        self._btn_rw    = btn("⏮️", self._go_start)
-        self._btn_back  = btn("⏪", self._step_back)
-        self._btn_play  = btn("▶️", self._toggle_play)
-        self._btn_fwd   = btn("⏩", self._step_fwd)
-        self._btn_ff    = btn("⏭️", self._go_end)
+        if self._system == "Darwin":
+            self._btn_rw    = btn("⏮️", self._go_start)
+            self._btn_back  = btn("⏪", self._step_back)
+            self._btn_play  = btn("▶️", self._toggle_play)
+            self._btn_fwd   = btn("⏩", self._step_fwd)
+            self._btn_ff    = btn("⏭️", self._go_end)
+        else:
+            self._btn_rw    = btn("<<<", self._go_start)
+            self._btn_back  = btn("<<", self._step_back)
+            self._btn_play  = btn(">", self._toggle_play)
+            self._btn_fwd   = btn(">>", self._step_fwd)
+            self._btn_ff    = btn(">>>", self._go_end)
+
 
         for b in (self._btn_rw, self._btn_back, self._btn_play,
                   self._btn_fwd, self._btn_ff):
@@ -609,7 +619,7 @@ class DroneViewer(tk.Tk):
         speed_row.pack(pady=(4, 2))
 
         tk.Label(speed_row, text="Speed:", bg=PANEL_BG, fg=SUBTEXT_COLOR,
-                 font=FONT_LABEL).pack(side=tk.LEFT, padx=(8, 4))
+                 font=LABEL_FONT).pack(side=tk.LEFT, padx=(8, 4))
 
         self._speed_var = tk.StringVar(value="1×")
         speeds = ["1×", "2×", "4×", "8×", "16×"]
@@ -624,7 +634,7 @@ class DroneViewer(tk.Tk):
                                 activeforeground=ACCENT_COLOR,
                                 indicatoron=True,
                                 relief=tk.FLAT,
-                                font=FONT_LABEL,
+                                font=LABEL_FONT,
                                 padx=4, pady=2)
             rb.pack(side=tk.LEFT)
 
@@ -868,7 +878,10 @@ class DroneViewer(tk.Tk):
         if self.current_idx >= len(self.records) - 1:
             self.current_idx = 0
         self.playing = True
-        self._btn_play.configure(text="⏸", bg=WARN_COLOR, fg=CANVAS_BG)
+        if self._system == "Darwin":
+            self._btn_play.configure(text="⏸️", bg=WARN_COLOR, fg=CANVAS_BG)
+        else:
+            self._btn_play.configure(text="||", bg=WARN_COLOR, fg=CANVAS_BG)
         self._stop_event.clear()
         self.playback_thread = threading.Thread(
             target=self._playback_loop, daemon=True)
