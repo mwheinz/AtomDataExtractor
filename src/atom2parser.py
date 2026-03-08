@@ -87,6 +87,7 @@ EXTENDED_DATA = [
 
 """ These are derived from data in the file in order to compare results. """
 VALIDATION_DATA = [
+    "Battery (mv)", # Total battery voltage.
     "2d Derived Distance (m)", # 2d distance, derived from position and altitude.
     "3d Derived Distance (m)", # 3d distance, derived from position and altitude.
     "2d Derived Speed (m/s)", # derived from delta X and delta Y.
@@ -400,15 +401,17 @@ def derived_fields(record):
     if record["Auto"] > 0: 
         if record["Drone Mode (text)"] == "Flying":
             if record["Auto"] == 1:
-                record["Drone Mode (text)"] = "Autopilot: RTH"
+                record["Drone Mode (text)"] = "AI: RTH"
             elif record["Auto"] == 6:
-                record["Drone Mode (text)"] = "Autopilot"
+                record["Drone Mode (text)"] = "AI"
             else:
                 record["Drone Mode (text)"] = "???"
         elif record["Drone Mode (text)"] == "Launching":
             if record["Auto"] > 0:
-                record["Drone Mode (text)"] = "Autopilot: Launch"
+                record["Drone Mode (text)"] = "AI: Launch"
 
+    record["Battery (mv)"] = record["Battery V1 (mv)"] + \
+        record["Battery V2 (mv)"]
     record["2d Derived Distance (m)"] = round(math.sqrt(
             record["Position X (m)"]**2 +
             record["Position Y (m)"]**2
