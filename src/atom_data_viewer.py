@@ -65,7 +65,7 @@ def save_prefs(prefs: dict) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # Colour / font palette
 # ─────────────────────────────────────────────────────────────────────────────
-BG          = "#0d1117"
+CANVAS_BG   = "#0d1117"
 PANEL_BG    = "#161b22"
 ACCENT      = "#58a6ff"
 ACCENT2     = "#3fb950"
@@ -79,9 +79,9 @@ GAUGE_BG    = "#0d1117"
 PATH        = "#30363d"
 
 FONT_MONO   = ("Courier New", 10)
-FONT_LABEL  = ("Segoe UI", 9)
-FONT_VALUE  = ("Segoe UI", 12, "bold")
-FONT_TITLE  = ("Segoe UI", 11, "bold")
+FONT_LABEL  = ("Segoe UI", 10)
+#FONT_VALUE  = ("Segoe UI", 12, "bold")
+FONT_TITLE  = ("Segoe UI", 13, "bold")
 FONT_SMALL  = ("Segoe UI", 8)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ class CompassGauge(tk.Canvas):
             ly = cy + (r - 14) * math.sin(rad)
             color = DANGER if label == "N" else SUBTEXT
             self.create_text(lx, ly, text=label, fill=color,
-                             font=("Segoe UI", 7, "bold"))
+                             font=FONT_SMALL)
 
         # Tick marks
         for i in range(36):
@@ -143,7 +143,7 @@ class CompassGauge(tk.Canvas):
 
         # Value text
         self.create_text(cx, s - 8, text=f"{self.heading:.1f}°",
-                         fill=TEXT, font=("Segoe UI", 8, "bold"))
+                         fill=TEXT, font=FONT_SMALL)
 
     def set_value(self, heading: float):
         self.heading = heading % 360
@@ -209,15 +209,15 @@ class ArcGauge(tk.Canvas):
         self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=TEXT, outline="")
 
         # Label
-        self.create_text(cx, cy - r * 0.35,
+        self.create_text(cx, cy - r * 0.5,
                          text=self.label, fill=SUBTEXT,
-                         font=("Segoe UI", 7))
+                         font=FONT_SMALL)
 
         # Value
         val_text = f"{self.value:.1f}{self.unit}"
-        self.create_text(cx, cy - 6,
+        self.create_text(cx, cy - 10,
                          text=val_text, fill=TEXT,
-                         font=("Segoe UI", 9, "bold"))
+                         font=FONT_LABEL)
 
     def set_value(self, value: float):
         self.value = value
@@ -241,7 +241,7 @@ class StickDisplay(tk.Canvas):
 
     def _draw(self):
         s = self.size
-        pad = 10
+        pad = 2
         inner = s - 2 * pad
 
         self.delete("all")
@@ -262,13 +262,13 @@ class StickDisplay(tk.Canvas):
         # Glow circle
         gr = 12
         self.create_oval(nx - gr, ny - gr, nx + gr, ny + gr,
-                         fill="#1f3a5f", outline="")
+                         fill=PANEL_BG, outline="")
         self.create_oval(nx - 5, ny - 5, nx + 5, ny + 5,
                          fill=ACCENT, outline="")
 
         # Label
         self.create_text(mid, s - 5, text=self.label,
-                         fill=SUBTEXT, font=("Segoe UI", 7))
+                         fill=SUBTEXT, font=FONT_SMALL)
 
     def set_values(self, x_val: float, y_val: float):
         self.x_val = x_val
@@ -327,12 +327,12 @@ class BarGauge(tk.Canvas):
 
         # Label
         self.create_text(w / 2, 9, text=self.label,
-                         fill=SUBTEXT, font=("Segoe UI", 6))
+                         fill=SUBTEXT, font=FONT_SMALL)
 
         # Value
         self.create_text(w / 2, h - 10,
                          text=f"{self.value:.0f}{self.unit}",
-                         fill=TEXT, font=("Segoe UI", 8, "bold"))
+                         fill=TEXT, font=FONT_SMALL)
 
     def set_value(self, value: float):
         self.value = value
@@ -350,13 +350,15 @@ class InfoPanel(tk.Frame):
         super().__init__(parent, bg=PANEL_BG, **kw)
         self._vars = {}
         for i, name in enumerate(fields):
+            row = i // 2
+            col = (i % 2) * 2
             tk.Label(self, text=name + ":", bg=PANEL_BG, fg=SUBTEXT,
-                     font=FONT_SMALL, anchor="w").grid(
-                row=i, column=0, sticky="w", padx=(6, 2), pady=1)
+                     font=FONT_LABEL, anchor="w").grid(
+                row=row, column=col, sticky="w", padx=(6, 2), pady=1)
             var = tk.StringVar(value="—")
             tk.Label(self, textvariable=var, bg=PANEL_BG, fg=TEXT,
-                     font=FONT_MONO, anchor="w").grid(
-                row=i, column=1, sticky="w", padx=(2, 6), pady=1)
+                     font=FONT_LABEL, anchor="w").grid(
+                row=row, column=col+1, sticky="w", padx=(2, 6), pady=1)
             self._vars[name] = var
 
     def update_field(self, name: str, value):
@@ -380,7 +382,7 @@ class DroneViewer(tk.Tk):
 
         self.configure(menu=tk.Menu(self))
         self.title("Atom 2 Flight Log Viewer")
-        self.configure(bg=BG)
+        self.configure(bg=CANVAS_BG)
         self.minsize(1100, 720)
 
         my_logger.setLevel(LOG_LEVEL_MAP[self.prefs.get("log_level", "Debug")])
@@ -449,27 +451,27 @@ class DroneViewer(tk.Tk):
 
         tk.Label(top, text="✈  ATOM 2 FLIGHT VIEWER",
                  bg=PANEL_BG, fg=ACCENT,
-                 font=("Segoe UI", 13, "bold")).pack(side=tk.LEFT, padx=16)
+                 font=FONT_TITLE).pack(side=tk.LEFT, padx=16)
 
         self._file_label = tk.Label(top, text="No file loaded",
                                     bg=PANEL_BG, fg=SUBTEXT,
-                                    font=FONT_LABEL)
+                                    font=FONT_TITLE)
         self._file_label.pack(side=tk.LEFT, padx=8)
 
         open_btn = tk.Button(top, text="Open FC2…",
                              command=self._open_file,
-                             bg=ACCENT, fg=BG, relief=tk.FLAT,
-                             font=("Segoe UI", 9, "bold"),
+                             bg=ACCENT, fg=CANVAS_BG, relief=tk.FLAT,
+                             font=FONT_LABEL,
                              padx=10, pady=2, cursor="hand2")
         open_btn.pack(side=tk.RIGHT, padx=16)
 
         # ── Main paned area ───────────────────────────────────────────────
         main = tk.PanedWindow(self, orient=tk.HORIZONTAL,
-                              bg=BG, sashwidth=4, sashrelief=tk.FLAT)
+                              bg=CANVAS_BG, sashwidth=4, sashrelief=tk.FLAT)
         main.pack(fill=tk.BOTH, expand=True)
 
         # Left: map
-        map_frame = tk.Frame(main, bg=BG)
+        map_frame = tk.Frame(main, bg=CANVAS_BG)
         main.add(map_frame, stretch="always", minsize=500)
 
         self.map_widget = tkintermapview.TkinterMapView(
@@ -480,7 +482,7 @@ class DroneViewer(tk.Tk):
         self.map_widget.canvas.unbind("<MouseWheel>")
 
         # Right: gauges + controls
-        right = tk.Frame(main, bg=BG, width=340)
+        right = tk.Frame(main, bg=CANVAS_BG, width=340)
         right.pack_propagate(False)
         main.add(right, stretch="never", minsize=320)
 
@@ -503,7 +505,7 @@ class DroneViewer(tk.Tk):
         """Build the entire right-side gauge panel."""
 
         # ── Section: Arc gauges row ───────────────────────────────────────
-        arc_row = tk.Frame(parent, bg=BG)
+        arc_row = tk.Frame(parent, bg=CANVAS_BG)
         arc_row.pack(fill=tk.X, padx=6, pady=(6, 0))
 
         # TODO: Need the maximum values for these to adjust gauges.
@@ -515,13 +517,13 @@ class DroneViewer(tk.Tk):
             g.pack(side=tk.LEFT, expand=True)
 
         # ── Section: Compass + bars ───────────────────────────────────────
-        mid_row = tk.Frame(parent, bg=BG)
+        mid_row = tk.Frame(parent, bg=CANVAS_BG)
         mid_row.pack(fill=tk.X, padx=6, pady=4)
 
         self.gauge_compass = CompassGauge(mid_row, size=110)
         self.gauge_compass.pack(side=tk.LEFT, padx=(0, 8))
 
-        bars = tk.Frame(mid_row, bg=BG)
+        bars = tk.Frame(mid_row, bg=CANVAS_BG)
         bars.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         self.bar_battery = BarGauge(bars, label="BATT", max_val=100, unit="%", size_w=36, size_h=110, warn_low=0.3)
@@ -533,14 +535,14 @@ class DroneViewer(tk.Tk):
             b.pack(side=tk.LEFT, padx=2)
 
         # ── Section: RC Sticks ────────────────────────────────────────────
-        tk.Label(parent, text="CONTROLLER", bg=BG, fg=SUBTEXT,
-                 font=FONT_SMALL).pack(anchor="c", padx=8)
+        sticks_frame = tk.Frame(parent, bg=CANVAS_BG)
+        sticks_frame.pack(padx=6, pady=6)
 
-        sticks_row = tk.Frame(parent, bg=BG)
-        sticks_row.pack(fill=tk.X, padx=6, pady=2)
+        tk.Label(sticks_frame, text="CONTROLLER", bg=CANVAS_BG, fg=SUBTEXT,
+                 font=FONT_SMALL).pack(padx=8)
 
-        self.stick_left  = StickDisplay(sticks_row, "LEFT (Thr/Yaw)",  size=110)
-        self.stick_right = StickDisplay(sticks_row, "RIGHT (Pit/Rol)", size=110)
+        self.stick_left  = StickDisplay(sticks_frame, "Throttle & Yaw",  size=110)
+        self.stick_right = StickDisplay(sticks_frame, "Pitch & Bank", size=110)
         self.stick_left.pack(side=tk.LEFT, padx=(0, 4))
         self.stick_right.pack(side=tk.LEFT)
 
@@ -550,13 +552,15 @@ class DroneViewer(tk.Tk):
 
         self.info = InfoPanel(info_frame, [
             "Drone Mode",
+            "GPS Lock",
             "Flight Mode",
             "Pos Mode",
-            "GPS Lock",
-            "Heading",
-            "Bank",
-            "Pitch",
-            "Wind Dir",
+            "⚡ V",
+            "⚡ A",
+            "⚡ Temp",
+            "Flight Counter",
+            "💨 Dir",
+            "💨 Speed",
             "Record #",
             "Elapsed"
         ])
@@ -581,14 +585,14 @@ class DroneViewer(tk.Tk):
 
         def btn(text, cmd, color=PANEL_BG, fg=TEXT):
             return tk.Button(btn_row, text=text, command=cmd,
-                             bg=color, fg=fg, relief=tk.FLAT,
-                             font=("Segoe UI", 10), padx=8, pady=3,
+                             bg=color, fg=color, relief=tk.FLAT,
+                             font=FONT_LABEL,
                              cursor="hand2", activebackground=BORDER,
-                             activeforeground=TEXT, bd=1)
+                             activeforeground=color, bd=1)
 
         self._btn_rw    = btn("⏮️", self._go_start)
         self._btn_back  = btn("⏪", self._step_back)
-        self._btn_play  = btn("▶️", self._toggle_play, ACCENT, BG)
+        self._btn_play  = btn("▶️", self._toggle_play)
         self._btn_fwd   = btn("⏩", self._step_fwd)
         self._btn_ff    = btn("⏭️", self._go_end)
 
@@ -616,7 +620,7 @@ class DroneViewer(tk.Tk):
                                 activeforeground=ACCENT,
                                 indicatoron=False,
                                 relief=tk.FLAT,
-                                font=("Segoe UI", 8),
+                                font=FONT_SMALL,
                                 padx=4, pady=2)
             rb.pack(side=tk.LEFT)
 
@@ -751,10 +755,24 @@ class DroneViewer(tk.Tk):
 
     def _update_markers(self, record: dict):
         '''
-            A marker can be also customized by passing the following arguments to .set_marker(),
-            .set_address() or .set_position(): text, font, icon, icon_anchor, image (PhotoImage),
-            image_zoom_visibility, marker_color_circle, marker_color_outside, text_color, command.
+        Updates the position (and orientation) of the home and drone markers.
         '''
+        # Home marker
+        home_lat = record.get("Home Lat (deg)", "")
+        home_lon = record.get("Home Lon (deg)", "")
+        if is_valid_latlon(home_lat, home_lon):
+            if self._home_marker is None:
+                self._home_marker = self.map_widget.set_marker(
+                    home_lat, home_lon, 
+                    icon=self._make_home_icon(),
+                )
+                # Make sure the drone is drone on top of the home marker.
+                if self._drone_marker is not None:
+                    self._drone_marker.delete()
+                    self._drone_marker = None
+            else:
+                self._home_marker.set_position(home_lat,home_lon)
+
         lat = record["lat (deg)"]
         lon = record["lon (deg)"]
         heading = record["heading (deg)"]
@@ -768,19 +786,6 @@ class DroneViewer(tk.Tk):
             self._drone_marker.set_position(lat,lon)
 
         self._drone_marker.change_icon(self._make_drone_icon(heading))
-
-        # Home marker
-        home_lat = record.get("Home Lat (deg)", "")
-        home_lon = record.get("Home Lon (deg)", "")
-        if is_valid_latlon(home_lat, home_lon):
-            if self._home_marker is None:
-                self._home_marker = self.map_widget.set_marker(
-                    home_lat, home_lon, 
-                    icon=self._make_home_icon(),
-                )
-            else:
-                self._home_marker.set_position(home_lat,home_lon)
-
 
 
     # ── Display update ────────────────────────────────────────────────────
@@ -821,14 +826,16 @@ class DroneViewer(tk.Tk):
         elapsed_s  = elapsed_us / 1_000_000
         m, s       = divmod(int(elapsed_s), 60)
 
+        self.info.update_field("Flight Counter",  r.get("Flight Counter", "0"))
         self.info.update_field("Drone Mode",  r.get("Drone Mode (text)", "—"))
         self.info.update_field("Pos Mode",    r.get("Positioning Mode (text)", "—"))
         self.info.update_field("Flight Mode", r.get("Flight Mode (text)", "—"))
         self.info.update_field("GPS Lock",    r.get("GPS Lock", "—"))
-        self.info.update_field("Heading",     f"{r.get('heading (deg)', 0):.1f}°")
-        self.info.update_field("Bank",        f"{r.get('bank (deg)', 0):.1f}°")
-        self.info.update_field("Pitch",       f"{r.get('pitch angle (deg)', 0):.1f}°")
-        self.info.update_field("Wind Dir",    f"{r.get('Wind (deg)', 0):.1f}°")
+        self.info.update_field("⚡ V",        f"{r.get('Battery (mv)')/1000:.1f}V")
+        self.info.update_field("⚡ A",        f"{r.get('Battery Current (ma)')/1000:.1f}A")
+        self.info.update_field("⚡ Temp",     f"{r.get('Battery Temp (c)', 0):.1f}C")
+        self.info.update_field("💨 Dir",      f"{r.get('Wind (deg)', 0):.1f}°")
+        self.info.update_field("💨 Speed",    f"{r.get('Wind Speed (m/s)', 0):.1f} m/s")
         self.info.update_field("Record #",    str(idx + 1))
         self.info.update_field("Elapsed",     f"{m:02d}:{s:02d}")
 
@@ -853,7 +860,7 @@ class DroneViewer(tk.Tk):
         if self.current_idx >= len(self.records) - 1:
             self.current_idx = 0
         self.playing = True
-        self._btn_play.configure(text="⏸", bg=WARN, fg=BG)
+        self._btn_play.configure(text="⏸", bg=WARN, fg=CANVAS_BG)
         self._stop_event.clear()
         self.playback_thread = threading.Thread(
             target=self._playback_loop, daemon=True)
@@ -862,7 +869,7 @@ class DroneViewer(tk.Tk):
     def _pause(self):
         self.playing = False
         self._stop_event.set()
-        self._btn_play.configure(text="▶", bg=ACCENT, fg=BG)
+        self._btn_play.configure(text="▶", bg=ACCENT, fg=CANVAS_BG)
 
     def _playback_loop(self):
         """Background thread that advances frames at the selected rate."""
