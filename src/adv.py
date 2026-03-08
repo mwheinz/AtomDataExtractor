@@ -16,9 +16,10 @@ import time
 import json
 from pathlib import Path
 import tkinter as tk
+import tkinter.font as tkf
 from tkinter import ttk, filedialog, messagebox
 import tkintermapview
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageDraw, ImageTk, ImageFont
 from adeversion import _version
 from atom2parser import BadData, atom2_parser, is_valid_latlon
 import mwhlogging
@@ -65,24 +66,26 @@ def save_prefs(prefs: dict) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # Colour / font palette
 # ─────────────────────────────────────────────────────────────────────────────
-CANVAS_BG   = "#0d1117"
-PANEL_BG    = "#161b22"
-ACCENT      = "#58a6ff"
-ACCENT2     = "#3fb950"
-WARN        = "#d29922"
-DANGER      = "#f85149"
-TEXT        = "#e6edf3"
-SUBTEXT     = "#8b949e"
-BORDER      = "#30363d"
-GAUGE_BG    = "#0d1117"
+CANVAS_BG       = "#0d1117"
+GAUGE_BG        = "#0d1117"
+PANEL_BG        = "#161b22"
 
-PATH        = "#30363d"
+ACCENT_COLOR    = "#58a6ff"
 
-FONT_MONO   = ("Courier New", 10)
-FONT_LABEL  = ("Segoe UI", 10)
-#FONT_VALUE  = ("Segoe UI", 12, "bold")
-FONT_TITLE  = ("Segoe UI", 13, "bold")
-FONT_SMALL  = ("Segoe UI", 8)
+SAFE_COLOR      = "#3fb950"
+WARN_COLOR      = "#d29922"
+DANGER_COLOR    = "#f85149"
+
+TEXT_COLOR      = "#e6edf3"
+SUBTEXT_COLOR   = "#8b949e"
+BORDER_COLOR    = "#30363d"
+
+PATH_COLOR      = "#30363d"
+
+FONT_MONO       = ("Courier New", 10)
+FONT_LABEL      = ("Helvetica", 10)
+FONT_TITLE      = ("Helvetica", 13, "bold")
+FONT_SMALL      = ("Helvetica", 8)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Canvas-based gauge widgets
@@ -107,14 +110,14 @@ class CompassGauge(tk.Canvas):
 
         # Outer ring
         self.create_oval(cx-r, cy-r, cx+r, cy+r,
-                         outline=BORDER, width=2, fill=PANEL_BG)
+                         outline=BORDER_COLOR, width=2, fill=PANEL_BG)
 
         # Cardinal labels
         for label, angle in [("N", 0), ("E", 90), ("S", 180), ("W", 270)]:
             rad = math.radians(angle - 90)
             lx = cx + (r - 14) * math.cos(rad)
             ly = cy + (r - 14) * math.sin(rad)
-            color = DANGER if label == "N" else SUBTEXT
+            color = DANGER_COLOR if label == "N" else SUBTEXT_COLOR
             self.create_text(lx, ly, text=label, fill=color,
                              font=FONT_SMALL)
 
@@ -126,7 +129,7 @@ class CompassGauge(tk.Canvas):
             y1 = cy + inner * math.sin(ang)
             x2 = cx + r * math.cos(ang)
             y2 = cy + r * math.sin(ang)
-            self.create_line(x1, y1, x2, y2, fill=BORDER)
+            self.create_line(x1, y1, x2, y2, fill=BORDER_COLOR)
 
         # Needle
         needle_rad = math.radians(self.heading - 90)
@@ -135,15 +138,15 @@ class CompassGauge(tk.Canvas):
         # tail
         tx = cx - 8 * math.cos(needle_rad)
         ty = cy - 8 * math.sin(needle_rad)
-        self.create_line(tx, ty, nx, ny, fill=ACCENT, width=2,
+        self.create_line(tx, ty, nx, ny, fill=ACCENT_COLOR, width=2,
                          arrow=tk.LAST, arrowshape=(8, 10, 3))
 
         # Center dot
-        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=ACCENT, outline="")
+        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=ACCENT_COLOR, outline="")
 
         # Value text
         self.create_text(cx, s - 8, text=f"{self.heading:.1f}°",
-                         fill=TEXT, font=FONT_SMALL)
+                         fill=TEXT_COLOR, font=FONT_SMALL)
 
     def set_value(self, heading: float):
         self.heading = heading % 360
@@ -183,18 +186,18 @@ class ArcGauge(tk.Canvas):
         # Background arc (180°)
         self.create_arc(cx-r, cy-r, cx+r, cy+r,
                         start=0, extent=180,
-                        style=tk.ARC, outline=BORDER, width=8)
+                        style=tk.ARC, outline=BORDER_COLOR, width=8)
 
         # Coloured fill arc
         pct = (self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
         pct = max(0.0, min(1.0, pct))
         extent = pct * 180
 
-        color = ACCENT2
+        color = SAFE_COLOR
         if pct >= self.danger_pct:
-            color = DANGER
+            color = DANGER_COLOR
         elif pct >= self.warn_pct:
-            color = WARN
+            color = WARN_COLOR
 
         if extent > 0:
             self.create_arc(cx-r, cy-r, cx+r, cy+r,
@@ -205,18 +208,18 @@ class ArcGauge(tk.Canvas):
         needle_angle = math.radians(180 - pct * 180)
         nx = cx + (r - 2) * math.cos(needle_angle)
         ny = cy - (r - 2) * math.sin(needle_angle)
-        self.create_line(cx, cy, nx, ny, fill=TEXT, width=2)
-        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=TEXT, outline="")
+        self.create_line(cx, cy, nx, ny, fill=TEXT_COLOR, width=2)
+        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=TEXT_COLOR, outline="")
 
         # Label
         self.create_text(cx, cy - r * 0.5,
-                         text=self.label, fill=SUBTEXT,
+                         text=self.label, fill=SUBTEXT_COLOR,
                          font=FONT_SMALL)
 
         # Value
         val_text = f"{self.value:.1f}{self.unit}"
         self.create_text(cx, cy - 10,
-                         text=val_text, fill=TEXT,
+                         text=val_text, fill=TEXT_COLOR,
                          font=FONT_LABEL)
 
     def set_value(self, value: float):
@@ -248,12 +251,12 @@ class StickDisplay(tk.Canvas):
 
         # Box
         self.create_rectangle(pad, pad, s - pad, s - pad,
-                               outline=BORDER, fill=PANEL_BG)
+                               outline=BORDER_COLOR, fill=PANEL_BG)
 
         # Centre cross
         mid = s / 2
-        self.create_line(pad, mid, s - pad, mid, fill=BORDER, dash=(2, 3))
-        self.create_line(mid, pad, mid, s - pad, fill=BORDER, dash=(2, 3))
+        self.create_line(pad, mid, s - pad, mid, fill=BORDER_COLOR, dash=(2, 3))
+        self.create_line(mid, pad, mid, s - pad, fill=BORDER_COLOR, dash=(2, 3))
 
         # Dot position
         nx = pad + (self.x_val / 2048.0) * inner
@@ -264,11 +267,11 @@ class StickDisplay(tk.Canvas):
         self.create_oval(nx - gr, ny - gr, nx + gr, ny + gr,
                          fill=PANEL_BG, outline="")
         self.create_oval(nx - 5, ny - 5, nx + 5, ny + 5,
-                         fill=ACCENT, outline="")
+                         fill=ACCENT_COLOR, outline="")
 
         # Label
         self.create_text(mid, s - 5, text=self.label,
-                         fill=SUBTEXT, font=FONT_SMALL)
+                         fill=SUBTEXT_COLOR, font=FONT_SMALL)
 
     def set_values(self, x_val: float, y_val: float):
         self.x_val = x_val
@@ -308,16 +311,16 @@ class BarGauge(tk.Canvas):
 
         # Background
         self.create_rectangle(pad_x, bar_top, w - pad_x, bar_bot,
-                               outline=BORDER, fill=PANEL_BG)
+                               outline=BORDER_COLOR, fill=PANEL_BG)
 
         pct = (self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
         pct = max(0.0, min(1.0, pct))
 
-        color = ACCENT2
+        color = SAFE_COLOR
         if self.warn_low is not False and pct <= self.warn_low:
-            color = DANGER
+            color = DANGER_COLOR
         if self.warn_high is not False and pct >= self.warn_high:
-            color = DANGER
+            color = DANGER_COLOR
 
         fill_top = bar_bot - pct * bar_h
         if pct > 0:
@@ -327,12 +330,12 @@ class BarGauge(tk.Canvas):
 
         # Label
         self.create_text(w / 2, 9, text=self.label,
-                         fill=SUBTEXT, font=FONT_SMALL)
+                         fill=SUBTEXT_COLOR, font=FONT_SMALL)
 
         # Value
         self.create_text(w / 2, h - 10,
                          text=f"{self.value:.0f}{self.unit}",
-                         fill=TEXT, font=FONT_SMALL)
+                         fill=TEXT_COLOR, font=FONT_SMALL)
 
     def set_value(self, value: float):
         self.value = value
@@ -352,11 +355,11 @@ class InfoPanel(tk.Frame):
         for i, name in enumerate(fields):
             row = i // 2
             col = (i % 2) * 2
-            tk.Label(self, text=name + ":", bg=PANEL_BG, fg=SUBTEXT,
+            tk.Label(self, text=name + ":", bg=PANEL_BG, fg=SUBTEXT_COLOR,
                      font=FONT_LABEL, anchor="w").grid(
                 row=row, column=col, sticky="w", padx=(6, 2), pady=1)
             var = tk.StringVar(value="—")
-            tk.Label(self, textvariable=var, bg=PANEL_BG, fg=TEXT,
+            tk.Label(self, textvariable=var, bg=PANEL_BG, fg=TEXT_COLOR,
                      font=FONT_LABEL, anchor="w").grid(
                 row=row, column=col+1, sticky="w", padx=(2, 6), pady=1)
             self._vars[name] = var
@@ -450,17 +453,17 @@ class DroneViewer(tk.Tk):
         top.pack(fill=tk.X, side=tk.TOP)
 
         tk.Label(top, text="✈  ATOM 2 FLIGHT VIEWER",
-                 bg=PANEL_BG, fg=ACCENT,
+                 bg=PANEL_BG, fg=ACCENT_COLOR,
                  font=FONT_TITLE).pack(side=tk.LEFT, padx=16)
 
         self._file_label = tk.Label(top, text="No file loaded",
-                                    bg=PANEL_BG, fg=SUBTEXT,
+                                    bg=PANEL_BG, fg=SUBTEXT_COLOR,
                                     font=FONT_TITLE)
         self._file_label.pack(side=tk.LEFT, padx=8)
 
         open_btn = tk.Button(top, text="Open FC2…",
                              command=self._open_file,
-                             bg=ACCENT, fg=CANVAS_BG, relief=tk.FLAT,
+                             bg=ACCENT_COLOR, fg=CANVAS_BG, relief=tk.FLAT,
                              font=FONT_LABEL,
                              padx=10, pady=2, cursor="hand2")
         open_btn.pack(side=tk.RIGHT, padx=16)
@@ -495,11 +498,11 @@ class DroneViewer(tk.Tk):
 
         self._status_var = tk.StringVar(value="Ready. Open an FC2 file to begin.")
         tk.Label(bot, textvariable=self._status_var,
-                 bg=PANEL_BG, fg=SUBTEXT, font=FONT_SMALL).pack(side=tk.LEFT, padx=10)
+                 bg=PANEL_BG, fg=SUBTEXT_COLOR, font=FONT_SMALL).pack(side=tk.LEFT, padx=10)
 
         self._progress_var = tk.StringVar(value="0 / 0")
         tk.Label(bot, textvariable=self._progress_var,
-                 bg=PANEL_BG, fg=SUBTEXT, font=FONT_SMALL).pack(side=tk.RIGHT, padx=10)
+                 bg=PANEL_BG, fg=SUBTEXT_COLOR, font=FONT_SMALL).pack(side=tk.RIGHT, padx=10)
 
     def _build_gauges(self, parent):
         """Build the entire right-side gauge panel."""
@@ -559,7 +562,7 @@ class DroneViewer(tk.Tk):
         sticks_frame = tk.Frame(parent, bg=CANVAS_BG)
         sticks_frame.pack(padx=6, pady=6)
 
-        tk.Label(sticks_frame, text="CONTROLLER", bg=CANVAS_BG, fg=SUBTEXT,
+        tk.Label(sticks_frame, text="CONTROLLER", bg=CANVAS_BG, fg=SUBTEXT_COLOR,
                  font=FONT_SMALL).pack(padx=8)
 
         self.stick_left  = StickDisplay(sticks_frame, "Throttle & Yaw",  size=110)
@@ -584,11 +587,11 @@ class DroneViewer(tk.Tk):
         btn_row = tk.Frame(ctrl, bg=PANEL_BG)
         btn_row.pack()
 
-        def btn(text, cmd, color=PANEL_BG, fg=TEXT):
+        def btn(text, cmd, color=PANEL_BG, fg=TEXT_COLOR):
             return tk.Button(btn_row, text=text, command=cmd,
                              bg=color, fg=fg, relief=tk.FLAT,
                              font=FONT_LABEL,
-                             cursor="hand2", activebackground=BORDER,
+                             cursor="hand2", activebackground=BORDER_COLOR,
                              activeforeground=color, bd=1)
 
         self._btn_rw    = btn("⏮️", self._go_start)
@@ -605,7 +608,7 @@ class DroneViewer(tk.Tk):
         speed_row = tk.Frame(ctrl, bg=PANEL_BG)
         speed_row.pack(pady=(4, 2))
 
-        tk.Label(speed_row, text="Speed:", bg=PANEL_BG, fg=SUBTEXT,
+        tk.Label(speed_row, text="Speed:", bg=PANEL_BG, fg=SUBTEXT_COLOR,
                  font=FONT_LABEL).pack(side=tk.LEFT, padx=(8, 4))
 
         self._speed_var = tk.StringVar(value="1×")
@@ -615,10 +618,10 @@ class DroneViewer(tk.Tk):
             rb = tk.Radiobutton(speed_row, text=label,
                                 variable=self._speed_var, value=label,
                                 command=lambda i=idx: self._set_speed(i),
-                                bg=PANEL_BG, fg=SUBTEXT,
+                                bg=PANEL_BG, fg=SUBTEXT_COLOR,
                                 selectcolor=PANEL_BG,
                                 activebackground=PANEL_BG,
-                                activeforeground=ACCENT,
+                                activeforeground=ACCENT_COLOR,
                                 indicatoron=True,
                                 relief=tk.FLAT,
                                 font=FONT_LABEL,
@@ -629,7 +632,7 @@ class DroneViewer(tk.Tk):
         style = ttk.Style(self)
         style.theme_use("clam")
         style.configure("TScale", background=PANEL_BG,
-                        troughcolor=BORDER, slidercolor=ACCENT)
+                        troughcolor=BORDER_COLOR, slidercolor=ACCENT_COLOR)
 
     # ── File loading ──────────────────────────────────────────────────────
 
@@ -713,7 +716,7 @@ class DroneViewer(tk.Tk):
         coords = [(r["lat (deg)"], r["lon (deg)"]) for r in self.records]
         if len(coords) >= 2:
             self._path_line = self.map_widget.set_path(
-                coords, color=PATH, width=4)
+                coords, color=PATH_COLOR, width=4)
 
     #
     # Icons for the map
@@ -731,7 +734,7 @@ class DroneViewer(tk.Tk):
         # Draw a simple arrow/chevron pointing "up" (north = 0°)
         # Note the 4-pixel pad on the top and left.
         draw.polygon([(cx, 4), (size, size), (cx, cy+cy//2), (4, size)],
-                    fill=DANGER, outline=BORDER)
+                    fill=DANGER_COLOR, outline=BORDER_COLOR)
 
         img = img.rotate(-heading, resample=Image.BICUBIC, expand=False)
 
@@ -746,11 +749,14 @@ class DroneViewer(tk.Tk):
         cx, cy = size // 2, size // 2
 
         # Roof triangle
-        draw.polygon([(cx, 0), (size, cy), (0, cy)], fill=ACCENT, outline=BORDER)
+        draw.polygon([(cx, 0), (size, cy), (0, cy)], fill=ACCENT_COLOR, outline=BORDER_COLOR)
         # House body
-        draw.rectangle([(0, cy), (size, size)], fill=ACCENT, outline=BORDER)
+        draw.rectangle([(0, cy), (size, size)], fill=ACCENT_COLOR, outline=BORDER_COLOR)
         # Door
-        draw.rectangle([(cx-4, cy), (cx+4, size)], fill=BORDER)
+        draw.rectangle([(cx-4, cy), (cx+4, size)], fill=BORDER_COLOR)
+        #ttf = ImageFont.truetype(font="Helvetica", size=size, encoding="utf-8")
+        #my_logger.critical(f"Loaded {ttf}")
+        #draw.text((0,size), "🏠", font=ttf)
 
         return ImageTk.PhotoImage(img)
 
@@ -862,7 +868,7 @@ class DroneViewer(tk.Tk):
         if self.current_idx >= len(self.records) - 1:
             self.current_idx = 0
         self.playing = True
-        self._btn_play.configure(text="⏸", bg=WARN, fg=CANVAS_BG)
+        self._btn_play.configure(text="⏸", bg=WARN_COLOR, fg=CANVAS_BG)
         self._stop_event.clear()
         self.playback_thread = threading.Thread(
             target=self._playback_loop, daemon=True)
@@ -871,7 +877,7 @@ class DroneViewer(tk.Tk):
     def _pause(self):
         self.playing = False
         self._stop_event.set()
-        self._btn_play.configure(text="▶", bg=ACCENT, fg=CANVAS_BG)
+        self._btn_play.configure(text="▶", bg=ACCENT_COLOR, fg=CANVAS_BG)
 
     def _playback_loop(self):
         """Background thread that advances frames at the selected rate."""
