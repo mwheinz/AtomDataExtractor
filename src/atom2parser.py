@@ -402,10 +402,12 @@ def derived_fields(record):
         if record["Drone Mode (text)"] == "Flying":
             if record["Auto"] == 1:
                 record["Drone Mode (text)"] = "AI: RTH"
+            elif record["Auto"] == 2:
+                record["Drone Mode (text)"] = f"AI: WPT"
             elif record["Auto"] == 6:
-                record["Drone Mode (text)"] = "AI"
+                record["Drone Mode (text)"] = f"AI: QS"
             else:
-                record["Drone Mode (text)"] = "???"
+                record["Drone Mode (text)"] = f"AI: ({record["Auto"]})"
         elif record["Drone Mode (text)"] == "Launching":
             if record["Auto"] > 0:
                 record["Drone Mode (text)"] = "AI: Launch"

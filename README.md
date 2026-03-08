@@ -154,7 +154,7 @@ Fields are all little-endian.
 | 5 | 8 | long long | micro seconds since the drone started(?) or possibly since the PTD-1 started(?) Can be combined with the file name to generate time stamps for each record, which TO can use. | ✓ |
 | 17 | 2 | ushort | How many times the drone has flown? Increments with each landing. Slightly more than what the PTD-1 reports. | ✓ |
 | 428 | 1 | byte | Drone mode 0 = motors off or idle, 1 = launching, 2 = flying, 3 = landing | ✓ |
-| 429 | 1 | byte | During launch >0 means the drone is doing an auto-launch. During flight, 1 = Return-to-Home is active. During flight, 6 = An AI mode is active, such as taking a panoramic photo, or orbiting a selected point. | ✓ |
+| 429 | 1 | byte | During launch >0 means the drone is doing an auto-launch. During flight, 1 = Return-to-Home is active. During flight, 2 = Appears to indicated waypoint mode, 6 = An AI mode is active, such as taking a panoramic photo, or orbiting a selected point. | ✓ |
 | 430 | 1 | byte | Positioning mode. 3 = GPS, 2 = Optical, 1 = Attitude | ✓ |
 | 433 | 1 | byte | Flight mode 7 = video, 8 = normal, 9 = sport | ✓ |
 | 456 | 1 | byte | Drone mode 2: 0 = idle or motors off, 1 = launching, 2 = flying, 3 = landing - Sometimes takes longer to enter landing mode than #428 | ✓ |
