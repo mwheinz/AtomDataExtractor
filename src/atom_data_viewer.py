@@ -534,18 +534,6 @@ class DroneViewer(tk.Tk):
         for b in (self.bar_battery, self.bar_sats, self.bar_wind, self.bar_thrust):
             b.pack(side=tk.LEFT, padx=2)
 
-        # ── Section: RC Sticks ────────────────────────────────────────────
-        sticks_frame = tk.Frame(parent, bg=CANVAS_BG)
-        sticks_frame.pack(padx=6, pady=6)
-
-        tk.Label(sticks_frame, text="CONTROLLER", bg=CANVAS_BG, fg=SUBTEXT,
-                 font=FONT_SMALL).pack(padx=8)
-
-        self.stick_left  = StickDisplay(sticks_frame, "Throttle & Yaw",  size=110)
-        self.stick_right = StickDisplay(sticks_frame, "Pitch & Bank", size=110)
-        self.stick_left.pack(side=tk.LEFT, padx=(0, 4))
-        self.stick_right.pack(side=tk.LEFT)
-
         # ── Section: Text info ────────────────────────────────────────────
         info_frame = tk.Frame(parent, bg=PANEL_BG, bd=0)
         info_frame.pack(fill=tk.X, padx=6, pady=4)
@@ -558,13 +546,26 @@ class DroneViewer(tk.Tk):
             "⚡ V",
             "⚡ A",
             "⚡ Temp",
-            "Flight Counter",
+            "⚡ %",
             "💨 Dir",
             "💨 Speed",
             "Record #",
-            "Elapsed"
+            "Elapsed",
+            "Flight Counter",
         ])
         self.info.pack(fill=tk.X)
+
+        # ── Section: RC Sticks ────────────────────────────────────────────
+        sticks_frame = tk.Frame(parent, bg=CANVAS_BG)
+        sticks_frame.pack(padx=6, pady=6)
+
+        tk.Label(sticks_frame, text="CONTROLLER", bg=CANVAS_BG, fg=SUBTEXT,
+                 font=FONT_SMALL).pack(padx=8)
+
+        self.stick_left  = StickDisplay(sticks_frame, "Throttle & Yaw",  size=110)
+        self.stick_right = StickDisplay(sticks_frame, "Pitch & Bank", size=110)
+        self.stick_left.pack(side=tk.LEFT, padx=(0, 4))
+        self.stick_right.pack(side=tk.LEFT)
 
     def _build_controls(self, parent):
         """Transport controls at the bottom of the right panel."""
@@ -585,7 +586,7 @@ class DroneViewer(tk.Tk):
 
         def btn(text, cmd, color=PANEL_BG, fg=TEXT):
             return tk.Button(btn_row, text=text, command=cmd,
-                             bg=color, fg=color, relief=tk.FLAT,
+                             bg=color, fg=fg, relief=tk.FLAT,
                              font=FONT_LABEL,
                              cursor="hand2", activebackground=BORDER,
                              activeforeground=color, bd=1)
@@ -605,7 +606,7 @@ class DroneViewer(tk.Tk):
         speed_row.pack(pady=(4, 2))
 
         tk.Label(speed_row, text="Speed:", bg=PANEL_BG, fg=SUBTEXT,
-                 font=FONT_SMALL).pack(side=tk.LEFT, padx=(8, 4))
+                 font=FONT_LABEL).pack(side=tk.LEFT, padx=(8, 4))
 
         self._speed_var = tk.StringVar(value="1×")
         speeds = ["1×", "2×", "4×", "8×", "16×"]
@@ -618,9 +619,9 @@ class DroneViewer(tk.Tk):
                                 selectcolor=PANEL_BG,
                                 activebackground=PANEL_BG,
                                 activeforeground=ACCENT,
-                                indicatoron=False,
+                                indicatoron=True,
                                 relief=tk.FLAT,
-                                font=FONT_SMALL,
+                                font=FONT_LABEL,
                                 padx=4, pady=2)
             rb.pack(side=tk.LEFT)
 
@@ -834,6 +835,7 @@ class DroneViewer(tk.Tk):
         self.info.update_field("⚡ V",        f"{r.get('Battery (mv)')/1000:.1f}V")
         self.info.update_field("⚡ A",        f"{r.get('Battery Current (ma)')/1000:.1f}A")
         self.info.update_field("⚡ Temp",     f"{r.get('Battery Temp (c)', 0):.1f}C")
+        self.info.update_field("⚡ %",        f"{r.get('Battery Level (%)', 0)}%")
         self.info.update_field("💨 Dir",      f"{r.get('Wind (deg)', 0):.1f}°")
         self.info.update_field("💨 Speed",    f"{r.get('Wind Speed (m/s)', 0):.1f} m/s")
         self.info.update_field("Record #",    str(idx + 1))
