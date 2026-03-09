@@ -1,6 +1,4 @@
 .DS_Store
-*fc2
-*csv
 logs/**
 src/__pycache__/**
 src/build/**

@@ -24,7 +24,7 @@ This app would not exist if Koen Aerts and Rob Pitt hadn't already written the [
 ## Building
 At this point, AtomDataExtractor can be used via a command line tool or a GUI app. If you know your way around MacOS Terminal, or Windows Shell, or the Linux terminal app of your choice, download the latest release from [github](https://github.com/mwheinz/AtomDataExtractor) and add AtomDataExtractor/src to your command path, to use the CLI version. 
 
-To build the GUI version, start in the main AtomDataExtractor directory:
+To build the GUI apps, start in the main AtomDataExtractor directory:
 ```
 $ python3 -m venv ade-venv
 $ source ade-venv/bin/activate
@@ -32,11 +32,11 @@ $ pip install tk
 ```
 (on Ubuntu you may need `sudo apt install python3-tk` instead.)
 ```
-$ pip install pyinstaller
+$ pip install tkintermapview pyinstaller
 $ cd src
 $ ./build.sh
 ```
-The final executable should be in the AtomDataExtractor/src/dist directory.
+The final executables will be in the AtomDataExtractor/src/dist directory.
 
 ## Getting Telemetry Data From Your Atom 2 Drone
 ### PTD-1 Controller with SD card
@@ -115,18 +115,22 @@ Fully documenting how Telemetry Overlay works is outside the scope of this docum
 
 Note: If you have multiple videos associated with a single CSV file, I recommend processing them separately since the sync offset will be different for each.
 
+## Atom Data Viewer
+
+Atom Data Viewer (adv) is an alternative to loading data into Telemetry Overlay. It is meant to give you a way to review a flight log without dealing with video files. It is built at the same time as ade.py.
+
 # Development notes:
 
 ## Participating in this project
 I am always looking for contributions! If you are interested, check out the [github project](https://github.com/mwheinz/AtomDataExtractor) and get cracking!
 ## Building:
-To try and build the GUI app:
+To try and build the GUI apps:
 
 ```
 $ python3 -m venv venv
 $ source venv/bin/activate
 $ cd src
-$ pyinstaller --onedir --windowed ade.py
+$ ./build.sh
 ```
 
 ## Telemetry Overlay Documentation:
@@ -154,7 +158,7 @@ Fields are all little-endian.
 | 5 | 8 | long long | micro seconds since the drone started(?) or possibly since the PTD-1 started(?) Can be combined with the file name to generate time stamps for each record, which TO can use. | ✓ |
 | 17 | 2 | ushort | How many times the drone has flown? Increments with each landing. Slightly more than what the PTD-1 reports. | ✓ |
 | 428 | 1 | byte | Drone mode 0 = motors off or idle, 1 = launching, 2 = flying, 3 = landing | ✓ |
-| 429 | 1 | byte | During launch >0 means the drone is doing an auto-launch. During flight, 1 = Return-to-Home is active. During flight, 6 = An AI mode is active, such as taking a panoramic photo, or orbiting a selected point. | ✓ |
+| 429 | 1 | byte | During launch >0 means the drone is doing an auto-launch. During flight, 1 = Return-to-Home is active. During flight, 2 = Appears to indicated waypoint mode, 6 = An AI mode is active, such as taking a panoramic photo, or orbiting a selected point. | ✓ |
 | 430 | 1 | byte | Positioning mode. 3 = GPS, 2 = Optical, 1 = Attitude | ✓ |
 | 433 | 1 | byte | Flight mode 7 = video, 8 = normal, 9 = sport | ✓ |
 | 456 | 1 | byte | Drone mode 2: 0 = idle or motors off, 1 = launching, 2 = flying, 3 = landing - Sometimes takes longer to enter landing mode than #428 | ✓ |
