@@ -662,6 +662,8 @@ class DroneViewer(tk.Tk):
 
     # ── UI construction ───────────────────────────────────────────────────
     def _show_prefs(self):
+        if self.playing:
+            self._pause()
         PrefsDialog(self, self.prefs, self._on_prefs_saved)
 
     def _on_prefs_saved(self, new_prefs: dict):
