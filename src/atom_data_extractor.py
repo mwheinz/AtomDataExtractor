@@ -1,20 +1,15 @@
 #!python3
 '''
 Convert information from an Atom-2 flight log into a Telemetry Overlay CSV
-
-TODO: Add a mode that replaces errors with blank data instead of skipping the
-      record.
-
-TODO: Do a test to try and corrolate camera modes with fc2 data. Could be
-      done without even flying...
 '''
 
 import os
+import sys
 import argparse
 import csv
 import mwhlogging
 from mwhlogging import MWHLogger
-from atom2parser import BadData, atom2_parser, BASIC_DATA, EXTENDED_DATA, VALIDATION_DATA
+from atom2parser import atom2_parser, BASIC_DATA, EXTENDED_DATA, VALIDATION_DATA
 
 my_logger = MWHLogger("csv_extractor")
 
@@ -53,7 +48,8 @@ def main() -> None:
         "-D","--destination",
         type=str,
         default=None,
-        help="The directory to write the CSV files to. Defaults to the directory the telemetry file is in."
+        help="The directory to write the CSV files to. "\
+             "Defaults to the directory the telemetry file is in."
     )
 
     arg_parser.add_argument(

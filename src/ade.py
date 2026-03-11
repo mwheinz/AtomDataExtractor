@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """
-Atom 2 Flight Log Converter - GUI Version
+Atom 2 Flight Log Converter GUI
 
 A cross-platform GUI front-end for atom_data_extractor.py.
-
-Usage:
-    python ade.py
 """
 
 import os
@@ -14,14 +11,14 @@ import json
 import threading
 import subprocess
 import queue
-import datetime
 import traceback
 import csv
+import io
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import mwhlogging
-from atom2parser import atom2_parser, BadData, BASIC_DATA, EXTENDED_DATA, VALIDATION_DATA
+from atom2parser import atom2_parser, BASIC_DATA, EXTENDED_DATA, VALIDATION_DATA
 from adeversion import _version
 
 # ---------------------------------------------------------------------------
@@ -58,16 +55,19 @@ def load_prefs() -> dict:
             prefs = DEFAULT_PREFS.copy()
             prefs.update(saved)
             return prefs
-    except Exception:
-        pass
+    except Exception as e:
+        messagebox.showerror("Failed to load the saved preferences.", str(e))
+        logger.error("Failed to load the saved preferences.\n%s",e)
+
     return DEFAULT_PREFS.copy()
 
 def save_prefs(prefs: dict) -> None:
     try:
         with open(PREFS_FILE, "w", encoding="utf-8") as f:
             json.dump(prefs, f, indent=2)
-    except Exception:
-        pass
+    except Exception as e:
+        messagebox.showerror("Failed to save the preferences.", str(e))
+        logger.error("Failed to save the preferences.\n%s",e)
 
 # ---------------------------------------------------------------------------
 # A thread-safe queue so the worker thread can send log messages to the GUI.
@@ -78,10 +78,6 @@ def log(msg: str) -> None:
     log_queue.put(msg)
 
 def write_csv(file_name, records, extended=False, validation=False, destination=None):
-    """ Convert a list of parsed records into a CSV file. """
-
-    global logger
-
     base_name, _ = os.path.splitext(os.path.basename(file_name))
     directory = (destination if destination is not None else os.path.dirname(file_name))
 
@@ -106,19 +102,15 @@ def write_csv(file_name, records, extended=False, validation=False, destination=
 # ---------------------------------------------------------------------------
 def safe_atom2_parser(file_name: str, extended: bool, validation: bool,
                       destination) -> None:
-    """
-    Wrapper around atom2_parser() that captures print() output → log queue
-    """
-    import io
-    import contextlib
-
-    global logger
+    '''
+        Wrapper around atom2_parser() that captures print() output → log queue
+    '''
 
     buf = io.StringIO()
     logger.configure_logging(file_handle = buf)
 
     records = atom2_parser(file_name, logger)
-    write_csv(file_name, records, 
+    write_csv(file_name, records,
         extended=extended,
         validation=validation,
         destination=destination if destination else None)
@@ -128,15 +120,13 @@ def safe_atom2_parser(file_name: str, extended: bool, validation: bool,
         if line.strip():
             log(line)
 
-    # Work out the output CSV path to return it.
-    base_name = Path(file_name).stem
-    out_dir = Path(destination) if destination else Path(file_name).parent
-
 # ---------------------------------------------------------------------------
 # Main Application Window
 # ---------------------------------------------------------------------------
 class AtomConverterApp:
-    """Main application window."""
+    '''
+        Main application window.
+    '''
 
     # ---- construction -------------------------------------------------------
 
@@ -145,6 +135,17 @@ class AtomConverterApp:
         self.prefs = load_prefs()
         self.file_list: list[str] = []       # files queued for conversion
         self.converting = False
+
+        self.file_listbox = None
+        self.output_dir_var = None
+        self.extended_var = False
+        self.validation_var = False
+        self.log_level_var = None
+        self.progress = None
+        self.status_var = None
+        self.open_output_btn = None
+        self.convert_btn = None
+        self.log_text = None
 
         self._build_ui()
         self._restore_geometry()
@@ -177,22 +178,22 @@ class AtomConverterApp:
         style.configure("Header.TLabel", font=("TkDefaultFont", 11, "bold"))
 
         # ---- main layout ----
-        main = ttk.Frame(self.root, padding=10)
-        main.pack(fill=tk.BOTH, expand=True)
-        main.columnconfigure(0, weight=1)
-        main.rowconfigure(2, weight=1)   # log area expands
+        main_frame = ttk.Frame(self.root, padding=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(2, weight=1)   # log area expands
 
         # ---- Section 1: file drop / file list ----
-        self._build_file_section(main, row=0)
+        self._build_file_section(main_frame, row=0)
 
         # ---- Section 2: options ----
-        self._build_options_section(main, row=1)
+        self._build_options_section(main_frame, row=1)
 
         # ---- Section 3: log ----
-        self._build_log_section(main, row=2)
+        self._build_log_section(main_frame, row=2)
 
         # ---- Section 4: action bar ----
-        self._build_action_bar(main, row=3)
+        self._build_action_bar(main_frame, row=3)
 
     def _build_file_section(self, parent, row):
         frame = ttk.LabelFrame(parent, text="Input Files (.fc2)", padding=8)
@@ -310,24 +311,24 @@ class AtomConverterApp:
                                                   pady=(4, 0))
 
     def _build_action_bar(self, parent, row):
-        bar = ttk.Frame(parent)
-        bar.grid(row=row, column=0, sticky="ew")
-        bar.columnconfigure(0, weight=1)
+        action_bar = ttk.Frame(parent)
+        action_bar.grid(row=row, column=0, sticky="ew")
+        action_bar.columnconfigure(0, weight=1)
 
-        self.progress = ttk.Progressbar(bar, mode="determinate", length=200)
+        self.progress = ttk.Progressbar(action_bar, mode="determinate", length=200)
         self.progress.grid(row=0, column=0, sticky="ew", padx=(0, 10))
 
         self.status_var = tk.StringVar(value="Ready.")
-        ttk.Label(bar, textvariable=self.status_var, foreground="gray").grid(
+        ttk.Label(action_bar, textvariable=self.status_var, foreground="gray").grid(
             row=0, column=1, sticky="w", padx=(0, 10))
 
         self.open_output_btn = ttk.Button(
-            bar, text="Open Output Folder",
+            action_bar, text="Open Output Folder",
             command=self._open_output_folder, state=tk.DISABLED)
         self.open_output_btn.grid(row=0, column=2, padx=(0, 8))
 
         self.convert_btn = ttk.Button(
-            bar, text="Convert All", style="Convert.TButton",
+            action_bar, text="Convert All", style="Convert.TButton",
             command=self._start_conversion)
         self.convert_btn.grid(row=0, column=3)
 
@@ -402,8 +403,9 @@ class AtomConverterApp:
     # ---- conversion ---------------------------------------------------------
 
     def _start_conversion(self):
-        global logger
-
+        '''
+            Load the fc2 file, parse it and save it.
+        '''
         if self.converting:
             return
         if not self.file_list:
@@ -560,17 +562,6 @@ class AtomConverterApp:
                 subprocess.Popen(["xdg-open", out_dir])
         except Exception as e:
             messagebox.showerror("Error", f"Could not open folder:\n{e}")
-
-    # ---- warnings -----------------------------------------------------------
-
-    def _warn_no_extractor(self):
-        msg = (
-            "Could not import atom_data_extractor.py.\n\n"
-            "Make sure atom_data_extractor.py, mwhlogging.py, and atom2parser.py) are in the\n"
-            "same folder as this script, then restart.\n\n"
-            "The GUI will open but conversion will not work."
-        )
-        messagebox.showwarning("Missing Module", msg)
 
     # ---- shutdown -----------------------------------------------------------
 

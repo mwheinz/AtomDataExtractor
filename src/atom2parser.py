@@ -1,5 +1,8 @@
+'''
+    Parses an Atom Eve FC2 file and returns it as a dictionary.
+'''
+
 import os
-import sys
 import struct
 import re
 import math
@@ -9,7 +12,7 @@ from logging import Logger
 # This is a hack - we need to extract the start time of the data from the
 # file name - but it needs to be used inside code that can't see the value
 # unless it is passed globally.
-time_stamp: float = None
+TIME_STAMP: float = None
 
 """ The list of fields to include in the basic report. """
 BASIC_DATA = [
@@ -162,10 +165,9 @@ class FLFD:
     @staticmethod
     def fix_time(data) -> str:
         """Convert the relative timestamp to an absolute timestamp."""
-        #global time_stamp
-        if time_stamp is None:
+        if TIME_STAMP is None:
             return None # error case.
-        dt = time_stamp + data/1000
+        dt = TIME_STAMP + data/1000
         return dt
 
     @staticmethod
@@ -216,21 +218,22 @@ class FLFD:
         return f"\"0b{data:08b}\""
 
     @staticmethod
-    def hex_dump(data) -> str:
+    def _hex_dump(data) -> str:
         """Convert an arbitrary value to a 1-byte hexadecimal number."""
         return f"\"0x{data:02x}\""
 
     @staticmethod
-    def hex_dump2(data) -> str:
+    def _hex_dump2(data) -> str:
         """Convert an arbitrary value to a 2-byte hexadecimal number."""
         return f"\"0x{data:04x}\""
 
     @staticmethod
-    def hex_dump4(data) -> str:
+    def _hex_dump4(data) -> str:
         """Convert an arbitrary value to a 4-byte hexadecimal number."""
         return f"\"0x{data:08x}\""
 
-    def hex_dump8(data) -> str:
+    @staticmethod
+    def _hex_dump8(data) -> str:
         """Convert an arbitrary value to a 8-byte hexadecimal number."""
         return f"\"0x{data:08x}\""
 
@@ -284,7 +287,7 @@ ATOM2_FIELDS = [
 
     #
     # Basic Data
-    # 
+    #
     # (0-3) Record id.
     FLFD("rid", "<i", 0, 4),
     FLFD("utc (ms)", "<Q", 5, 8, FLFD.fix_time), # Absolute time in ms.
@@ -337,7 +340,7 @@ ATOM2_FIELDS = [
     FLFD("Thrust", "<f", 412, 4, FLFD.round3),
     FLFD("Wind Speed 2 (m/s)", "<f", 458, 4, FLFD.round3),
 
-    # 
+    #
     # Compass
     #
     FLFD("Magnetometer X", "<h", 79, 2),
@@ -398,14 +401,14 @@ def derived_fields(record):
     """
 
     # Merge the rth flag and the drone mode.
-    if record["Auto"] > 0: 
+    if record["Auto"] > 0:
         if record["Drone Mode (text)"] == "Flying":
             if record["Auto"] == 1:
                 record["Drone Mode (text)"] = "AI: RTH"
             elif record["Auto"] == 2:
-                record["Drone Mode (text)"] = f"AI: WPT"
+                record["Drone Mode (text)"] = "AI: WPT"
             elif record["Auto"] == 6:
-                record["Drone Mode (text)"] = f"AI: QS"
+                record["Drone Mode (text)"] = "AI: QS"
             else:
                 record["Drone Mode (text)"] = f"AI: ({record['Auto']})"
         elif record["Drone Mode (text)"] == "Launching":
@@ -444,13 +447,13 @@ def atom2_parser(file_name, logger: Logger) -> list[dict]:
         logger: a running instance of the Logger class.
     """
 
-    global time_stamp
+    global TIME_STAMP
 
     # Extract timestamp from filename
     base_name, _ = os.path.splitext(os.path.basename(file_name))
 
     try:
-        time_stamp = datetime.datetime.strptime(
+        TIME_STAMP = datetime.datetime.strptime(
             re.sub("-.*", "", base_name),
             "%Y%m%d%H%M%S"
         ).timestamp() * 1000
@@ -506,8 +509,9 @@ def atom2_parser(file_name, logger: Logger) -> list[dict]:
                 logger.warning(
                     "Time went backwards at record %s. Trying to fix.",
                     record_count)
-                time_stamp = time_stamp + elapsed/1000
-                record["utc (ms)"] = time_stamp
+                TIME_STAMP = TIME_STAMP + elapsed/1000
+                record["utc (ms)"] = TIME_STAMP
+                error_count += 1
             elapsed = current
 
             # GPS coordinates can be wildly wrong if the drone hasn't
