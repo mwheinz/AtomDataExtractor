@@ -45,18 +45,20 @@ DEFAULT_PREFS = {
     "color_panel_bg" : "#161b22",
     "color_accent"   : "#58a6ff",
     "color_border"   : "#30363d",
+    "color_text"     : "#e6edf3",
+    "color_subtext"  : "#8b949e",
+    "color_path"     : "#3fb950",
+
     "color_safe"     : "#3fb950",
     "color_warn"     : "#d29922",
     "color_danger"   : "#f85149",
-    "color_text"     : "#e6edf3",
-    "color_subtext"  : "#8b949e",
-    "color_path"     : "#30363d",
 
     # ─────────────────────────────────────────────────────────────────────────
     # Font palette. May be overridden by the platform type.
     # ─────────────────────────────────────────────────────────────────────────
     "font_label"     : ("Helvetica", 10),
     "font_title"     : ("Times", 13, "bold"),
+    "font_marker"    : "",
     "font_small"     : ("Helvetica", 8),
 }
 
@@ -65,16 +67,19 @@ DEFAULT_PREFS = {
 # ─────────────────────────────────────────────────────────────────────────────
 PLATFORM_SYSTEM = platform.system()
 if PLATFORM_SYSTEM == "Linux":
-    DEFAULT_PREFS["font_label"] = ("Liberation", 10)
-    DEFAULT_PREFS["font_title"] = ("Times", 13, "bold")
-    DEFAULT_PREFS["font_small"] = ("Liberation", 8)
+    DEFAULT_PREFS["font_label"]  = ("Liberation", 10)
+    DEFAULT_PREFS["font_title"]  = ("Times", 13, "bold")
+    DEFAULT_PREFS["font_marker"] = ""
+    DEFAULT_PREFS["font_small"]  = ("Liberation", 8)
 elif PLATFORM_SYSTEM == "Darwin":
-    DEFAULT_PREFS["font_label"] = ("Helvetica Neue", 10)
-    DEFAULT_PREFS["font_title"] = ("Helvetica Neue", 13, "bold")
-    DEFAULT_PREFS["font_small"] = ("Helvetica Neue", 8)
+    DEFAULT_PREFS["font_label"]  = ("Helvetica Neue", 10)
+    DEFAULT_PREFS["font_title"]  = ("Helvetica Neue", 13, "bold")
+    DEFAULT_PREFS["font_marker"] = "/System/Library/Fonts/HelveticaNeue.ttc"
+    DEFAULT_PREFS["font_small"]  = ("Helvetica Neue", 8)
 else:
     DEFAULT_PREFS["font_label"] = ("Helvetica", 10)
     DEFAULT_PREFS["font_title"] = ("Times", 13, "bold")
+    DEFAULT_PREFS["font_marker"] = ""
     DEFAULT_PREFS["font_small"] = ("Helvetica", 8)
 
 LOG_LEVEL_MAP = {
@@ -283,7 +288,9 @@ class StickDisplay(tk.Canvas):
         self.delete("all")
 
         # Box
-        self.create_rectangle(pad, pad, s - pad, s - pad,
+        #self.create_rectangle(pad, pad, s - pad, s - pad,
+        #                       outline=self.prefs["color_border"], fill=self.prefs["color_panel_bg"])
+        self.create_oval(pad, pad, s - pad, s - pad,
                                outline=self.prefs["color_border"], fill=self.prefs["color_panel_bg"])
 
         # Centre cross
@@ -380,21 +387,21 @@ class BarGauge(tk.Canvas):
 # Text info panel
 # ─────────────────────────────────────────────────────────────────────────────
 
-class InfoPanel(tk.Frame):
+class InfoPanel(tk.LabelFrame):
     """Key/value text readout for status fields."""
 
     def __init__(self, parent, prefs, fields: list[str], **kw):
-        super().__init__(parent, bg=prefs["color_panel_bg"], **kw)
+        super().__init__(parent, bg=prefs["color_bg"], **kw)
         self._vars = {}
         self.prefs = prefs
         for i, name in enumerate(fields):
             row = i // 2
             col = (i % 2) * 2
-            tk.Label(self, text=name + ":", bg=self.prefs["color_panel_bg"], fg=self.prefs["color_subtext"],
+            tk.Label(self, text=name + ":", bg=self.prefs["color_bg"], fg=self.prefs["color_subtext"],
                      font=self.prefs["font_label"], anchor="w").grid(
                 row=row, column=col, sticky="w", padx=(6, 2), pady=1)
             var = tk.StringVar(value="—")
-            tk.Label(self, textvariable=var, bg=self.prefs["color_panel_bg"], fg=self.prefs["color_text"],
+            tk.Label(self, textvariable=var, bg=self.prefs["color_bg"], fg=self.prefs["color_text"],
                      font=self.prefs["font_label"], anchor="w").grid(
                 row=row, column=col+1, sticky="w", padx=(2, 6), pady=1)
             self._vars[name] = var
@@ -522,9 +529,9 @@ class DroneViewer(tk.Tk):
         self.map_widget.canvas.unbind("<MouseWheel>")
 
         # Right: gauges + controls
-        right = tk.Frame(main, bg=self.prefs["color_bg"], width=340)
+        right = tk.Frame(main, bg=self.prefs["color_bg"], width=380)
         right.pack_propagate(False)
-        main.add(right, stretch="never", minsize=320)
+        main.add(right, stretch="never", minsize=380)
 
         self._build_gauges(right)
         self._build_controls(right)
@@ -547,7 +554,7 @@ class DroneViewer(tk.Tk):
         my_logger.debug("Building the Gauges")
 
         # ── Section: Arc gauges row ───────────────────────────────────────
-        arc_row = tk.Frame(parent, bg=self.prefs["color_bg"])
+        arc_row = tk.LabelFrame(parent, bg=self.prefs["color_bg"])
         arc_row.pack(fill=tk.X, padx=6, pady=(6, 0))
 
         # TODO: Need the maximum values for these to adjust gauges.
@@ -577,7 +584,7 @@ class DroneViewer(tk.Tk):
             b.pack(side=tk.LEFT, padx=2)
 
         # ── Section: Text info ────────────────────────────────────────────
-        info_frame = tk.Frame(parent, bg=self.prefs["color_panel_bg"], bd=0)
+        info_frame = tk.Frame(parent, bg=self.prefs["color_bg"], bd=0)
         info_frame.pack(fill=tk.X, padx=6, pady=4)
 
         self.info = InfoPanel(info_frame, self.prefs, [
@@ -614,7 +621,7 @@ class DroneViewer(tk.Tk):
 
         my_logger.debug("Building the Controls")
 
-        ctrl = tk.Frame(parent, bg=self.prefs["color_panel_bg"], pady=8)
+        ctrl = tk.LabelFrame(parent, bg=self.prefs["color_panel_bg"], pady=8)
         ctrl.pack(fill=tk.X, side=tk.BOTTOM, padx=0, pady=0)
 
         # Slider
@@ -774,8 +781,8 @@ class DroneViewer(tk.Tk):
     def _make_drone_icon(self, heading) -> ImageTk.PhotoImage:
         """Draw a simple arrow head rotated to the current heading."""
         size = 21 # Make this an odd number so we actually have a center pixel.
-        # Note we add 4 pixels of padding on all sides to support
-        # the rotation.
+        # Note we add 4 pixels of padding on all sides to make sure there's
+        # room for the rotation.
         img = Image.new("RGBA", (size+8, size+8), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
@@ -791,19 +798,32 @@ class DroneViewer(tk.Tk):
         return ImageTk.PhotoImage(img)
 
     def _make_home_icon(self) -> ImageTk.PhotoImage:
-        """Draw a simple house icon."""
         size = 20
         img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        cx, cy = size // 2, size // 2
+        cc = size // 2
 
-        # Roof triangle
-        draw.polygon([(cx, 0), (size, cy), (0, cy)], fill=self.prefs["color_accent"], outline=self.prefs["color_border"])
-        # House body
-        draw.rectangle([(0, cy), (size, size)], fill=self.prefs["color_accent"], outline=self.prefs["color_border"])
-        # Door
-        draw.rectangle([(cx-4, cy), (cx+4, size)], fill=self.prefs["color_border"])
+        if self.prefs["font_marker"] == "":
+            """Draw a simple house icon."""
+            # Roof triangle
+            draw.polygon([(cc, 0), (size, cc), (0, cc)],
+                         fill=self.prefs["color_accent"],
+                         outline=self.prefs["color_border"])
+            # House body
+            draw.rectangle([(0, cc), (size, size)],
+                           fill=self.prefs["color_accent"],
+                           outline=self.prefs["color_border"])
+            # Door
+            draw.rectangle([(cc-4, cc), (cc+4, size)],
+                           fill=self.prefs["color_border"])
+        else:
+            font = ImageFont.truetype(self.prefs["font_marker"], size)
+            draw.ellipse([(0,0),(size,size)], fill=self.prefs["color_bg"],
+                         outline=self.prefs["color_path"])
+            draw.text((cc, cc), "H", font=font,
+                      fill=self.prefs["color_path"],
+                      anchor="mm")
 
         return ImageTk.PhotoImage(img)
 
