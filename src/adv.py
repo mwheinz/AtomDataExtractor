@@ -599,22 +599,97 @@ class InfoPanel(tk.LabelFrame):
     def __init__(self, parent, prefs, fields: list[str], **kw):
         super().__init__(parent, bg=prefs["color_bg"], **kw)
         self._vars = {}
+        self._labels = []
         self.prefs = prefs
-        for i, name in enumerate(fields):
-            row = i // 2
-            col = (i % 2) * 2
-            tk.Label(self, text=name + ":", bg=self.prefs["color_bg"],
-                     fg=self.prefs["color_label"],
-                     font=self.prefs["font_label"],
-                     anchor="w").grid(row=row, column=col, sticky="w",
-                                      padx=(6, 2), pady=1)
-            var = tk.StringVar(value="—")
-            tk.Label(self, textvariable=var, bg=self.prefs["color_bg"],
-                     fg=self.prefs["color_value"],
-                     font=self.prefs["font_label"],
-                     anchor="w").grid(row=row, column=col+1, sticky="w",
-                                      padx=(2, 6), pady=1)
-            self._vars[name] = var
+
+        self._canvas = tk.Canvas(self, bg=prefs["color_bg"],
+                                 highlightthickness=0, height=64)
+        scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL,
+                                  command=self._canvas.yview)
+        self._canvas.configure(yscrollcommand=scrollbar.set)
+
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self._canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self._inner = tk.Frame(self._canvas, bg=prefs["color_bg"])
+        self._window_id = self._canvas.create_window((0,0), window=self._inner,
+                                                     anchor="nw")
+
+        # Resize the scroll region whenever the inner frame changes size
+        self._inner.bind("<Configure>", self._on_inner_configure)
+        # Stretch the inner frame to fill canvas width
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
+        # Mouse wheel scrolling
+        self._canvas.bind("<MouseWheel>",  self._on_mousewheel)      # Windows/macOS
+        self._canvas.bind("<Button-4>",    self._on_mousewheel)      # Linux scroll up
+        self._canvas.bind("<Button-5>",    self._on_mousewheel)      # Linux scroll down
+
+        col = 0
+        row = 0
+        for name in fields:
+            is_header = name.startswith("---")
+
+            if is_header:
+                lbl = tk.Label(self._inner, text=name.strip("- "),
+                               bg=self.prefs["color_bg"],
+                               fg=self.prefs["color_accent"],
+                               font=self.prefs["font_label"],
+                               anchor="center")
+                lbl.grid(row=row, column=0, columnspan=4,
+                        sticky="ew", padx=6, pady=(6, 1))
+                row += 1
+                col = 0
+            else:
+                key_lbl = tk.Label(self._inner, text=name + ":", bg=self.prefs["color_bg"],
+                        fg=self.prefs["color_label"],
+                        font=self.prefs["font_label"],
+                        anchor="w")
+                key_lbl.grid(row=row, column=col, sticky="w",
+                            padx=(6, 2), pady=1)
+                var = tk.StringVar(value="—")
+                val_lbl = tk.Label(self._inner, textvariable=var,
+                                   bg=self.prefs["color_bg"],
+                                   fg=self.prefs["color_value"],
+                                   font=self.prefs["font_label"],
+                                   anchor="w")
+                val_lbl.grid(row=row, column=col+1, sticky="w",
+                             padx=(2, 6), pady=1)
+                col += 2
+                if col > 2:
+                    col = 0
+                    row += 1
+
+                self._vars[name] = var
+                self._labels.append((key_lbl, val_lbl))
+
+    def _on_inner_configure(self, event):
+        """Update scroll region when inner frame resizes."""
+        self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        """Keep inner frame width matched to canvas width."""
+        self._canvas.itemconfig(self._window_id, width=event.width)
+
+    def _on_mousewheel(self, event):
+        if event.num == 4:          # Linux scroll up
+            self._canvas.yview_scroll(-1, "units")
+        elif event.num == 5:        # Linux scroll down
+            self._canvas.yview_scroll(1, "units")
+        else:                       # Windows / macOS
+            self._canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def redraw(self):
+        """Reconfigure all labels to pick up changed prefs."""
+        self._canvas.configure(bg=self.prefs["color_bg"])
+        self._inner.configure(bg=self.prefs["color_bg"])
+        self.configure(bg=self.prefs["color_bg"])
+        for key_lbl, val_lbl in self._labels:
+            key_lbl.configure(bg=self.prefs["color_bg"],
+                              fg=self.prefs["color_label"],
+                              font=self.prefs["font_label"])
+            val_lbl.configure(bg=self.prefs["color_bg"],
+                              fg=self.prefs["color_value"],
+                              font=self.prefs["font_label"])
 
     def update_field(self, name: str, value):
         if name in self._vars:
@@ -817,24 +892,33 @@ class DroneViewer(tk.Tk):
 
         # ── Section: Text info ────────────────────────────────────────────
         info_frame = tk.Frame(parent, bg=self.prefs["color_bg"], bd=0)
-        info_frame.pack(fill=tk.X, padx=6, pady=4)
+        info_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
 
         self.info = InfoPanel(info_frame, self.prefs, [
-            "Drone Mode",
-            "GPS Lock",
-            "Flight Mode",
-            "Pos Mode",
-            "Batt. V",
-            "Batt. A",
-            "Batt. Temp",
-            "Batt. %",
-            "Wind Dir",
-            "Wind Speed",
-            "Record #",
-            "Elapsed",
+            "---Status---", 
+            "Drone Mode", "GPS Lock",
+            "Flight Mode", "Pos Mode",
+            "---Battery---",
+            "Batt. V", "Batt. A",
+            "Batt. Temp", "Batt. %",
+            "---Weather---",
+            "Wind Dir", "Wind Speed",
+            "---Time---",
+            "Record #", "Elapsed",
             "Flight Ctr",
+            "---Dummies---",
+            "Dummy 0",
+            "Dummy 1",
+            "Dummy 2",
+            "Dummy 3",
+            "Dummy 4",
+            "Dummy 5",
+            "Dummy 6",
+            "Dummy 7",
+            "Dummy 8",
+            "Dummy 9",
         ])
-        self.info.pack(fill=tk.X)
+        self.info.pack(fill=tk.BOTH, expand=True)
 
         # ── Section: RC Sticks ────────────────────────────────────────────
         sticks_frame = tk.Frame(parent, bg=self.prefs["color_bg"])
