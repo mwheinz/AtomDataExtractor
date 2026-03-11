@@ -462,6 +462,7 @@ def atom2_parser(file_name, logger: Logger) -> list[dict]:
         record_count = 0
         error_count = 0
 
+        elapsed = 0
         records = []
 
         while True:
@@ -497,6 +498,17 @@ def atom2_parser(file_name, logger: Logger) -> list[dict]:
                 raise
 
             # Validation and derived fields follow.
+
+            # This seems to happen if you reboot the drone without
+            # rebooting the controller?!?
+            current = record["elapsed (us)"]
+            if current < elapsed:
+                logger.warning(
+                    "Time went backwards at record %s. Trying to fix.",
+                    record_count)
+                time_stamp = time_stamp + elapsed/1000
+                record["utc (ms)"] = time_stamp
+            elapsed = current
 
             # GPS coordinates can be wildly wrong if the drone hasn't
             # achieved a lock yet.
