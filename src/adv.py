@@ -42,21 +42,23 @@ DEFAULT_PREFS = {
     # Color palette
     # ─────────────────────────────────────────────────────────────────────────
     "color_bg"       : "#0d1117",
-    "color_panel_bg" : "#161b22",
+    "color_gauge_bg" : "#161b22",
     "color_accent"   : "#58a6ff",
     "color_border"   : "#30363d",
+    "color_value"    : "#e6edf3",
+    "color_label"    : "#8b949e",
+    "color_path"     : "#3fb950",
+
     "color_safe"     : "#3fb950",
     "color_warn"     : "#d29922",
     "color_danger"   : "#f85149",
-    "color_text"     : "#e6edf3",
-    "color_subtext"  : "#8b949e",
-    "color_path"     : "#30363d",
 
     # ─────────────────────────────────────────────────────────────────────────
     # Font palette. May be overridden by the platform type.
     # ─────────────────────────────────────────────────────────────────────────
     "font_label"     : ("Helvetica", 10),
     "font_title"     : ("Times", 13, "bold"),
+    "font_marker"    : "",
     "font_small"     : ("Helvetica", 8),
 }
 
@@ -65,16 +67,19 @@ DEFAULT_PREFS = {
 # ─────────────────────────────────────────────────────────────────────────────
 PLATFORM_SYSTEM = platform.system()
 if PLATFORM_SYSTEM == "Linux":
-    DEFAULT_PREFS["font_label"] = ("Liberation", 10)
-    DEFAULT_PREFS["font_title"] = ("Times", 13, "bold")
-    DEFAULT_PREFS["font_small"] = ("Liberation", 8)
+    DEFAULT_PREFS["font_label"]  = ("Liberation", 10)
+    DEFAULT_PREFS["font_title"]  = ("Times", 13, "bold")
+    DEFAULT_PREFS["font_marker"] = ""
+    DEFAULT_PREFS["font_small"]  = ("Liberation", 8)
 elif PLATFORM_SYSTEM == "Darwin":
-    DEFAULT_PREFS["font_label"] = ("Helvetica Neue", 10)
-    DEFAULT_PREFS["font_title"] = ("Helvetica Neue", 13, "bold")
-    DEFAULT_PREFS["font_small"] = ("Helvetica Neue", 8)
+    DEFAULT_PREFS["font_label"]  = ("Helvetica Neue", 10)
+    DEFAULT_PREFS["font_title"]  = ("Helvetica Neue", 13, "bold")
+    DEFAULT_PREFS["font_marker"] = "/System/Library/Fonts/HelveticaNeue.ttc"
+    DEFAULT_PREFS["font_small"]  = ("Helvetica Neue", 8)
 else:
     DEFAULT_PREFS["font_label"] = ("Helvetica", 10)
     DEFAULT_PREFS["font_title"] = ("Times", 13, "bold")
+    DEFAULT_PREFS["font_marker"] = ""
     DEFAULT_PREFS["font_small"] = ("Helvetica", 8)
 
 LOG_LEVEL_MAP = {
@@ -109,6 +114,213 @@ def save_prefs(prefs: dict) -> None:
         my_logger.error(f"Failed to save the preferences.\n{e}")
         pass
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Preferences Dialog
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PrefsDialog(tk.Toplevel):
+    """
+    Modal dialog for editing the application preferences.
+    Edits a copy of prefs and calls on_save(new_prefs) if the user clicks Save.
+    """
+
+    COLOR_FIELDS = [
+        ("color_bg",       "Background"),
+        ("color_gauge_bg", "Gauge Background"),
+        ("color_accent",   "Accent"),
+        ("color_border",   "Border"),
+        ("color_value",    "Values"),
+        ("color_label",    "Label"),
+        ("color_path",     "Flight Path"),
+        ("color_safe",     "Safe"),
+        ("color_warn",     "Warning"),
+        ("color_danger",   "Danger"),
+    ]
+
+    FONT_FIELDS = [
+        ("font_label",  "Label Font"),
+        ("font_title",  "Title Font"),
+        ("font_small",  "Small Font"),
+    ]
+
+    def __init__(self, parent, prefs: dict, on_save):
+        super().__init__(parent)
+        self.title("Preferences")
+        self.resizable(False, False)
+        self.grab_set()             # make modal
+        self.transient(parent)      # keep on top of parent
+
+        self._prefs   = prefs.copy()
+        self._on_save = on_save
+        self._swatches: dict[str, tk.Label] = {}
+        self._font_vars: dict[str, tuple]   = {}
+
+        self._build()
+        self._center_on(parent)
+
+    # ── Layout ────────────────────────────────────────────────────────────
+
+    def _build(self):
+        PAD = dict(padx=10, pady=4)
+
+        tk.Label(self, text="Some changes will not take effect until restart.",
+             font=self._prefs["font_label"],
+             fg="white").pack(padx=12, pady=(8, 0), anchor="w")
+
+        # ── Colors ────────────────────────────────────────────────────────
+        color_frame = tk.LabelFrame(self, text=" Colors ", padx=6, pady=6)
+        color_frame.pack(fill=tk.X, padx=12, pady=(12, 4))
+
+        for i, (key, label) in enumerate(self.COLOR_FIELDS):
+            row = i // 2
+            col = (i % 2) * 3       # 3 columns per side: label | swatch | button
+
+            tk.Label(color_frame, text=label + ":", anchor="w",
+                     width=12).grid(row=row, column=col, sticky="w", **PAD)
+
+            swatch = tk.Label(color_frame, width=3,
+                              bg=self._prefs.get(key, "#000000"),
+                              relief=tk.SOLID, bd=1)
+            swatch.grid(row=row, column=col + 1, padx=(0, 4), pady=4)
+            self._swatches[key] = swatch
+
+            tk.Button(color_frame, text="Choose…",
+                      command=lambda k=key: self._pick_color(k),
+                      padx=4).grid(row=row, column=col + 2, **PAD)
+
+        # ── Fonts ─────────────────────────────────────────────────────────
+        font_frame = tk.LabelFrame(self, text=" Fonts ", padx=6, pady=6)
+        font_frame.pack(fill=tk.X, padx=12, pady=4)
+
+        families = self._get_font_families()
+
+        for i, (key, label) in enumerate(self.FONT_FIELDS):
+            current = self._prefs.get(key, ("Helvetica", 10))
+            # current may be a list if loaded from JSON (JSON turns tuples into lists)
+            current_family = current[0]
+            current_size   = current[1]
+            current_bold   = len(current) > 2 and current[2] == "bold"
+
+            tk.Label(font_frame, text=label + ":", anchor="w",
+                    width=12).grid(row=i, column=0, sticky="w", padx=(10, 4), pady=4)
+
+            # Family dropdown
+            family_var = tk.StringVar(value=current_family)
+            family_cb  = ttk.Combobox(font_frame, textvariable=family_var,
+                                    values=families, width=22, state="readonly")
+            family_cb.grid(row=i, column=1, padx=4, pady=4)
+
+            # Size spinbox
+            size_var = tk.IntVar(value=current_size)
+            tk.Spinbox(font_frame, textvariable=size_var,
+                    from_=6, to=32, width=4).grid(row=i, column=2, padx=4, pady=4)
+
+            # Bold checkbox
+            bold_var = tk.BooleanVar(value=current_bold)
+            tk.Checkbutton(font_frame, text="Bold",
+                        variable=bold_var).grid(row=i, column=3, padx=4, pady=4)
+
+            self._font_vars[key] = (family_var, size_var, bold_var)
+
+        # Font marker path (separate — it's a file path, not a tkinter font)
+        tk.Label(font_frame, text="Marker Font:", anchor="w",
+                width=12).grid(row=len(self.FONT_FIELDS), column=0,
+                                sticky="w", padx=(10, 4), pady=4)
+        self._marker_var = tk.StringVar(value=self._prefs.get("font_marker", ""))
+        tk.Entry(font_frame, textvariable=self._marker_var,
+                width=28).grid(row=len(self.FONT_FIELDS), column=1,
+                                columnspan=2, padx=4, pady=4, sticky="w")
+        tk.Button(font_frame, text="Browse…",
+                command=self._pick_marker_font).grid(
+            row=len(self.FONT_FIELDS), column=3, padx=4, pady=4)
+
+        # ── Logging ───────────────────────────────────────────────────────
+        log_frame = tk.LabelFrame(self, text=" Logging ", padx=6, pady=6)
+        log_frame.pack(fill=tk.X, padx=12, pady=4)
+
+        tk.Label(log_frame, text="Log Level:").pack(side=tk.LEFT, padx=(4, 8))
+        self._log_var = tk.StringVar(value=self._prefs.get("log_level", "Info"))
+        for level in ("Error", "Warning", "Info", "Debug"):
+            tk.Radiobutton(log_frame, text=level,
+                           variable=self._log_var, value=level).pack(
+                side=tk.LEFT, padx=4)
+
+        # ── Buttons ───────────────────────────────────────────────────────
+        btn_row = tk.Frame(self)
+        btn_row.pack(fill=tk.X, padx=12, pady=(4, 12))
+
+        tk.Button(btn_row, text="Restore Defaults",
+                  command=self._restore_defaults).pack(side=tk.LEFT)
+        tk.Button(btn_row, text="Cancel",
+                  command=self.destroy).pack(side=tk.RIGHT, padx=(4, 0))
+        tk.Button(btn_row, text="Save",
+                  command=self._save,
+                  default=tk.ACTIVE).pack(side=tk.RIGHT)
+
+        # Allow Enter to save and Escape to cancel
+        self.bind("<Return>",  lambda e: self._save())
+        self.bind("<Escape>",  lambda e: self.destroy())
+
+    # ── Helpers ───────────────────────────────────────────────────────────
+
+    def _pick_marker_font(self):
+        path = filedialog.askopenfilename(
+            title="Select marker font file",
+            filetypes=[("Font files", "*.ttf *.ttc *.otf"), ("All files", "*.*")],
+            parent=self
+        )
+        if path:
+            self._marker_var.set(path)
+
+    def _get_font_families(self) -> list[str]:
+        families = sorted(set(tkf.families()))
+        return [f for f in families if not f.startswith("@")]  # skip vertical CJK fonts
+
+    def _center_on(self, parent):
+        self.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width()  - self.winfo_width())  // 2
+        y = parent.winfo_y() + (parent.winfo_height() - self.winfo_height()) // 2
+        self.geometry(f"+{x}+{y}")
+
+    def _pick_color(self, key: str):
+        from tkinter.colorchooser import askcolor
+        current = self._prefs.get(key, "#000000")
+        _, hex_color = askcolor(color=current,
+                                title=f"Choose: {key}",
+                                parent=self)
+        if hex_color:
+            self._prefs[key] = hex_color
+            self._swatches[key].configure(bg=hex_color)
+
+    def _restore_defaults(self):
+        for key, _ in self.COLOR_FIELDS:
+            default = DEFAULT_PREFS.get(key, "#000000")
+            self._prefs[key] = default
+            self._swatches[key].configure(bg=default)
+        for key, _ in self.FONT_FIELDS:
+            default = DEFAULT_PREFS.get(key, ("Helvetica", 10))
+            family_var, size_var, bold_var = self._font_vars[key]
+            family_var.set(default[0])
+            size_var.set(default[1])
+            bold_var.set(len(default) > 2 and default[2] == "bold")
+        self._marker_var.set(DEFAULT_PREFS.get("font_marker", ""))
+        self._log_var.set(DEFAULT_PREFS.get("log_level", "Info"))
+        self.update_idletasks()
+
+
+    def _save(self):
+        for key, _ in self.FONT_FIELDS:
+            family_var, size_var, bold_var = self._font_vars[key]
+            if bold_var.get():
+                self._prefs[key] = (family_var.get(), size_var.get(), "bold")
+            else:
+                self._prefs[key] = (family_var.get(), size_var.get())
+
+        self._prefs["font_marker"] = self._marker_var.get()
+        self._prefs["log_level"] = self._log_var.get()
+        self._on_save(self._prefs)
+        self.destroy()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Canvas-based gauge widgets
@@ -136,20 +348,20 @@ class CompassGauge(tk.Canvas):
         # Outer ring
         self.create_oval(cx-r, cy-r, cx+r, cy+r,
                          outline=self.prefs["color_border"], width=2,
-                         fill=self.prefs["color_panel_bg"])
+                         fill=self.prefs["color_gauge_bg"])
 
         # Cardinal labels
         for label, angle in [("N", 0), ("E", 90), ("S", 180), ("W", 270)]:
             rad = math.radians(angle - 90)
             lx = cx + (r - 14) * math.cos(rad)
             ly = cy + (r - 14) * math.sin(rad)
-            color = self.prefs["color_danger"] if label == "N" else self.prefs["color_subtext"]
+            color = self.prefs["color_danger"] if label == "N" else self.prefs["color_label"]
             self.create_text(lx, ly, text=label, fill=color,
                              font=self.prefs["font_small"])
 
         # Label
         self.create_text(cx, cy - r * 0.25,
-                         text=self.label, fill=self.prefs["color_subtext"],
+                         text=self.label, fill=self.prefs["color_label"],
                          font=self.prefs["font_small"])
 
         # Tick marks
@@ -177,7 +389,7 @@ class CompassGauge(tk.Canvas):
 
         # Value text
         self.create_text(cx, s - 8, text=f"{self.heading:.1f}°",
-                         fill=self.prefs["color_text"], font=self.prefs["font_small"])
+                         fill=self.prefs["color_value"], font=self.prefs["font_small"])
 
     def set_value(self, heading: float):
         self.heading = heading % 360
@@ -191,7 +403,7 @@ class ArcGauge(tk.Canvas):
     """
 
     def __init__(self, parent, prefs:dict, label, min_val, max_val,
-                 unit="", warn_pct=0.8, danger_pct=0.95,
+                 unit="", warn_pct=0.5, danger_pct=0.95,
                  size=110, **kw):
         super().__init__(parent, width=size, height=int(size * 0.75),
                          bg=prefs["color_bg"], highlightthickness=0, **kw)
@@ -240,18 +452,18 @@ class ArcGauge(tk.Canvas):
         needle_angle = math.radians(180 - pct * 180)
         nx = cx + (r - 2) * math.cos(needle_angle)
         ny = cy - (r - 2) * math.sin(needle_angle)
-        self.create_line(cx, cy, nx, ny, fill=self.prefs["color_text"], width=2)
-        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=self.prefs["color_text"], outline="")
+        self.create_line(cx, cy, nx, ny, fill=self.prefs["color_value"], width=2)
+        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=self.prefs["color_value"], outline="")
 
         # Label
         self.create_text(cx, cy - r * 0.5,
-                         text=self.label, fill=self.prefs["color_subtext"],
+                         text=self.label, fill=self.prefs["color_label"],
                          font=self.prefs["font_small"])
 
         # Value
         val_text = f"{self.value:.1f}{self.unit}"
         self.create_text(cx, cy - 10,
-                         text=val_text, fill=self.prefs["color_text"],
+                         text=val_text, fill=self.prefs["color_value"],
                          font=self.prefs["font_label"])
 
     def set_value(self, value: float):
@@ -283,8 +495,10 @@ class StickDisplay(tk.Canvas):
         self.delete("all")
 
         # Box
-        self.create_rectangle(pad, pad, s - pad, s - pad,
-                               outline=self.prefs["color_border"], fill=self.prefs["color_panel_bg"])
+        #self.create_rectangle(pad, pad, s - pad, s - pad,
+        #                       outline=self.prefs["color_border"], fill=self.prefs["color_gauge_bg"])
+        self.create_oval(pad, pad, s - pad, s - pad,
+                               outline=self.prefs["color_border"], fill=self.prefs["color_gauge_bg"])
 
         # Centre cross
         mid = s / 2
@@ -298,13 +512,13 @@ class StickDisplay(tk.Canvas):
         # Glow circle
         gr = 12
         self.create_oval(nx - gr, ny - gr, nx + gr, ny + gr,
-                         fill=self.prefs["color_panel_bg"], outline="")
+                         fill=self.prefs["color_gauge_bg"], outline="")
         self.create_oval(nx - 5, ny - 5, nx + 5, ny + 5,
                          fill=self.prefs["color_accent"], outline="")
 
         # Label
         self.create_text(mid, s - 5, text=self.label,
-                         fill=self.prefs["color_subtext"], font=self.prefs["font_small"])
+                         fill=self.prefs["color_label"], font=self.prefs["font_small"])
 
     def set_values(self, x_val: float, y_val: float):
         self.x_val = x_val
@@ -345,7 +559,7 @@ class BarGauge(tk.Canvas):
 
         # Background
         self.create_rectangle(pad_x, bar_top, w - pad_x, bar_bot,
-                               outline=self.prefs["color_border"], fill=self.prefs["color_panel_bg"])
+                               outline=self.prefs["color_border"], fill=self.prefs["color_gauge_bg"])
 
         pct = (self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
         pct = max(0.0, min(1.0, pct))
@@ -364,12 +578,12 @@ class BarGauge(tk.Canvas):
 
         # Label
         self.create_text(w / 2, 9, text=self.label,
-                         fill=self.prefs["color_subtext"], font=self.prefs["font_small"])
+                         fill=self.prefs["color_label"], font=self.prefs["font_small"])
 
         # Value
         self.create_text(w / 2, h - 10,
                          text=f"{self.value:.0f}{self.unit}",
-                         fill=self.prefs["color_text"], font=self.prefs["font_small"])
+                         fill=self.prefs["color_value"], font=self.prefs["font_small"])
 
     def set_value(self, value: float):
         self.value = value
@@ -380,21 +594,21 @@ class BarGauge(tk.Canvas):
 # Text info panel
 # ─────────────────────────────────────────────────────────────────────────────
 
-class InfoPanel(tk.Frame):
+class InfoPanel(tk.LabelFrame):
     """Key/value text readout for status fields."""
 
     def __init__(self, parent, prefs, fields: list[str], **kw):
-        super().__init__(parent, bg=prefs["color_panel_bg"], **kw)
+        super().__init__(parent, bg=prefs["color_bg"], **kw)
         self._vars = {}
         self.prefs = prefs
         for i, name in enumerate(fields):
             row = i // 2
             col = (i % 2) * 2
-            tk.Label(self, text=name + ":", bg=self.prefs["color_panel_bg"], fg=self.prefs["color_subtext"],
+            tk.Label(self, text=name + ":", bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
                      font=self.prefs["font_label"], anchor="w").grid(
                 row=row, column=col, sticky="w", padx=(6, 2), pady=1)
             var = tk.StringVar(value="—")
-            tk.Label(self, textvariable=var, bg=self.prefs["color_panel_bg"], fg=self.prefs["color_text"],
+            tk.Label(self, textvariable=var, bg=self.prefs["color_bg"], fg=self.prefs["color_value"],
                      font=self.prefs["font_label"], anchor="w").grid(
                 row=row, column=col+1, sticky="w", padx=(2, 6), pady=1)
             self._vars[name] = var
@@ -432,7 +646,7 @@ class DroneViewer(tk.Tk):
         self.records: list[dict] = []
         self.current_idx: int    = 0
         self.playing: bool       = False
-        self.speed_idx: int      = 2          # default 1×
+        self.speed_idx: int      = 1          # default 1×
         self.playback_thread     = None
         self._stop_event         = threading.Event()
 
@@ -447,7 +661,22 @@ class DroneViewer(tk.Tk):
         self._apply_styles()
 
     # ── UI construction ───────────────────────────────────────────────────
+    def _show_prefs(self):
+        if self.playing:
+            self._pause()
+        PrefsDialog(self, self.prefs, self._on_prefs_saved)
 
+    def _on_prefs_saved(self, new_prefs: dict):
+        self.prefs.update(new_prefs)
+        save_prefs(self.prefs)
+        my_logger.setLevel(LOG_LEVEL_MAP[self.prefs["log_level"]])
+        # Redraw all canvas gauges so they pick up the new colors immediately
+        for widget in (self._gauge_speed, self._gauge_alt, self._gauge_dist,
+                       self._gauge_compass, self._bar_battery, self._bar_sats,
+                       self._bar_wind, self._bar_thrust, self._stick_left,
+                       self._stick_right):
+            widget._draw()
+ 
     def _show_about(self):
         messagebox.showinfo(
             "About",
@@ -477,6 +706,8 @@ class DroneViewer(tk.Tk):
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Open FC2", command=self._open_file)
         file_menu.add_separator()
+        file_menu.add_command(label="Preferences…", command=self._show_prefs)  # ← add this
+        file_menu.add_separator()
         file_menu.add_command(label="About", command=self._show_about)
         file_menu.add_command(label="Quit", command=self._on_close)
 
@@ -492,14 +723,12 @@ class DroneViewer(tk.Tk):
                  font=self.prefs["font_title"]).pack(side=tk.LEFT, padx=16)
 
         self._file_label = tk.Label(top, text="No file loaded",
-                                    bg=self.prefs["color_bg"], fg=self.prefs["color_subtext"],
+                                    bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
                                     font=self.prefs["font_title"])
         self._file_label.pack(side=tk.LEFT, padx=8)
 
-        my_logger.debug(f"bg={self.prefs['color_accent']}")
         open_btn = tk.Button(top, text="Open FC2…",
                              command=self._open_file,
-                             #bg=self.prefs["color_accent"],
                              fg=self.prefs["color_bg"], relief=tk.FLAT,
                              font=self.prefs["font_label"],
                              padx=10, pady=2, cursor="hand2")
@@ -522,9 +751,9 @@ class DroneViewer(tk.Tk):
         self.map_widget.canvas.unbind("<MouseWheel>")
 
         # Right: gauges + controls
-        right = tk.Frame(main, bg=self.prefs["color_bg"], width=340)
+        right = tk.Frame(main, bg=self.prefs["color_bg"], width=360)
         right.pack_propagate(False)
-        main.add(right, stretch="never", minsize=320)
+        main.add(right, stretch="never", minsize=360)
 
         self._build_gauges(right)
         self._build_controls(right)
@@ -535,11 +764,11 @@ class DroneViewer(tk.Tk):
 
         self._status_var = tk.StringVar(value="Ready. Open an FC2 file to begin.")
         tk.Label(bot, textvariable=self._status_var,
-                 bg=self.prefs["color_bg"], fg=self.prefs["color_subtext"], font=self.prefs["font_small"]).pack(side=tk.LEFT, padx=10)
+                 bg=self.prefs["color_bg"], fg=self.prefs["color_label"], font=self.prefs["font_small"]).pack(side=tk.LEFT, padx=10)
 
         self._progress_var = tk.StringVar(value="0 / 0")
         tk.Label(bot, textvariable=self._progress_var,
-                 bg=self.prefs["color_bg"], fg=self.prefs["color_subtext"], font=self.prefs["font_small"]).pack(side=tk.RIGHT, padx=10)
+                 bg=self.prefs["color_bg"], fg=self.prefs["color_label"], font=self.prefs["font_small"]).pack(side=tk.RIGHT, padx=10)
 
     def _build_gauges(self, parent):
         """Build the entire right-side gauge panel."""
@@ -547,37 +776,37 @@ class DroneViewer(tk.Tk):
         my_logger.debug("Building the Gauges")
 
         # ── Section: Arc gauges row ───────────────────────────────────────
-        arc_row = tk.Frame(parent, bg=self.prefs["color_bg"])
+        arc_row = tk.LabelFrame(parent, bg=self.prefs["color_bg"])
         arc_row.pack(fill=tk.X, padx=6, pady=(6, 0))
 
         # TODO: Need the maximum values for these to adjust gauges.
-        self.gauge_speed  = ArcGauge(arc_row, self.prefs, "SPEED",   0, 10, " kph", size=110)
-        self.gauge_alt    = ArcGauge(arc_row, self.prefs, "ALT",     0, 120, " m",  size=110)
-        self.gauge_dist   = ArcGauge(arc_row, self.prefs, "DIST",    0, 500, " m",  size=110)
+        self._gauge_speed  = ArcGauge(arc_row, self.prefs, "SPEED",   0, 1, " kph", size=110)
+        self._gauge_alt    = ArcGauge(arc_row, self.prefs, "ALT",     0, 1, " m",  size=110)
+        self._gauge_dist   = ArcGauge(arc_row, self.prefs, "DIST",    0, 1, " m",  size=110)
 
-        for g in (self.gauge_speed, self.gauge_alt, self.gauge_dist):
+        for g in (self._gauge_speed, self._gauge_alt, self._gauge_dist):
             g.pack(side=tk.LEFT, expand=True)
 
         # ── Section: Compass + bars ───────────────────────────────────────
         mid_row = tk.Frame(parent, bg=self.prefs["color_bg"])
         mid_row.pack(fill=tk.X, padx=6, pady=4)
 
-        self.gauge_compass = CompassGauge(mid_row, self.prefs, label="HEADING", size=110)
-        self.gauge_compass.pack(side=tk.LEFT, padx=(0, 8))
+        self._gauge_compass = CompassGauge(mid_row, self.prefs, label="HEADING", size=110)
+        self._gauge_compass.pack(side=tk.LEFT, padx=(0, 8))
 
         bars = tk.Frame(mid_row, bg=self.prefs["color_bg"])
         bars.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        self.bar_battery = BarGauge(bars, self.prefs, label="BATT", max_val=100, unit="%", size_w=36, size_h=110, warn_low=0.3)
-        self.bar_sats    = BarGauge(bars, self.prefs, label="SATS", max_val=30,  size_w=36, size_h=110)
-        self.bar_wind    = BarGauge(bars, self.prefs, label="WIND", max_val=15, unit=" m/s", size_w=36, size_h=110, warn_high=0.8)
-        self.bar_thrust  = BarGauge(bars, self.prefs, label="THRST",max_val=10, size_w=36, size_h=110, warn_high=0.8)
+        self._bar_battery = BarGauge(bars, self.prefs, label="BATT", max_val=100, unit="%", size_w=36, size_h=110, warn_low=0.3)
+        self._bar_sats    = BarGauge(bars, self.prefs, label="SATS", max_val=30,  size_w=36, size_h=110)
+        self._bar_wind    = BarGauge(bars, self.prefs, label="WIND", max_val=15, unit=" m/s", size_w=36, size_h=110, warn_high=0.8)
+        self._bar_thrust  = BarGauge(bars, self.prefs, label="THRST",max_val=10, size_w=36, size_h=110, warn_high=0.8)
 
-        for b in (self.bar_battery, self.bar_sats, self.bar_wind, self.bar_thrust):
+        for b in (self._bar_battery, self._bar_sats, self._bar_wind, self._bar_thrust):
             b.pack(side=tk.LEFT, padx=2)
 
         # ── Section: Text info ────────────────────────────────────────────
-        info_frame = tk.Frame(parent, bg=self.prefs["color_panel_bg"], bd=0)
+        info_frame = tk.Frame(parent, bg=self.prefs["color_bg"], bd=0)
         info_frame.pack(fill=tk.X, padx=6, pady=4)
 
         self.info = InfoPanel(info_frame, self.prefs, [
@@ -585,15 +814,15 @@ class DroneViewer(tk.Tk):
             "GPS Lock",
             "Flight Mode",
             "Pos Mode",
-            "⚡ V",
-            "⚡ A",
-            "⚡ Temp",
-            "⚡ %",
-            "💨 Dir",
-            "💨 Speed",
+            "Batt. V",
+            "Batt. A",
+            "Batt. Temp",
+            "Batt. %",
+            "Wind Dir",
+            "Wind Speed",
             "Record #",
             "Elapsed",
-            "Flight Counter",
+            "Flight Ctr",
         ])
         self.info.pack(fill=tk.X)
 
@@ -601,20 +830,20 @@ class DroneViewer(tk.Tk):
         sticks_frame = tk.Frame(parent, bg=self.prefs["color_bg"])
         sticks_frame.pack(padx=6, pady=6)
 
-        tk.Label(sticks_frame, text="CONTROLLER", bg=self.prefs["color_bg"], fg=self.prefs["color_subtext"],
+        tk.Label(sticks_frame, text="CONTROLLER", bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
                  font=self.prefs["font_small"]).pack(padx=8)
 
-        self.stick_left  = StickDisplay(sticks_frame, self.prefs, "Throttle & Yaw",  size=110)
-        self.stick_right = StickDisplay(sticks_frame, self.prefs, "Pitch & Bank", size=110)
-        self.stick_left.pack(side=tk.LEFT, padx=(0, 4))
-        self.stick_right.pack(side=tk.LEFT)
+        self._stick_left  = StickDisplay(sticks_frame, self.prefs, "Throttle & Yaw",  size=110)
+        self._stick_right = StickDisplay(sticks_frame, self.prefs, "Pitch & Bank", size=110)
+        self._stick_left.pack(side=tk.LEFT, padx=(0, 4))
+        self._stick_right.pack(side=tk.LEFT)
 
     def _build_controls(self, parent):
         """Transport controls at the bottom of the right panel."""
 
         my_logger.debug("Building the Controls")
 
-        ctrl = tk.Frame(parent, bg=self.prefs["color_panel_bg"], pady=8)
+        ctrl = tk.LabelFrame(parent, bg=self.prefs["color_bg"], pady=8)
         ctrl.pack(fill=tk.X, side=tk.BOTTOM, padx=0, pady=0)
 
         # Slider
@@ -625,10 +854,10 @@ class DroneViewer(tk.Tk):
                                  command=self._on_slider)
         self._slider.pack(fill=tk.X, padx=10, pady=(4, 6))
 
-        btn_row = tk.Frame(ctrl, bg=self.prefs["color_panel_bg"])
+        btn_row = tk.Frame(ctrl, bg=self.prefs["color_bg"])
         btn_row.pack()
 
-        def btn(text, cmd, color=self.prefs["color_panel_bg"], fg=self.prefs["color_text"]):
+        def btn(text, cmd, color=self.prefs["color_gauge_bg"], fg=self.prefs["color_value"]):
             return tk.Button(btn_row, text=text, command=cmd,
                              bg=color, fg=fg, relief=tk.FLAT,
                              font=self.prefs["font_label"],
@@ -654,7 +883,7 @@ class DroneViewer(tk.Tk):
             b.pack(side=tk.LEFT, padx=2)
 
         # Speed selector
-        speed_row = tk.Frame(ctrl, bg=self.prefs["color_panel_bg"])
+        speed_row = tk.Frame(ctrl, bg=self.prefs["color_bg"])
         speed_row.pack(pady=(4, 2))
 
         self._speed_var = tk.StringVar(value="1×")
@@ -664,9 +893,10 @@ class DroneViewer(tk.Tk):
             rb = tk.Radiobutton(speed_row, text=label,
                                 variable=self._speed_var, value=label,
                                 command=lambda i=idx: self._set_speed(i),
-                                bg=self.prefs["color_panel_bg"], fg=self.prefs["color_subtext"],
-                                selectcolor=self.prefs["color_panel_bg"],
-                                activebackground=self.prefs["color_panel_bg"],
+                                bg=self.prefs["color_bg"],
+                                fg=self.prefs["color_label"],
+                                selectcolor=self.prefs["color_bg"],
+                                activebackground=self.prefs["color_bg"],
                                 activeforeground=self.prefs["color_accent"],
                                 indicatoron=True,
                                 relief=tk.FLAT,
@@ -677,7 +907,7 @@ class DroneViewer(tk.Tk):
     def _apply_styles(self):
         style = ttk.Style(self)
         style.theme_use("clam")
-        style.configure("TScale", background=self.prefs["color_panel_bg"],
+        style.configure("TScale", background=self.prefs["color_gauge_bg"],
                         troughcolor=self.prefs["color_border"], slidercolor=self.prefs["color_accent"])
 
     # ── File loading ──────────────────────────────────────────────────────
@@ -729,17 +959,21 @@ class DroneViewer(tk.Tk):
 
         range = [r["3d Derived Speed (m/s)"] for r in records if r.get("3d Derived Speed (m/s)") != ""]
         #range = [r["speed (m/s)"] for r in records if r.get("speed (m/s)") != ""]
-        self.max_speed = max(range)
+        self.max_speed = max(range)*3.6 # convert to KPH
 
         range = [r["distance (m)"] for r in records if r.get("distance (m)") != ""]
-        self.max_distance = max(range)
+        self.max_dist = max(range)
 
         range = [r["Wind Speed (m/s)"] for r in records if r.get("Wind Speed (m/s)") != ""]
         self.max_wind = max(range)
 
-        self.bar_thrust.max_val = self.max_thrust
-        self.gauge_speed.max_val = self.max_speed
-        self.bar_wind.max_val = self.max_wind
+        self._bar_thrust.max_val = self.max_thrust
+        self._bar_wind.max_val = self.max_wind
+        self._gauge_alt.max_val = self.max_alt
+        self._gauge_speed.max_val = self.max_speed
+        self._gauge_dist.max_val = self.max_dist
+        my_logger.debug(f"Max speed = {self.max_speed} kph, Max dist = {self.max_dist} m, Max alt = {self.max_alt} m")
+        my_logger.debug(f"Max thrust = {self.max_thrust}, Max wind = {self.max_wind} m/s")
 
         # Get the initial bounding box for the map.
         range = [r["lat (deg)"] for r in records if r.get("lat (deg)") != ""]
@@ -774,8 +1008,8 @@ class DroneViewer(tk.Tk):
     def _make_drone_icon(self, heading) -> ImageTk.PhotoImage:
         """Draw a simple arrow head rotated to the current heading."""
         size = 21 # Make this an odd number so we actually have a center pixel.
-        # Note we add 4 pixels of padding on all sides to support
-        # the rotation.
+        # Note we add 4 pixels of padding on all sides to make sure there's
+        # room for the rotation.
         img = Image.new("RGBA", (size+8, size+8), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
@@ -791,19 +1025,32 @@ class DroneViewer(tk.Tk):
         return ImageTk.PhotoImage(img)
 
     def _make_home_icon(self) -> ImageTk.PhotoImage:
-        """Draw a simple house icon."""
         size = 20
         img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        cx, cy = size // 2, size // 2
+        cc = size // 2
 
-        # Roof triangle
-        draw.polygon([(cx, 0), (size, cy), (0, cy)], fill=self.prefs["color_accent"], outline=self.prefs["color_border"])
-        # House body
-        draw.rectangle([(0, cy), (size, size)], fill=self.prefs["color_accent"], outline=self.prefs["color_border"])
-        # Door
-        draw.rectangle([(cx-4, cy), (cx+4, size)], fill=self.prefs["color_border"])
+        if self.prefs["font_marker"] == "":
+            """Draw a simple house icon."""
+            # Roof triangle
+            draw.polygon([(cc, 0), (size, cc), (0, cc)],
+                         fill=self.prefs["color_accent"],
+                         outline=self.prefs["color_border"])
+            # House body
+            draw.rectangle([(0, cc), (size, size)],
+                           fill=self.prefs["color_accent"],
+                           outline=self.prefs["color_border"])
+            # Door
+            draw.rectangle([(cc-4, cc), (cc+4, size)],
+                           fill=self.prefs["color_border"])
+        else:
+            font = ImageFont.truetype(self.prefs["font_marker"], size)
+            draw.ellipse([(0,0),(size,size)], fill=self.prefs["color_bg"],
+                         outline=self.prefs["color_path"])
+            draw.text((cc, cc), "H", font=font,
+                      fill=self.prefs["color_path"],
+                      anchor="mm")
 
         return ImageTk.PhotoImage(img)
 
@@ -854,25 +1101,25 @@ class DroneViewer(tk.Tk):
         r = self.records[idx]
 
         # Gauges
-        self.gauge_speed.set_value(r.get("3d Derived Speed (m/s)", 0)*3.6)
-        #self.gauge_speed.set_value(r.get("speed (m/s)", 0)*3.6)
-        self.gauge_alt.set_value(r.get("alt (m)", 0))
-        self.gauge_dist.set_value(r.get("distance (m)", 0))
-        self.gauge_compass.set_value(r.get("heading (deg)", 0))
+        self._gauge_speed.set_value(r.get("3d Derived Speed (m/s)", 0)*3.6)
+        #self._gauge_speed.set_value(r.get("speed (m/s)", 0)*3.6)
+        self._gauge_alt.set_value(r.get("alt (m)", 0))
+        self._gauge_dist.set_value(r.get("distance (m)", 0))
+        self._gauge_compass.set_value(r.get("heading (deg)", 0))
 
-        self.bar_battery.set_value(r.get("Battery Level (%)", 0))
-        self.bar_sats.set_value(r.get("Satellites", 0))
-        self.bar_wind.set_value(r.get("Wind Speed (m/s)", 0))
-        self.bar_thrust.set_value(max(0.0, r.get("Thrust", 0)))
+        self._bar_battery.set_value(r.get("Battery Level (%)", 0))
+        self._bar_sats.set_value(r.get("Satellites", 0))
+        self._bar_wind.set_value(r.get("Wind Speed (m/s)", 0))
+        self._bar_thrust.set_value(max(0.0, r.get("Thrust", 0)))
 
         # RC Sticks
         # Left stick: throttle (Y) + rudder/yaw (X)
         # Right stick: elevator/pitch (Y) + aileron/roll (X)
-        self.stick_left.set_values(
+        self._stick_left.set_values(
             r.get("rc rudder",   1024),
             r.get("rc throttle", 1024)
         )
-        self.stick_right.set_values(
+        self._stick_right.set_values(
             r.get("rc aileron",  1024),
             r.get("rc elevator", 1024)
         )
@@ -882,17 +1129,17 @@ class DroneViewer(tk.Tk):
         elapsed_s  = elapsed_us / 1_000_000
         m, s       = divmod(int(elapsed_s), 60)
 
-        self.info.update_field("Flight Counter",  r.get("Flight Counter", "0"))
+        self.info.update_field("Flight Ctr",  r.get("Flight Counter", "0"))
         self.info.update_field("Drone Mode",  r.get("Drone Mode (text)", "—"))
         self.info.update_field("Pos Mode",    r.get("Positioning Mode (text)", "—"))
         self.info.update_field("Flight Mode", r.get("Flight Mode (text)", "—"))
         self.info.update_field("GPS Lock",    r.get("GPS Lock", "—"))
-        self.info.update_field("⚡ V",        f"{r.get('Battery (mv)')/1000:.1f}V")
-        self.info.update_field("⚡ A",        f"{r.get('Battery Current (ma)')/1000:.1f}A")
-        self.info.update_field("⚡ Temp",     f"{r.get('Battery Temp (c)', 0):.1f}C")
-        self.info.update_field("⚡ %",        f"{r.get('Battery Level (%)', 0)}%")
-        self.info.update_field("💨 Dir",      f"{r.get('Wind (deg)', 0):.1f}°")
-        self.info.update_field("💨 Speed",    f"{r.get('Wind Speed (m/s)', 0):.1f} m/s")
+        self.info.update_field("Batt. V",        f"{r.get('Battery (mv)')/1000:.1f}V")
+        self.info.update_field("Batt. A",        f"{r.get('Battery Current (ma)')/1000:.1f}A")
+        self.info.update_field("Batt. Temp",     f"{r.get('Battery Temp (c)', 0):.1f}C")
+        self.info.update_field("Batt. %",        f"{r.get('Battery Level (%)', 0)}%")
+        self.info.update_field("Wind Dir",      f"{r.get('Wind (deg)', 0):.1f}°")
+        self.info.update_field("Wind Speed",    f"{r.get('Wind Speed (m/s)', 0):.1f} m/s")
         self.info.update_field("Record #",    str(idx + 1))
         self.info.update_field("Elapsed",     f"{m:02d}:{s:02d}")
 
@@ -929,7 +1176,10 @@ class DroneViewer(tk.Tk):
     def _pause(self):
         self.playing = False
         self._stop_event.set()
-        self._btn_play.configure(text="▶", bg=self.prefs["color_accent"], fg=self.prefs["color_bg"])
+        if PLATFORM_SYSTEM == "Darwin":
+            self._btn_play.configure(text="▶️", bg=self.prefs["color_accent"], fg=self.prefs["color_bg"])
+        else:
+            self._btn_play.configure(text=">", bg=self.prefs["color_accent"], fg=self.prefs["color_bg"])
 
     def _playback_loop(self):
         """Background thread that advances frames at the selected rate."""
