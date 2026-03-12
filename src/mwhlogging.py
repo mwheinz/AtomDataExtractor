@@ -80,8 +80,8 @@ class MWHLogger(logging.Logger):
 
         if file_handle:
             self.file_handle = file_handle
-            if self.handler is not None:
-                self.removeHandler(self.handler)
+            #if self.handler is not None:
+                #self.removeHandler(self.handler)
 
             # Lazy import to avoid overhead when not used
             from logging import StreamHandler

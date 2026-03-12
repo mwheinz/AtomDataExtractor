@@ -14,6 +14,7 @@ import platform
 from pathlib import Path
 import tkinter as tk
 import tkinter.font as tkf
+from io import StringIO
 from tkinter import ttk, filedialog, messagebox
 from tkinter.colorchooser import askcolor
 import tkintermapview
@@ -23,12 +24,69 @@ from atom2parser import atom2_parser, is_valid_latlon
 import mwhlogging
 from mwhlogging import MWHLogger
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Configure the logger to write to a buffer as well as the console.
+#
+# We will load the buffer into a dialog box on request.
+# ─────────────────────────────────────────────────────────────────────────────
 my_logger = MWHLogger("atom_data_viewer")
 my_logger.setLevel(mwhlogging.DEBUG)
+my_logging_buf = StringIO()
+my_logger.configure_logging(file_handle=my_logging_buf)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Constants
-# ─────────────────────────────────────────────────────────────────────────────
+class LogDialog(tk.Toplevel):
+    '''
+        Display the contents of the my_logger buffer.
+    '''
+
+    def __init__(self, parent, log_buffer: StringIO, prefs):
+        super().__init__(parent)
+        self.title("Atom Data Viewer Log")
+        self.geometry("640x480")
+        self.resizable(True, True)
+        self.transient(parent)
+
+        btn_row = tk.Frame(self)
+        btn_row.pack(fill=tk.X, padx=8, pady=(4, 8), side=tk.BOTTOM)
+        tk.Button(btn_row, text="Refresh", command=lambda: self._load(log_buffer)).pack(side=tk.LEFT)
+        tk.Button(btn_row, text="Copy All", command=self._copy_all).pack(side=tk.LEFT, padx=4)
+        tk.Button(btn_row, text="Close", command=self.destroy).pack(side=tk.RIGHT)
+
+        h_scroll = ttk.Scrollbar(self, orient=tk.HORIZONTAL)
+        h_scroll.pack(fill=tk.X, padx=8, side=tk.BOTTOM)
+
+        text_frame = tk.Frame(self)
+        text_frame.pack(fill = tk.BOTH, expand = True, padx = 8, pady=(8, 4))
+
+        scroll_bar = ttk.Scrollbar(text_frame)
+        scroll_bar.pack(side = tk.RIGHT, fill = tk.Y)
+
+        self._text = tk.Text(text_frame, wrap=tk.NONE,
+                             yscrollcommand=scroll_bar.set,
+                             xscrollcommand=h_scroll.set,
+                             font=prefs["font_label"],
+                             state=tk.DISABLED)
+        self._text.pack(fill=tk.BOTH, expand = True)
+        
+        self._center_on(parent)
+        self._load(log_buffer)
+
+    def _center_on(self, parent):
+        x = parent.winfo_x() + (parent.winfo_width()  - self.winfo_width())  // 2
+        y = parent.winfo_y() + (parent.winfo_height() - self.winfo_height()) // 2
+        self.geometry(f"+{x}+{y}")
+
+    def _load(self, log_buffer: StringIO):
+        contents = log_buffer.getvalue()
+        self._text.configure(state=tk.NORMAL)
+        self._text.delete("1.0", tk.END)
+        self._text.insert(tk.END, contents)
+        self._text.configure(state=tk.DISABLED)
+        self._text.see(tk.END)  # scroll to bottom
+
+    def _copy_all(self):
+        self.clipboard_clear()
+        self.clipboard_append(self._text.get("1.0", tk.END))    
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Each pair represents a panel label and the matching data field.
@@ -228,6 +286,7 @@ class PrefsDialog(tk.Toplevel):
 
     def __init__(self, parent, prefs: dict, on_save):
         super().__init__(parent)
+        my_logger.debug("Creating the Prefs dialog")
         self.title("Preferences")
         self.resizable(False, False)
         self.grab_set()             # make modal
@@ -414,6 +473,7 @@ class CompassGauge(tk.Canvas):
     def __init__(self, parent, prefs:dict, label="", size=120, **kw):
         super().__init__(parent, width=size, height=size,
                          bg=prefs["color_bg"], highlightthickness=0, **kw)
+        my_logger.debug("Creating Compass %s", label)
         self.prefs = prefs
         self.label = label
         self.size = size
@@ -489,6 +549,7 @@ class ArcGauge(tk.Canvas):
                  size=110, **kw):
         super().__init__(parent, width=size, height=int(size * 0.75),
                          bg=prefs["color_bg"], highlightthickness=0, **kw)
+        my_logger.debug("Creating Gauge %s", label)
         self.prefs     = prefs
         self.label     = label
         self.min_val   = min_val
@@ -562,6 +623,7 @@ class StickDisplay(tk.Canvas):
     def __init__(self, parent, prefs, label, size=100, **kw):
         super().__init__(parent, width=size, height=size,
                          bg=prefs["color_bg"], highlightthickness=0, **kw)
+        my_logger.debug("Creating Stick %s", label)
         self.prefs  = prefs
         self.label  = label
         self.size   = size
@@ -618,6 +680,7 @@ class BarGauge(tk.Canvas):
                  warn_high=False, **kw):
         super().__init__(parent, width=size_w, height=size_h,
                          bg=prefs["color_bg"], highlightthickness=0, **kw)
+        my_logger.debug("Creating Bar %s", label)
         self.prefs   = prefs
         self.label   = label
         self.min_val = min_val
@@ -685,6 +748,7 @@ class InfoPanel(tk.LabelFrame):
 
     def __init__(self, parent, prefs, fields: list, **kw):
         super().__init__(parent, bg=prefs["color_bg"], **kw)
+        my_logger.debug("Creating InfoPanel")
         self._vars = {}
         self._labels = []
         self.prefs = prefs
@@ -802,6 +866,8 @@ class DroneViewer(tk.Tk):
     def __init__(self):
         super().__init__()
 
+        my_logger.debug("Creating DroneViewer window")
+
         self.prefs = load_prefs()
 
         self.configure(menu=tk.Menu(self))
@@ -837,6 +903,9 @@ class DroneViewer(tk.Tk):
         if self.playing:
             self._pause()
         PrefsDialog(self, self.prefs, self._on_prefs_saved)
+
+    def _show_log(self):
+        LogDialog(self, my_logging_buf, self.prefs)
 
     def _on_prefs_saved(self, new_prefs: dict):
         self.prefs.update(new_prefs)
@@ -881,6 +950,7 @@ class DroneViewer(tk.Tk):
         file_menu.add_command(label="Preferences…", command=self._show_prefs)  # ← add this
         file_menu.add_separator()
         file_menu.add_command(label="About", command=self._show_about)
+        file_menu.add_command(label="View Log…", command=self._show_log)
         file_menu.add_command(label="Quit", command=self._on_close)
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -1108,7 +1178,7 @@ class DroneViewer(tk.Tk):
         self.load_file(path)
 
     def load_file(self, path: str):
-        my_logger.debug("Loading %s", path)
+        my_logger.info("Loading %s", path)
         self._set_status("Loading…")
         self.update_idletasks()
 
