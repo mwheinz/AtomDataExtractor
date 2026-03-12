@@ -829,9 +829,9 @@ class DroneViewer(tk.Tk):
         self.map_widget.canvas.unbind("<MouseWheel>")
 
         # Right: gauges + controls
-        right = tk.Frame(main_pane, bg=self.prefs["color_bg"], width=360)
+        right = tk.Frame(main_pane, bg=self.prefs["color_bg"], width=380)
         right.pack_propagate(False)
-        main_pane.add(right, stretch="never", minsize=360)
+        main_pane.add(right, stretch="never", minsize=380)
 
         self._build_gauges(right)
         self._build_controls(right)
@@ -896,27 +896,24 @@ class DroneViewer(tk.Tk):
 
         self.info = InfoPanel(info_frame, self.prefs, [
             "---Status---", 
-            "Drone Mode", "GPS Lock",
-            "Flight Mode", "Pos Mode",
+            "Drn Mode", "GPS Lock",
+            "Flt Mode", "Pos Mode",
             "---Battery---",
             "Batt. V", "Batt. A",
             "Batt. Temp", "Batt. %",
+            "---Position---",
+            "Lat", "Lon",
+            "H Lat", "H Lon",
+            "Alt",
+            "---Orientation---",
+            "Bank", "Pitch",
+            "Distance", "2d Dist", "3d Dist",
+            "Speed", "2d Speed", "3d Speed",
             "---Weather---",
-            "Wind Dir", "Wind Speed",
+            "Wind Dir", "Wind Spd",
             "---Time---",
-            "Record #", "Elapsed",
-            "Flight Ctr",
-            "---Dummies---",
-            "Dummy 0",
-            "Dummy 1",
-            "Dummy 2",
-            "Dummy 3",
-            "Dummy 4",
-            "Dummy 5",
-            "Dummy 6",
-            "Dummy 7",
-            "Dummy 8",
-            "Dummy 9",
+            "Flt Ctr", "Record #",
+            "Elapsed",
         ])
         self.info.pack(fill=tk.BOTH, expand=True)
 
@@ -1037,8 +1034,8 @@ class DroneViewer(tk.Tk):
             self._set_status("Error loading file.")
             return
 
-        self.records     = [r for r in records if r.get("GPS Lock") == "Yes"]
-        if not records:
+        self.records = [r for r in records if r.get("GPS Lock") == "Yes"]
+        if not self.records:
             messagebox.showwarning("No data",
                 "No valid records found in this file.")
             return
@@ -1201,6 +1198,15 @@ class DroneViewer(tk.Tk):
 
     # ── Display update ────────────────────────────────────────────────────
 
+    @staticmethod
+    def _deg_to_dms(deg:float) ->str:
+        m = (deg - math.floor(deg))*60
+        s = (m - math.floor(m))*60
+        deg = math.floor(deg)
+        m = math.floor(m)
+        s = round(s,2)
+        return f"{deg}:{m:02d}:{s:02.2f}"
+
     def _update_display(self, idx: int):
         if not self.records:
             return
@@ -1217,7 +1223,7 @@ class DroneViewer(tk.Tk):
 
         self._bar_battery.set_value(r.get("Battery Level (%)", 0))
         self._bar_sats.set_value(r.get("Satellites", 0))
-        self._bar_wind.set_value(r.get("Wind Speed (m/s)", 0))
+        self._bar_wind.set_value(r.get("Wind Spd (m/s)", 0))
         self._bar_thrust.set_value(max(0.0, r.get("Thrust", 0)))
 
         # RC Sticks
@@ -1233,23 +1239,48 @@ class DroneViewer(tk.Tk):
         )
 
         # Text info
+        self.info.update_field("Drn Mode",    r.get("Drone Mode (text)", "—"))
+        self.info.update_field("Pos Mode",    r.get("Positioning Mode (text)", "—"))
+        self.info.update_field("Flt Mode",    r.get("Flight Mode (text)", "—"))
+        self.info.update_field("GPS Lock",    r.get("GPS Lock", "—"))
+        self.info.update_field("Batt. V",     f"{r.get('Battery (mv)')/1000:.1f}V")
+        self.info.update_field("Batt. A",     f"{r.get('Battery Current (ma)')/1000:.1f}A")
+        self.info.update_field("Batt. Temp",  f"{r.get('Battery Temp (c)', 0):.1f}C")
+        self.info.update_field("Batt. %",     f"{r.get('Battery Level (%)', 0)}%")
+        self.info.update_field("Alt",         f"{r.get('alt (m)', 0)} m")
+        self.info.update_field("Distance",    f"{r.get('distance (m)', 0)} m")
+        self.info.update_field("Bank",        f"{r.get('bank (deg)', 0)}°")
+        self.info.update_field("Pitch",       f"{r.get('pitch angle (deg)', 0)}°")
+        self.info.update_field("Wind Dir",    f"{r.get('Wind (deg)', 0):.1f}°")
+        self.info.update_field("Wind Spd",    f"{r.get('Wind Speed (m/s)', 0):.1f} m/s")
+        self.info.update_field("Flt Ctr",     r.get("Flight Counter", "0"))
+        self.info.update_field("Record #",    str(idx + 1))
+
         elapsed_us = r.get("elapsed (us)", 0)
         elapsed_s  = elapsed_us / 1_000_000
         m, s       = divmod(int(elapsed_s), 60)
-
-        self.info.update_field("Flight Ctr",  r.get("Flight Counter", "0"))
-        self.info.update_field("Drone Mode",  r.get("Drone Mode (text)", "—"))
-        self.info.update_field("Pos Mode",    r.get("Positioning Mode (text)", "—"))
-        self.info.update_field("Flight Mode", r.get("Flight Mode (text)", "—"))
-        self.info.update_field("GPS Lock",    r.get("GPS Lock", "—"))
-        self.info.update_field("Batt. V",        f"{r.get('Battery (mv)')/1000:.1f}V")
-        self.info.update_field("Batt. A",        f"{r.get('Battery Current (ma)')/1000:.1f}A")
-        self.info.update_field("Batt. Temp",     f"{r.get('Battery Temp (c)', 0):.1f}C")
-        self.info.update_field("Batt. %",        f"{r.get('Battery Level (%)', 0)}%")
-        self.info.update_field("Wind Dir",      f"{r.get('Wind (deg)', 0):.1f}°")
-        self.info.update_field("Wind Speed",    f"{r.get('Wind Speed (m/s)', 0):.1f} m/s")
-        self.info.update_field("Record #",    str(idx + 1))
         self.info.update_field("Elapsed",     f"{m:02d}:{s:02d}")
+
+        lat = r.get("lat (deg)")
+        lon = r.get("lon (deg)")
+        if is_valid_latlon(lat, lon):
+            self.info.update_field("Lat",     self._deg_to_dms(lat))
+            self.info.update_field("Lon",     self._deg_to_dms(lon))
+
+        lat = r.get("Home Lat (deg)")
+        lon = r.get("Home Lon (deg)")
+        if is_valid_latlon(lat, lon):
+            self.info.update_field("H Lat",    self._deg_to_dms(lat))
+            self.info.update_field("H Lon",    self._deg_to_dms(lon))
+        else:
+            self.info.update_field("H Lat","—")
+            self.info.update_field("H Lon","—")
+        self.info.update_field("Speed",       r.get("speed (m/s)"))
+        self.info.update_field("Distance",    r.get("distance (m)"))
+        self.info.update_field("2d Dist",     round(r.get("2d Derived Distance (m)"),3))
+        self.info.update_field("3d Dist",     round(r.get("3d Derived Distance (m)"),3))
+        self.info.update_field("2d Speed",    round(r.get("2d Derived Speed (m/s)"),3))
+        self.info.update_field("3d Speed",    round(r.get("3d Derived Speed (m/s)"),3))
 
         # Slider
         self._slider_var.set(idx)
