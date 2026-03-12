@@ -134,7 +134,7 @@ class FLFD:
         """radians to decimal degrees."""
         result = round((360 + data * 180/math.pi) % 360, 3)
         if math.isnan(result):
-            raise BadData(f"Bad radian value {data!r}.", data)
+            raise BadData(f"Bad radian value {data}.")
         return result
 
     @staticmethod
@@ -142,7 +142,7 @@ class FLFD:
         """radians to decimal degrees."""
         result = round(data * 180/math.pi, 3)
         if math.isnan(result):
-            raise BadData(f"Bad radian value {data!r}.", data)
+            raise BadData(f"Bad radian value {data}.")
         return result
 
     @staticmethod
@@ -394,7 +394,7 @@ def is_valid_latlon(lat, lon) -> bool:
         return False
     return True
 
-def derived_fields(record):
+def _add_derived_fields(record):
     """
     Adds calculated fields or modifies existing fields based on
     other information.
@@ -536,7 +536,7 @@ def atom2_parser(file_name, logger: Logger) -> list[dict]:
                 error_count += 1
                 continue
 
-            derived_fields(record)
+            _add_derived_fields(record)
 
             records.append(record)
 

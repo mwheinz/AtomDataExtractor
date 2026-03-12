@@ -26,6 +26,93 @@ from mwhlogging import MWHLogger
 my_logger = MWHLogger("atom_data_viewer")
 my_logger.setLevel(mwhlogging.DEBUG)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Constants
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Each pair represents a panel label and the matching data field.
+# Section headers begin with None and the second field is the header label.
+# None by itself will act as a spacer.
+# Items will appear in the panel in the order they are listed.
+# ─────────────────────────────────────────────────────────────────────────────
+PANEL_ITEMS = [
+    (None, "Time"),
+    ("Flt Ctr", "Flight Counter"),
+    ("Record #", "rid"),
+    ("Elapsed", "elapsed (us)"),
+
+    (None, "Status"),
+    ("Drn Mode", "Drone Mode (text)"),
+    ("Flt Mode", "Flight Mode (text)"),
+    ("Pos Mode", "Positioning Mode (text)"),
+
+    (None, "Battery"),
+    ("Batt. V", "Battery (mv)"),
+    ("Batt. A", "Battery Current (ma)"),
+    ("Batt. Temp", "Battery Temp (c)"),
+    ("Batt. %", "Battery Level (%)"),
+
+    (None, "Position"),
+    ("GPS", "GPS Lock"),
+    ("Sats", "Satellites"),
+    ("Lat", "lat (deg)"),
+    ("Lon", "lon (deg)"),
+    ("Alt m", "alt (m)"),
+    ("HDOP", "HDOP"),
+    ("H Lat", "Home Lat (deg)"),
+    ("H Lon", "Home Lon (deg)"),
+
+    (None, "Distance"),
+    ("Dist m", "distance (m)"),
+    ("2d m", "2d Derived Distance (m)"),
+    ("3d m", "3d Derived Distance (m)"),
+
+    (None, "Orientation"),
+    ("Bank Deg", "bank (deg)"),
+    ("Pitch Deg", "pitch angle (deg)"),
+    ("Heading Deg", "heading (deg)"),
+
+    (None, "Speed"),
+    #("m/s","speed (m/s)"),
+    ("2d m/s", "2d Derived Speed (m/s)"),
+    ("3d m/s", "3d Derived Speed (m/s)"),
+
+    (None, "Wind"),
+    ("Wind Deg", "Wind (deg)"),
+    ("Wind m/s", "Wind Speed (m/s)"),
+
+    (None, "Motor"),
+    ("1 State", "Motor 1 State"),
+    ("1 RPM", "Motor 1 RPM"),
+    ("2 State", "Motor 2 State"),
+    ("2 RPM", "Motor 2 RPM"),
+    ("3 State", "Motor 3 State"),
+    ("3 RPM", "Motor 3 RPM"),
+    ("4 State", "Motor 4 State"),
+    ("4 RPM", "Motor 4 RPM"),
+    ("Thrust", "Thrust"),
+
+    (None, "Controls"),
+    ("Up/Down", "rc elevator"),
+    ("Turn", "rc rudder"),
+    ("Throttle", "rc throttle"),
+    ("Bank", "rc aileron"),
+
+    (None, "IMU"),
+    ("X m/s2", "Accelerometer X (m/s2)"),
+    ("Y m/s2", "Accelerometer Y (m/s2)"),
+    ("Z m/s2", "Accelerometer Z (m/s2)"),
+    (None),
+    ("Gyr X d/s", "Gyroscope X (deg/s)"),
+    ("Gyr Y d/s", "Gyroscope Y (deg/s)"),
+    ("Gyr Z d/s", "Gyroscope Z (deg/s)"),
+    ("Air pres", "Air Pressure (pascals)"),
+    ("Mag X", "Magnetometer X"),
+    ("Mag Y", "Magnetometer Y"),
+
+]
+
 PREFS_FILE = Path.home() / ".atom_data_viewer.json"
 
 DEFAULT_PREFS = {
@@ -490,12 +577,12 @@ class StickDisplay(tk.Canvas):
         self.delete("all")
 
         # Box
-        #self.create_rectangle(pad, pad, s - pad, s - pad,
-        #                       outline=self.prefs["color_border"],
-        #                       fill=self.prefs["color_gauge_bg"])
-        self.create_oval(pad, pad, s - pad, s - pad,
-                         outline=self.prefs["color_border"],
-                         fill=self.prefs["color_gauge_bg"])
+        self.create_rectangle(pad, pad, s - pad, s - pad,
+                               outline=self.prefs["color_border"],
+                               fill=self.prefs["color_gauge_bg"])
+        #self.create_oval(pad, pad, s - pad, s - pad,
+        #                 outline=self.prefs["color_border"],
+        #                 fill=self.prefs["color_gauge_bg"])
 
         # Centre cross
         mid = s / 2
@@ -596,25 +683,107 @@ class BarGauge(tk.Canvas):
 class InfoPanel(tk.LabelFrame):
     """Key/value text readout for status fields."""
 
-    def __init__(self, parent, prefs, fields: list[str], **kw):
+    def __init__(self, parent, prefs, fields: list, **kw):
         super().__init__(parent, bg=prefs["color_bg"], **kw)
         self._vars = {}
+        self._labels = []
         self.prefs = prefs
-        for i, name in enumerate(fields):
-            row = i // 2
-            col = (i % 2) * 2
-            tk.Label(self, text=name + ":", bg=self.prefs["color_bg"],
-                     fg=self.prefs["color_label"],
-                     font=self.prefs["font_label"],
-                     anchor="w").grid(row=row, column=col, sticky="w",
-                                      padx=(6, 2), pady=1)
+
+        self._canvas = tk.Canvas(self, bg=prefs["color_bg"],
+                                 highlightthickness=0, height=64)
+        scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL,
+                                  command=self._canvas.yview)
+        self._canvas.configure(yscrollcommand=scrollbar.set)
+
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self._canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self._inner = tk.Frame(self._canvas, bg=prefs["color_bg"])
+        self._window_id = self._canvas.create_window((0,0), window=self._inner,
+                                                     anchor="nw")
+
+        # Resize the scroll region whenever the inner frame changes size
+        self._inner.bind("<Configure>", self._on_inner_configure)
+        # Stretch the inner frame to fill canvas width
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
+        # Mouse wheel scrolling
+        self._canvas.bind("<MouseWheel>",  self._on_mousewheel)      # Windows/macOS
+        self._canvas.bind("<Button-4>",    self._on_mousewheel)      # Linux scroll up
+        self._canvas.bind("<Button-5>",    self._on_mousewheel)      # Linux scroll down
+
+        col = 0
+        row = 0
+        for field in fields:
+            if field is None:
+                row += 1
+                col = 0
+                continue
+
+            if field[0] is None:
+                if col > 0:
+                    row += 1
+                if field[1] is not None:
+                    lbl = tk.Label(self._inner, text=field[1],
+                                bg=self.prefs["color_bg"],
+                                fg=self.prefs["color_accent"],
+                                font=self.prefs["font_label"],
+                                anchor="center")
+                    lbl.grid(row=row, column=0, columnspan=4,
+                            sticky="ew", padx=6, pady=(6, 1))
+                row += 1
+                col = 0
+                continue
+
+            key_lbl = tk.Label(self._inner, text=field[0] + ":", bg=self.prefs["color_bg"],
+                    fg=self.prefs["color_label"],
+                    font=self.prefs["font_label"],
+                    anchor="w")
+            key_lbl.grid(row=row, column=col, sticky="w",
+                        padx=(6, 2), pady=1)
             var = tk.StringVar(value="—")
-            tk.Label(self, textvariable=var, bg=self.prefs["color_bg"],
-                     fg=self.prefs["color_value"],
-                     font=self.prefs["font_label"],
-                     anchor="w").grid(row=row, column=col+1, sticky="w",
-                                      padx=(2, 6), pady=1)
-            self._vars[name] = var
+            val_lbl = tk.Label(self._inner, textvariable=var,
+                                bg=self.prefs["color_bg"],
+                                fg=self.prefs["color_value"],
+                                font=self.prefs["font_label"],
+                                anchor="w")
+            val_lbl.grid(row=row, column=col+1, sticky="w",
+                            padx=(2, 6), pady=1)
+            col += 2
+            if col > 2:
+                col = 0
+                row += 1
+
+            self._vars[field[0]] = var
+            self._labels.append((key_lbl, val_lbl))
+
+    def _on_inner_configure(self, event):
+        """Update scroll region when inner frame resizes."""
+        self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        """Keep inner frame width matched to canvas width."""
+        self._canvas.itemconfig(self._window_id, width=event.width)
+
+    def _on_mousewheel(self, event):
+        if event.num == 4:          # Linux scroll up
+            self._canvas.yview_scroll(-1, "units")
+        elif event.num == 5:        # Linux scroll down
+            self._canvas.yview_scroll(1, "units")
+        else:                       # Windows / macOS
+            self._canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def redraw(self):
+        """Reconfigure all labels to pick up changed prefs."""
+        self._canvas.configure(bg=self.prefs["color_bg"])
+        self._inner.configure(bg=self.prefs["color_bg"])
+        self.configure(bg=self.prefs["color_bg"])
+        for key_lbl, val_lbl in self._labels:
+            key_lbl.configure(bg=self.prefs["color_bg"],
+                              fg=self.prefs["color_label"],
+                              font=self.prefs["font_label"])
+            val_lbl.configure(bg=self.prefs["color_bg"],
+                              fg=self.prefs["color_value"],
+                              font=self.prefs["font_label"])
 
     def update_field(self, name: str, value):
         if name in self._vars:
@@ -676,8 +845,8 @@ class DroneViewer(tk.Tk):
         # Redraw all canvas gauges so they pick up the new colors immediately
         for widget in (self._gauge_speed, self._gauge_alt, self._gauge_dist,
                        self._gauge_compass, self._bar_battery, self._bar_sats,
-                       self._bar_wind, self._bar_thrust, self._stick_left,
-                       self._stick_right):
+                       self._bar_wind, self._stick_left,
+                       self._stick_right, self._gauge_wind):
             widget._draw()
 
     def _show_about(self):
@@ -751,12 +920,22 @@ class DroneViewer(tk.Tk):
         self.map_widget.pack(fill=tk.BOTH, expand=True)
 
         # Disable the scroll wheel, it doesn't seem to work correctly.
-        self.map_widget.canvas.unbind("<MouseWheel>")
+        if PLATFORM_SYSTEM == "Darwin":
+            def _map_mouse_zoom(event):
+                relative_x = event.x / self.map_widget.width
+                relative_y = event.y / self.map_widget.height
+                delta = event.delta * 0.01
+                new_zoom = self.map_widget.zoom + delta
+                self.map_widget.set_zoom(new_zoom,
+                             relative_pointer_x=relative_x,
+                             relative_pointer_y=relative_y)
+
+            self.map_widget.canvas.bind("<MouseWheel>", _map_mouse_zoom)
 
         # Right: gauges + controls
-        right = tk.Frame(main_pane, bg=self.prefs["color_bg"], width=360)
+        right = tk.Frame(main_pane, bg=self.prefs["color_bg"], width=380)
         right.pack_propagate(False)
-        main_pane.add(right, stretch="never", minsize=360)
+        main_pane.add(right, stretch="never", minsize=380)
 
         self._build_gauges(right)
         self._build_controls(right)
@@ -809,32 +988,19 @@ class DroneViewer(tk.Tk):
         self._bar_wind    = BarGauge(bars, self.prefs, label="WIND", max_val=15,
                                      unit=" m/s", size_w=36, size_h=110,
                                      warn_high=0.8)
-        self._bar_thrust  = BarGauge(bars, self.prefs, label="THRST",max_val=10,
-                                     size_w=36, size_h=110, warn_high=0.8)
 
-        for b in (self._bar_battery, self._bar_sats, self._bar_wind, self._bar_thrust):
+        for b in (self._bar_battery, self._bar_sats, self._bar_wind):
             b.pack(side=tk.LEFT, padx=2)
+
+        self._gauge_wind = CompassGauge(mid_row, self.prefs, label="WIND", size=110)
+        self._gauge_wind.pack(side=tk.LEFT, padx=(0, 8))
 
         # ── Section: Text info ────────────────────────────────────────────
         info_frame = tk.Frame(parent, bg=self.prefs["color_bg"], bd=0)
-        info_frame.pack(fill=tk.X, padx=6, pady=4)
+        info_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
 
-        self.info = InfoPanel(info_frame, self.prefs, [
-            "Drone Mode",
-            "GPS Lock",
-            "Flight Mode",
-            "Pos Mode",
-            "Batt. V",
-            "Batt. A",
-            "Batt. Temp",
-            "Batt. %",
-            "Wind Dir",
-            "Wind Speed",
-            "Record #",
-            "Elapsed",
-            "Flight Ctr",
-        ])
-        self.info.pack(fill=tk.X)
+        self.info = InfoPanel(info_frame, self.prefs, PANEL_ITEMS)
+        self.info.pack(fill=tk.BOTH, expand=True)
 
         # ── Section: RC Sticks ────────────────────────────────────────────
         sticks_frame = tk.Frame(parent, bg=self.prefs["color_bg"])
@@ -953,8 +1119,8 @@ class DroneViewer(tk.Tk):
             self._set_status("Error loading file.")
             return
 
-        self.records     = [r for r in records if r.get("GPS Lock") == "Yes"]
-        if not records:
+        self.records = [r for r in records if r.get("GPS Lock") == "Yes"]
+        if not self.records:
             messagebox.showwarning("No data",
                 "No valid records found in this file.")
             return
@@ -974,9 +1140,6 @@ class DroneViewer(tk.Tk):
         field_range = [r["alt (m)"] for r in records if r.get("alt (m)") != ""]
         self.max_alt = max(field_range)
 
-        field_range = [r["Thrust"] for r in records if r.get("Thrust") != ""]
-        self.max_thrust = max(field_range)
-
         field_range = [r["3d Derived Speed (m/s)"] for r in records if r.get("3d Derived Speed (m/s)") != ""]
         #field_range = [r["speed (m/s)"] for r in records if r.get("speed (m/s)") != ""]
         self.max_speed = max(field_range)*3.6 # convert to KPH
@@ -987,15 +1150,13 @@ class DroneViewer(tk.Tk):
         field_range = [r["Wind Speed (m/s)"] for r in records if r.get("Wind Speed (m/s)") != ""]
         self.max_wind = max(field_range)
 
-        self._bar_thrust.max_val = self.max_thrust
         self._bar_wind.max_val = self.max_wind
         self._gauge_alt.max_val = self.max_alt
         self._gauge_speed.max_val = self.max_speed
         self._gauge_dist.max_val = self.max_dist
         my_logger.debug("Max speed = %s kph, Max dist = %s m, Max alt = %s m",
                         self.max_speed, self.max_dist, self.max_alt)
-        my_logger.debug("Max thrust = %s, Max wind = %s m/s",
-                        self.max_thrust, self.max_wind)
+        my_logger.debug("Max wind = %s m/s", self.max_wind)
 
         # Get the initial bounding box for the map.
         field_range = [r["lat (deg)"] for r in records if r.get("lat (deg)") != ""]
@@ -1117,6 +1278,15 @@ class DroneViewer(tk.Tk):
 
     # ── Display update ────────────────────────────────────────────────────
 
+    @staticmethod
+    def _deg_to_dms(deg:float) ->str:
+        m = (deg - math.floor(deg))*60
+        s = (m - math.floor(m))*60
+        deg = math.floor(deg)
+        m = math.floor(m)
+        s = round(s,1)
+        return f"{deg}:{m:02d}:{s:02.1f}"
+
     def _update_display(self, idx: int):
         if not self.records:
             return
@@ -1130,11 +1300,11 @@ class DroneViewer(tk.Tk):
         self._gauge_alt.set_value(r.get("alt (m)", 0))
         self._gauge_dist.set_value(r.get("distance (m)", 0))
         self._gauge_compass.set_value(r.get("heading (deg)", 0))
+        self._gauge_wind.set_value(r.get("Wind (deg)", 0))
 
         self._bar_battery.set_value(r.get("Battery Level (%)", 0))
         self._bar_sats.set_value(r.get("Satellites", 0))
-        self._bar_wind.set_value(r.get("Wind Speed (m/s)", 0))
-        self._bar_thrust.set_value(max(0.0, r.get("Thrust", 0)))
+        self._bar_wind.set_value(r.get("Wind Spd (m/s)", 0))
 
         # RC Sticks
         # Left stick: throttle (Y) + rudder/yaw (X)
@@ -1148,24 +1318,37 @@ class DroneViewer(tk.Tk):
             r.get("rc elevator", 1024)
         )
 
-        # Text info
+        # Update Panel Items
+        for field in PANEL_ITEMS:
+            if field is None:
+                continue
+            if field[0] is not None:
+                self.info.update_field(field[0], r.get(field[1], "—"))
         elapsed_us = r.get("elapsed (us)", 0)
         elapsed_s  = elapsed_us / 1_000_000
         m, s       = divmod(int(elapsed_s), 60)
-
-        self.info.update_field("Flight Ctr",  r.get("Flight Counter", "0"))
-        self.info.update_field("Drone Mode",  r.get("Drone Mode (text)", "—"))
-        self.info.update_field("Pos Mode",    r.get("Positioning Mode (text)", "—"))
-        self.info.update_field("Flight Mode", r.get("Flight Mode (text)", "—"))
-        self.info.update_field("GPS Lock",    r.get("GPS Lock", "—"))
-        self.info.update_field("Batt. V",        f"{r.get('Battery (mv)')/1000:.1f}V")
-        self.info.update_field("Batt. A",        f"{r.get('Battery Current (ma)')/1000:.1f}A")
-        self.info.update_field("Batt. Temp",     f"{r.get('Battery Temp (c)', 0):.1f}C")
-        self.info.update_field("Batt. %",        f"{r.get('Battery Level (%)', 0)}%")
-        self.info.update_field("Wind Dir",      f"{r.get('Wind (deg)', 0):.1f}°")
-        self.info.update_field("Wind Speed",    f"{r.get('Wind Speed (m/s)', 0):.1f} m/s")
-        self.info.update_field("Record #",    str(idx + 1))
         self.info.update_field("Elapsed",     f"{m:02d}:{s:02d}")
+
+        lat = r.get("lat (deg)")
+        lon = r.get("lon (deg)")
+        if is_valid_latlon(lat, lon):
+            self.info.update_field("Lat",     self._deg_to_dms(lat))
+            self.info.update_field("Lon",     self._deg_to_dms(lon))
+
+        lat = r.get("Home Lat (deg)")
+        lon = r.get("Home Lon (deg)")
+        if is_valid_latlon(lat, lon):
+            self.info.update_field("H Lat",    self._deg_to_dms(lat))
+            self.info.update_field("H Lon",    self._deg_to_dms(lon))
+        else:
+            self.info.update_field("H Lat","—")
+            self.info.update_field("H Lon","—")
+        self.info.update_field("Speed",       r.get("speed (m/s)"))
+        self.info.update_field("Distance",    r.get("distance (m)"))
+        self.info.update_field("2d Dist",     round(r.get("2d Derived Distance (m)"),3))
+        self.info.update_field("3d Dist",     round(r.get("3d Derived Distance (m)"),3))
+        self.info.update_field("2d Speed",    round(r.get("2d Derived Speed (m/s)"),3))
+        self.info.update_field("3d Speed",    round(r.get("3d Derived Speed (m/s)"),3))
 
         # Slider
         self._slider_var.set(idx)

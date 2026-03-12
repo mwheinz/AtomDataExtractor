@@ -75,7 +75,7 @@ class MWHLogger(logging.Logger):
         if level:
             self.setLevel(level)
             if self.handler is not None:
-                self.setLevel(self.level)
+                self.handler.setLevel(self.level)
 
 
         if file_handle:
