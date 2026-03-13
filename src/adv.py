@@ -918,10 +918,11 @@ class DroneViewer(tk.Tk):
         self.geometry(geometry)
 
         # ── State ─────────────────────────────────────────────────────────
-        self.records: list[dict] = []
-        self.current_idx: int    = 0
-        self.playing: bool       = False
-        self.speed_idx: int      = 0
+        self.records             = []
+        self.current_idx         = 0
+        self.playing             = False
+        self.pending_update      = False
+        self.speed_idx           = 0
         self.playback_thread     = None
         self._stop_event         = threading.Event()
 
@@ -1385,7 +1386,6 @@ class DroneViewer(tk.Tk):
                 self._heading = round(heading,0)
                 self._drone_marker.change_icon(self._make_drone_icon(self._heading))
 
-    # ── Display update ────────────────────────────────────────────────────
 
     @staticmethod
     def _deg_to_dms(deg:float) ->str:
@@ -1466,6 +1466,8 @@ class DroneViewer(tk.Tk):
         # Map marker
         self._update_markers(r)
 
+        self.pending_update = False
+
     # ── Transport controls ────────────────────────────────────────────────
 
     def _toggle_play(self):
@@ -1525,7 +1527,9 @@ class DroneViewer(tk.Tk):
             dt_us  = dt_us / self.SPEEDS[self.speed_idx]
             sleep  = max(0.01, dt_us / 1_000_000)
 
-            self.after(0, self._update_display, i_next)
+            if not self.pending_update:
+                pending_update = True
+                self.after(0, self._update_display, i_next)
 
             self._stop_event.wait(timeout=sleep)
 
@@ -1548,7 +1552,6 @@ class DroneViewer(tk.Tk):
     def _on_slider(self, val):
         idx = int(float(val))
         if idx != self.current_idx:
-            # Don't pause—let the user scrub while paused
             self._update_display(idx)
 
     def _set_speed(self, idx: int):
