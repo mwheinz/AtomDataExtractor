@@ -1305,14 +1305,19 @@ class DroneViewer(tk.Tk):
         size = 21 # Make this an odd number so we actually have a center pixel.
         # Note we add 4 pixels of padding on all sides to make sure there's
         # room for the rotation.
-        img = Image.new("RGBA", (size+8, size+8), (0, 0, 0, 0))
+        pad = 4
+        tsize = size + pad * 2
+        img = Image.new("RGBA", (tsize, tsize), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        cx, cy = size // 2 + 1, size // 2 + 1
+        cx = cy = tsize // 2
 
         # Draw a simple arrow/chevron pointing "up" (north = 0°)
         # Note the 4-pixel pad on the top and left.
-        draw.polygon([(cx, 0), (size, size), (cx, cy+cy//2), (0, size)],
+        draw.polygon([(cx, pad),
+                      (cx + size//2, pad + size),
+                      (cx, cy+ pad),
+                      (cx - size//2, pad + size)],
                     fill=self.prefs["color_danger"], outline=self.prefs["color_border"])
 
         img = img.rotate(-heading, resample=Image.BICUBIC, expand=False)
