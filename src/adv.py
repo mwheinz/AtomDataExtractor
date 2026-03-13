@@ -471,7 +471,6 @@ class PrefsDialog(tk.Toplevel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CompassGauge(tk.Canvas):
-    """Circular compass that shows heading."""
 
     def __init__(self, parent, prefs:dict, label="", size=120, **kw):
         super().__init__(parent, width=size, height=size,
@@ -481,21 +480,20 @@ class CompassGauge(tk.Canvas):
         self.label = label
         self.size = size
         self.heading = 0.0
+        self._draw_static()
         self._draw()
 
-    def _draw(self):
+    def _draw_static(self):
         s = self.size
         cx = cy = s / 2
         r = s / 2 - 4
 
         self.delete("all")
 
-        # Outer ring
         self.create_oval(cx-r, cy-r, cx+r, cy+r,
                          outline=self.prefs["color_border"], width=2,
                          fill=self.prefs["color_gauge_bg"])
 
-        # Cardinal labels
         for label, angle in [("N", 0), ("E", 90), ("S", 180), ("W", 270)]:
             rad = math.radians(angle - 90)
             lx = cx + (r - 14) * math.cos(rad)
@@ -504,12 +502,6 @@ class CompassGauge(tk.Canvas):
             self.create_text(lx, ly, text=label, fill=color,
                              font=self.prefs["font_small"])
 
-        # Label
-        self.create_text(cx, cy - r * 0.25,
-                         text=self.label, fill=self.prefs["color_label"],
-                         font=self.prefs["font_small"])
-
-        # Tick marks
         for i in range(36):
             ang = math.radians(i * 10 - 90)
             inner = r - 6 if i % 9 == 0 else r - 4
@@ -519,22 +511,31 @@ class CompassGauge(tk.Canvas):
             y2 = cy + r * math.sin(ang)
             self.create_line(x1, y1, x2, y2, fill=self.prefs["color_border"])
 
-        # Needle
+        self.create_text(cx, cy - r * 0.25,
+                         text=self.label, fill=self.prefs["color_label"],
+                         font=self.prefs["font_small"])
+
+
+    def _draw(self):
+
+        self.delete("dynamic")
+
+        s = self.size
+        cx = cy = s / 2
+        r = s / 2 - 4
         needle_rad = math.radians(self.heading - 90)
         nx = cx + (r - 18) * math.cos(needle_rad)
         ny = cy + (r - 18) * math.sin(needle_rad)
-        # tail
         tx = cx - 8 * math.cos(needle_rad)
         ty = cy - 8 * math.sin(needle_rad)
-        self.create_line(tx, ty, nx, ny, fill=self.prefs["color_accent"], width=2,
-                         arrow=tk.LAST, arrowshape=(8, 10, 3))
 
-        # Center dot
-        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=self.prefs["color_accent"], outline="")
-
-        # Value text
-        self.create_text(cx, s - 8, text=f"{self.heading:.1f}°",
-                         fill=self.prefs["color_value"], font=self.prefs["font_small"])
+        self.create_line(tx, ty, nx, ny, fill=self.prefs["color_accent"],
+                         width=2, arrow=tk.LAST, arrowshape=(8,10,3), tags="dynamic")
+        self.create_oval(cx-3, cy-3, cx+3, cy+3,
+                         fill=self.prefs["color_accent"], outline="", tags="dynamic")
+        self.create_text(cx, s-8, text=f"{self.heading:.1f}°",
+                         fill=self.prefs["color_value"], font=self.prefs["font_small"],
+                         tags="dynamic")
 
     def set_value(self, heading: float):
         self.heading = heading % 360
@@ -562,9 +563,10 @@ class ArcGauge(tk.Canvas):
         self.danger_pct= danger_pct
         self.size      = size
         self.value     = min_val
+        self._draw_static()
         self._draw()
 
-    def _draw(self):
+    def _draw_static(self):
         s = self.size
         h = int(s * 0.75)
         cx = s / 2
@@ -578,6 +580,26 @@ class ArcGauge(tk.Canvas):
                         start=0, extent=180,
                         style=tk.ARC, outline=self.prefs["color_border"], width=8)
 
+        # Label
+        self.create_text(cx, cy - r * 0.5,
+                         text=self.label, fill=self.prefs["color_label"],
+                         font=self.prefs["font_small"])
+
+    def _draw(self):
+        s = self.size
+        h = int(s * 0.75)
+        cx = s / 2
+        cy = h * 0.88
+        r  = s * 0.42
+
+        self.delete("dynamic")
+
+        # Value
+        val_text = f"{self.value:.1f}{self.unit}"
+        self.create_text(cx, cy - 10, tags="dynamic",
+                         text=val_text, fill=self.prefs["color_value"],
+                         font=self.prefs["font_label"])
+
         # Colored fill arc
         pct = (self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
         pct = max(0.0, min(1.0, pct))
@@ -590,7 +612,7 @@ class ArcGauge(tk.Canvas):
             color = self.prefs["color_warn"]
 
         if extent > 0:
-            self.create_arc(cx-r, cy-r, cx+r, cy+r,
+            self.create_arc(cx-r, cy-r, cx+r, cy+r, tags="dynamic",
                             start=180 - extent, extent=extent,
                             style=tk.ARC, outline=color, width=8)
 
@@ -598,19 +620,10 @@ class ArcGauge(tk.Canvas):
         needle_angle = math.radians(180 - pct * 180)
         nx = cx + (r - 2) * math.cos(needle_angle)
         ny = cy - (r - 2) * math.sin(needle_angle)
-        self.create_line(cx, cy, nx, ny, fill=self.prefs["color_value"], width=2)
-        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=self.prefs["color_value"], outline="")
-
-        # Label
-        self.create_text(cx, cy - r * 0.5,
-                         text=self.label, fill=self.prefs["color_label"],
-                         font=self.prefs["font_small"])
-
-        # Value
-        val_text = f"{self.value:.1f}{self.unit}"
-        self.create_text(cx, cy - 10,
-                         text=val_text, fill=self.prefs["color_value"],
-                         font=self.prefs["font_label"])
+        self.create_line(cx, cy, nx, ny, fill=self.prefs["color_value"],
+                         tags="dynamic", width=2)
+        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=self.prefs["color_value"],
+                         tags="dynamic", outline="")
 
     def set_value(self, value: float):
         self.value = value
@@ -632,9 +645,10 @@ class StickDisplay(tk.Canvas):
         self.size   = size
         self.x_val  = 1024.0   # 0..2048
         self.y_val  = 1024.0
+        self._draw_static()
         self._draw()
 
-    def _draw(self):
+    def _draw_static(self):
         s = self.size
         pad = 2
         inner = s - 2 * pad
@@ -654,20 +668,27 @@ class StickDisplay(tk.Canvas):
         self.create_line(pad, mid, s - pad, mid, fill=self.prefs["color_border"], dash=(2, 3))
         self.create_line(mid, pad, mid, s - pad, fill=self.prefs["color_border"], dash=(2, 3))
 
+        # Label
+        self.create_text(mid, s - 5, text=self.label,
+                         fill=self.prefs["color_label"], font=self.prefs["font_small"])
+
+    def _draw(self):
+        s = self.size
+        pad = 2
+        inner = s - 2 * pad
+
+        self.delete("dynamic")
+
         # Dot position
         nx = pad + (self.x_val / 2048.0) * inner
         ny = pad + (1.0 - self.y_val / 2048.0) * inner  # invert Y
 
         # Glow circle
         gr = 12
-        self.create_oval(nx - gr, ny - gr, nx + gr, ny + gr,
+        self.create_oval(nx - gr, ny - gr, nx + gr, ny + gr, tags="dynamic",
                          fill=self.prefs["color_gauge_bg"], outline="")
-        self.create_oval(nx - 5, ny - 5, nx + 5, ny + 5,
+        self.create_oval(nx - 5, ny - 5, nx + 5, ny + 5, tags="dynamic",
                          fill=self.prefs["color_accent"], outline="")
-
-        # Label
-        self.create_text(mid, s - 5, text=self.label,
-                         fill=self.prefs["color_label"], font=self.prefs["font_small"])
 
     def set_values(self, x_val: float, y_val: float):
         self.x_val = x_val
@@ -694,9 +715,10 @@ class BarGauge(tk.Canvas):
         self.value   = min_val
         self.warn_low = warn_low
         self.warn_high = warn_high
+        self._draw_static()
         self._draw()
 
-    def _draw(self):
+    def _draw_static(self):
         w = self.size_w
         h = self.size_h
         pad_x = 8
@@ -711,6 +733,21 @@ class BarGauge(tk.Canvas):
                               outline=self.prefs["color_border"],
                               fill=self.prefs["color_gauge_bg"])
 
+        # Label
+        self.create_text(w / 2, 9, text=self.label,
+                         fill=self.prefs["color_label"],
+                         font=self.prefs["font_small"])
+
+    def _draw(self):
+        w = self.size_w
+        h = self.size_h
+        pad_x = 8
+        bar_top = 18
+        bar_bot = h - 24
+        bar_h   = bar_bot - bar_top
+
+        self.delete("dynamic")
+
         pct = (self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
         pct = max(0.0, min(1.0, pct))
 
@@ -724,22 +761,20 @@ class BarGauge(tk.Canvas):
         if pct > 0:
             self.create_rectangle(pad_x + 1, fill_top,
                                   w - pad_x - 1, bar_bot - 1,
-                                  fill=color, outline="")
-
-        # Label
-        self.create_text(w / 2, 9, text=self.label,
-                         fill=self.prefs["color_label"],
-                         font=self.prefs["font_small"])
+                                  fill=color, outline="", 
+                                  tags="dynamic")
 
         # Value
-        self.create_text(w / 2, h - 10,
+        self.create_text(w / 2, h - 10, tags="dynamic",
                          text=f"{self.value:.0f}{self.unit}",
                          fill=self.prefs["color_value"],
                          font=self.prefs["font_small"])
 
     def set_value(self, value: float):
-        self.value = value
-        self._draw()
+        # Don't redraw unless the value has changed.
+        if self.value != value:
+            self.value = value
+            self._draw()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -780,6 +815,9 @@ class InfoPanel(tk.LabelFrame):
 
         col = 0
         row = 0
+        ufont = self.prefs["font_label"].copy()
+        ufont.append("underline")
+
         for field in fields:
             if field is None:
                 row += 1
@@ -793,8 +831,8 @@ class InfoPanel(tk.LabelFrame):
                     lbl = tk.Label(self._inner, text=field[1],
                                 bg=self.prefs["color_bg"],
                                 fg=self.prefs["color_accent"],
-                                font=self.prefs["font_label"],
-                                anchor="center")
+                                font=ufont,
+                                anchor="w")
                     lbl.grid(row=row, column=0, columnspan=4,
                             sticky="ew", padx=6, pady=(6, 1))
                 row += 1
@@ -883,7 +921,7 @@ class DroneViewer(tk.Tk):
         self.records: list[dict] = []
         self.current_idx: int    = 0
         self.playing: bool       = False
-        self.speed_idx: int      = 1          # default 1×
+        self.speed_idx: int      = 0
         self.playback_thread     = None
         self._stop_event         = threading.Event()
 
