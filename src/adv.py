@@ -863,9 +863,6 @@ class InfoPanel(tk.LabelFrame):
 
 class DroneViewer(tk.Tk):
 
-    # Playback speed multipliers
-    SPEEDS = [1.0, 2.0, 4.0, 8.0, 16.0]
-
     def __init__(self):
         super().__init__()
 
@@ -1466,23 +1463,31 @@ class DroneViewer(tk.Tk):
             self._btn_play.configure(text=">", bg=self.prefs["color_accent"],
                                      fg=self.prefs["color_bg"])
 
+    # Playback speed multipliers
+    SPEEDS = [1, 2, 4, 8, 16]
+    INCREMENTS = [1, 1, 2, 2, 4]
+
     def _playback_loop(self):
         """Background thread that advances frames at the selected rate."""
         while not self._stop_event.is_set():
-            idx = self.current_idx
-            if idx >= self.records_len:
+            # To improve performance, we skip records when running at
+            # higher playback speeds.
+            i_cur = self.current_idx
+            i_next = self.current_idx + self.INCREMENTS[self.speed_idx]
+
+            if i_next >= self.records_len:
                 self.after(0, self._pause)
                 break
 
             # Calculate sleep based on elapsed time between records
-            r_cur  = self.records[idx]
-            r_next = self.records[idx + 1]
+            # divided by the playback multiplier.
+            r_cur  = self.records[i_cur]
+            r_next = self.records[i_next]
             dt_us  = r_next.get("elapsed (us)", 0) - r_cur.get("elapsed (us)", 0)
-            dt_s   = max(0.01, dt_us / 1_000_000)
-            sleep  = dt_s / self.SPEEDS[self.speed_idx]
+            dt_us  = dt_us / self.SPEEDS[self.speed_idx]
+            sleep  = max(0.01, dt_us / 1_000_000)
 
-            self.after(0, self._update_display, idx + 1)
-            self.current_idx += 1
+            self.after(0, self._update_display, i_next)
 
             self._stop_event.wait(timeout=sleep)
 
@@ -1515,7 +1520,6 @@ class DroneViewer(tk.Tk):
         self._status_var.set(msg)
 
 def main():
-    # Allow an fc2 file to be passed as a command-line argument
     app = DroneViewer()
 
     if len(sys.argv) > 1:
