@@ -39,12 +39,13 @@ class LogDialog(tk.Toplevel):
         Display the contents of the my_logger buffer.
     '''
 
-    def __init__(self, parent, log_buffer: StringIO, prefs):
+    def __init__(self, parent, log_buffer: StringIO, prefs, menubar):
         super().__init__(parent)
         self.title("Atom Data Viewer Log")
         self.geometry("640x480")
         self.resizable(True, True)
         self.transient(parent)
+        self.configure(menu=menubar)
 
         btn_row = tk.Frame(self)
         btn_row.pack(fill=tk.X, padx=8, pady=(4, 8), side=tk.BOTTOM)
@@ -284,14 +285,16 @@ class PrefsDialog(tk.Toplevel):
         ("font_small",  "Small Font"),
     ]
 
-    def __init__(self, parent, prefs: dict, on_save):
+    def __init__(self, parent, prefs: dict, on_save, menubar):
         super().__init__(parent)
         my_logger.debug("Creating the Prefs dialog")
         self.title("Preferences")
         self.resizable(False, False)
         self.grab_set()             # make modal
         self.transient(parent)      # keep on top of parent
+        self.menubar = menubar
 
+        self.configure(menu=self.menubar)
         self._prefs   = prefs.copy()
         self._on_save = on_save
         self._swatches: dict[str, tk.Label] = {}
@@ -870,7 +873,6 @@ class DroneViewer(tk.Tk):
 
         self.prefs = load_prefs()
 
-        self.configure(menu=tk.Menu(self))
         self.title("Atom 2 Flight Log Viewer")
         self.configure(bg=self.prefs["color_bg"])
         self.minsize(1100, 720)
@@ -902,10 +904,10 @@ class DroneViewer(tk.Tk):
     def _show_prefs(self):
         if self.playing:
             self._pause()
-        PrefsDialog(self, self.prefs, self._on_prefs_saved)
+        PrefsDialog(self, self.prefs, self._on_prefs_saved, self.menubar)
 
     def _show_log(self):
-        LogDialog(self, my_logging_buf, self.prefs)
+        LogDialog(self, my_logging_buf, self.prefs, self.menubar)
 
     def _on_prefs_saved(self, new_prefs: dict):
         self.prefs.update(new_prefs)
@@ -939,12 +941,12 @@ class DroneViewer(tk.Tk):
         my_logger.debug("Building the UI")
 
         self.option_add('*tearOff', False)
-        self.configure(menu=tk.Menu(self))
-        menubar = tk.Menu(self)
-        self.configure(menu=menubar)
 
-        file_menu = tk.Menu(menubar)
-        menubar.add_cascade(label="File", menu=file_menu)
+        self.menubar = tk.Menu(self)
+        self.configure(menu=self.menubar)
+
+        file_menu = tk.Menu(self.menubar)
+        self.menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Open FC2", command=self._open_file)
         file_menu.add_separator()
         file_menu.add_command(label="Preferences…", command=self._show_prefs)  # ← add this
@@ -989,7 +991,8 @@ class DroneViewer(tk.Tk):
             map_frame, corner_radius=0)
         self.map_widget.pack(fill=tk.BOTH, expand=True)
 
-        # Disable the scroll wheel, it doesn't seem to work correctly.
+        # Override the scroll wheel, it doesn't seem to work correctly in
+        # Darwin.
         if PLATFORM_SYSTEM == "Darwin":
             def _map_mouse_zoom(event):
                 relative_x = event.x / self.map_widget.width
