@@ -107,8 +107,8 @@ PANEL_ITEMS = [
     ("Pos Mode", "Positioning Mode (text)"),
 
     (None, "Battery"),
-    ("Batt. V", "Battery (mv)"),
-    ("Batt. A", "Battery Current (ma)"),
+    ("Batt. mV", "Battery (mv)"),
+    ("Batt. mA", "Battery Current (ma)"),
     ("Batt. Temp", "Battery Temp (c)"),
     ("Batt. %", "Battery Level (%)"),
 
@@ -954,7 +954,9 @@ class DroneViewer(tk.Tk):
                        self._gauge_compass, self._bar_battery, self._bar_sats,
                        self._bar_wind, self._stick_left,
                        self._stick_right, self._gauge_wind):
+            widget._draw_static()
             widget._draw()
+        self.info.redraw()
 
     def _show_about(self):
         messagebox.showinfo(
@@ -1152,19 +1154,24 @@ class DroneViewer(tk.Tk):
                              cursor="hand2", activebackground=self.prefs["color_border"],
                              activeforeground=color, bd=1)
 
+        self.bind("<space>",      lambda e: self._toggle_play())
+        self.bind("<Left>",       lambda e: self._step_back())
+        self.bind("<Right>",      lambda e: self._step_fwd())
+
         if PLATFORM_SYSTEM == "Darwin":
             self._btn_rw    = btn("⏮️", self._go_start)
             self._btn_back  = btn("⏪", self._step_back)
             self._btn_play  = btn("▶️", self._toggle_play)
             self._btn_fwd   = btn("⏩", self._step_fwd)
             self._btn_ff    = btn("⏭️", self._go_end)
+            self.bind("<Command-o>",  lambda e: self._open_file())  # macOS
         else:
             self._btn_rw    = btn("<<<", self._go_start)
             self._btn_back  = btn("<<", self._step_back)
             self._btn_play  = btn(">", self._toggle_play)
             self._btn_fwd   = btn(">>", self._step_fwd)
             self._btn_ff    = btn(">>>", self._go_end)
-
+            self.bind("<Control-o>",  lambda e: self._open_file())  # Windows/Linux
 
         for b in (self._btn_rw, self._btn_back, self._btn_play,
                   self._btn_fwd, self._btn_ff):
@@ -1240,24 +1247,24 @@ class DroneViewer(tk.Tk):
         self.current_idx = 0
 
         # Slider range
-        self._slider.configure(to=len(records) - 1)
+        self._slider.configure(to=len(self.records) - 1)
         self._slider_var.set(0)
 
         # Draw full path on map
         self._draw_map_path()
 
         # Get the max for some attributes so I can scale the gauges.
-        field_range = [r["alt (m)"] for r in records if r.get("alt (m)") != ""]
+        field_range = [r["alt (m)"] for r in self.records if r.get("alt (m)") != ""]
         self.max_alt = max(field_range)
 
-        field_range = [r["3d Derived Speed (m/s)"] for r in records if r.get("3d Derived Speed (m/s)") != ""]
+        field_range = [r["3d Derived Speed (m/s)"] for r in self.records if r.get("3d Derived Speed (m/s)") != ""]
         #field_range = [r["speed (m/s)"] for r in records if r.get("speed (m/s)") != ""]
         self.max_speed = max(field_range)*3.6 # convert to KPH
 
-        field_range = [r["distance (m)"] for r in records if r.get("distance (m)") != ""]
+        field_range = [r["distance (m)"] for r in self.records if r.get("distance (m)") != ""]
         self.max_dist = max(field_range)
 
-        field_range = [r["Wind Speed (m/s)"] for r in records if r.get("Wind Speed (m/s)") != ""]
+        field_range = [r["Wind Speed (m/s)"] for r in self.records if r.get("Wind Speed (m/s)") != ""]
         self.max_wind = max(field_range)
 
         self._bar_wind.max_val = self.max_wind
@@ -1269,10 +1276,10 @@ class DroneViewer(tk.Tk):
         my_logger.debug("Max wind = %s m/s", self.max_wind)
 
         # Get the initial bounding box for the map.
-        field_range = [r["lat (deg)"] for r in records if r.get("lat (deg)") != ""]
+        field_range = [r["lat (deg)"] for r in self.records if r.get("lat (deg)") != ""]
         self.min_lat = min(field_range)
         self.max_lat = max(field_range)
-        field_range = [r["lon (deg)"] for r in records if r.get("lon (deg)") != ""]
+        field_range = [r["lon (deg)"] for r in self.records if r.get("lon (deg)") != ""]
         self.min_lon = min(field_range)
         self.max_lon = max(field_range)
 
@@ -1399,7 +1406,7 @@ class DroneViewer(tk.Tk):
         deg = math.floor(deg)
         m = math.floor(m)
         s = round(s,1)
-        return f"{deg}:{m:02d}:{s:02.1f}"
+        return f"{deg}:{m:02d}:{s:04.1f}"
 
     def _update_display(self, idx: int):
         if not self.records:
@@ -1418,7 +1425,7 @@ class DroneViewer(tk.Tk):
 
         self._bar_battery.set_value(r.get("Battery Level (%)", 0))
         self._bar_sats.set_value(r.get("Satellites", 0))
-        self._bar_wind.set_value(r.get("Wind Spd (m/s)", 0))
+        self._bar_wind.set_value(r.get("Wind Speed (m/s)", 0))
 
         # RC Sticks
         # Left stick: throttle (Y) + rudder/yaw (X)
@@ -1432,12 +1439,17 @@ class DroneViewer(tk.Tk):
             r.get("rc elevator", 1024)
         )
 
-        # Update Panel Items
+        # Update Panel Items. PANEL_SKIP lists items that require special
+        # handling.
+        PANEL_SKIP = { "Elapsed", "Lat", "Lon", "H Lat", "H Lon",
+                       "Speed", "Distance", "2d Dist", "3d Dist", "2d Speed",
+                      "3d Speed"}
         for field in PANEL_ITEMS:
             if field is None:
                 continue
-            if field[0] is not None:
+            if field[0] is not None and field[0] not in PANEL_SKIP:
                 self.info.update_field(field[0], r.get(field[1], "—"))
+ 
         elapsed_us = r.get("elapsed (us)", 0)
         elapsed_s  = elapsed_us / 1_000_000
         m, s       = divmod(int(elapsed_s), 60)
@@ -1533,7 +1545,7 @@ class DroneViewer(tk.Tk):
             sleep  = max(0.01, dt_us / 1_000_000)
 
             if not self.pending_update:
-                pending_update = True
+                self.pending_update = True
                 self.after(0, self._update_display, i_next)
 
             self._stop_event.wait(timeout=sleep)
