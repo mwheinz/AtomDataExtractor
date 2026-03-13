@@ -1197,6 +1197,7 @@ class DroneViewer(tk.Tk):
             messagebox.showwarning("No data",
                 "No valid records found in this file.")
             return
+        self.records_len = len(self.records) - 1
 
         self.coords = [(r["lat (deg)"], r["lon (deg)"]) for r in self.records]
 
@@ -1469,7 +1470,7 @@ class DroneViewer(tk.Tk):
         """Background thread that advances frames at the selected rate."""
         while not self._stop_event.is_set():
             idx = self.current_idx
-            if idx >= len(self.records) - 1:
+            if idx >= self.records_len:
                 self.after(0, self._pause)
                 break
 
@@ -1499,7 +1500,7 @@ class DroneViewer(tk.Tk):
 
     def _go_end(self):
         self._pause()
-        self._update_display(len(self.records) - 1)
+        self._update_display(self.records_len)
 
     def _on_slider(self, val):
         idx = int(float(val))
