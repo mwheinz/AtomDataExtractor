@@ -1,6 +1,6 @@
-'''
+"""
     Parses an Atom Eve FC2 file and returns it as a dictionary.
-'''
+"""
 
 import os
 import struct
@@ -131,18 +131,18 @@ class FLFD:
 
     @staticmethod
     def radian_heading_to_degrees(data) -> float:
-        """radians to decimal degrees."""
-        result = round((360 + data * 180/math.pi) % 360, 3)
-        if math.isnan(result):
+        """radian compass heading to decimal degrees."""
+        if not math.isfinite(data):
             raise BadData(f"Bad radian value {data}.")
+        result = round((360 + data * 180/math.pi) % 360, 3)
         return result
 
     @staticmethod
     def radians_to_degrees(data) -> float:
         """radians to decimal degrees."""
-        result = round(data * 180/math.pi, 3)
-        if math.isnan(result):
+        if not math.isfinite(data):
             raise BadData(f"Bad radian value {data}.")
+        result = round(data * 180/math.pi, 3)
         return result
 
     @staticmethod
@@ -176,7 +176,7 @@ class FLFD:
         f_mode = { 7: "Video", 8: "Normal", 9: "Sport"}
         value = f_mode.get(data,None)
         if value is None:
-            raise BadData(f"\"{data}\" is not a valid positioning mode.")
+            raise BadData(f"\"{data}\" is not a valid flight mode.")
         return value
 
     @staticmethod
@@ -211,31 +211,11 @@ class FLFD:
         """Convert the gps lock value to a readable string."""
         return "Yes" if data > 0 else "No"
 
-    # These are used when trying to investigate unknown parts of the record.
+    # This is used when trying to investigate unknown parts of the record.
     @staticmethod
-    def bin_dump(data) -> str:
-        """Convert an arbitrary value to a 1-byte binary number."""
-        return f"\"0b{data:08b}\""
-
-    @staticmethod
-    def _hex_dump(data) -> str:
-        """Convert an arbitrary value to a 1-byte hexadecimal number."""
-        return f"\"0x{data:02x}\""
-
-    @staticmethod
-    def _hex_dump2(data) -> str:
-        """Convert an arbitrary value to a 2-byte hexadecimal number."""
-        return f"\"0x{data:04x}\""
-
-    @staticmethod
-    def _hex_dump4(data) -> str:
-        """Convert an arbitrary value to a 4-byte hexadecimal number."""
-        return f"\"0x{data:08x}\""
-
-    @staticmethod
-    def _hex_dump8(data) -> str:
-        """Convert an arbitrary value to a 8-byte hexadecimal number."""
-        return f"\"0x{data:08x}\""
+    def hex_dump(data, width: int = 1) -> str:
+        """Convert an arbitrary value to a hexadecimal number."""
+        return f"\"0x{data:0{width*2}x}\""
 
     @staticmethod
     def round3(data):
@@ -259,13 +239,10 @@ class FLFD:
 
     def get_field(self,record) -> str:
         """Extract a field from the binary record."""
-        data = struct.unpack(
+        (data,) = struct.unpack(
             self.fmt_string,
             record[self.start_pos:self.start_pos+self.length]
         )
-        if not data:
-            return None
-        data = data[0]
 
         if self.scale is not None:
             data = self.scale(data)
@@ -438,16 +415,22 @@ def _add_derived_fields(record):
         ), 3)
     record["Date/Time"] = datetime.datetime.utcfromtimestamp(record["utc (ms)"]/1000)
 
-def atom2_parser(file_name, logger: Logger) -> list[dict]:
+def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Logger = None) -> list[dict]:
     """
     Parse Atom2 flight log and return a list of flight log records.
 
     Args:
         file_name: Path to .fc2 file
+        fields: the field definitions to use.
         logger: a running instance of the Logger class.
     """
 
     global TIME_STAMP
+
+    if file_name is None:
+        raise BadData("You must provide a file name.")
+    if logger is None:
+        raise BadData("You must specify the logger.")
 
     # Extract timestamp from filename
     base_name, _ = os.path.splitext(os.path.basename(file_name))
@@ -479,7 +462,7 @@ def atom2_parser(file_name, logger: Logger) -> list[dict]:
 
             record = {}
             try:
-                for field in ATOM2_FIELDS:
+                for field in fields:
                     field_data = field.get_field(data)
                     if field_data is None:
                         raise BadData(f"Illegal value for {field.name}")
