@@ -70,6 +70,9 @@ class LogDialog(tk.Toplevel):
                              state=tk.DISABLED)
         self._text.pack(fill=tk.BOTH, expand = True)
 
+        h_scroll.configure(command=self._text.xview)
+        scroll_bar.configure(command=self._text.yview)
+
         self._center_on(parent)
         self._load(log_buffer)
 
