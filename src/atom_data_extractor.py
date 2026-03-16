@@ -105,7 +105,7 @@ def main() -> None:
             sys.exit(-1)
         elif extension == ".fc2":
             my_logger.info("Parsing %s", f)
-            records = atom2_parser(f, my_logger)
+            records = atom2_parser(file_name=f, logger=my_logger)
             if records is not None:
                 write_csv(f, records,
                           extended=args.extended,
