@@ -256,9 +256,10 @@ Fields are all little-endian.
 | 67 | 4 | float | Possibly related to confidence in the drone's vertical position, with 10.0 being poor and 0.0 being best. ||
 | 77 | 2 | short | Unknown. ||
 | 81 | 2 | short | Unknown. ||
-| 85 | 88 | ??? | Unknown. ||
+| 85 | 4 | ??? | Unknown. ||
 | 109 | 2 | ??? | Always zero. ||
 | 111 | 2 | ??? | Usually zero, but some files have non-zero values here. ||
+| 225 | 7 | ??? | These 7 bytes are zero when the motors are off but non-zero when the motors are running. ||
 | 296 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 298 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
 | 300 | 1 | byte | Seems to be related to motor state. Value = 182 when motor is off. Sometimes varies, sometimes jumps. Probably unsigned?||
