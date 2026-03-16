@@ -118,6 +118,15 @@ Note: If you have multiple videos associated with a single CSV file, I recommend
 ## Atom Data Viewer
 
 Atom Data Viewer (adv) is an alternative to loading data into Telemetry Overlay. It is meant to give you a way to review a flight log without dealing with video files. It is built at the same time as ade.py.
+![ADV on MacOS](resources/adv-screenshot.png)
+
+### Overview
+ADV is a little more complex than ADE. The top of the screen shows the currently loaded FC2 file and, to the right, a button to open new FC2 files. The left is a view of the currently loaded map, while the right shows a read out of most of the telemetry data in the file. At the bottom right are the play back buttons. The slider allows you to jump directly to a point in time, and the play buttons allow you to re-enact the flight at different speeds. In addition, ADV has a file menu with a few options. The Preferences dialog lets you tune the fonts to your machine, change the amount of logging the app generates, and to change the colors of different UI elements to your preference. 
+![ADV Preferences](resources/adv-screenshot3.png)
+
+### Logging
+![ADV Logging on MacOS](resources/adv-screenshot2.png)
+Speaking of logging, the File->View Log menu item displays and informational or error messages generated while processing the FC2 file. These aren't usually too useful but they can help you understand what's happening if your file doesn't seem to load correctly.
 
 # Development notes:
 
