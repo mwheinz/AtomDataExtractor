@@ -49,7 +49,8 @@ class LogDialog(tk.Toplevel):
 
         btn_row = tk.Frame(self)
         btn_row.pack(fill=tk.X, padx=8, pady=(4, 8), side=tk.BOTTOM)
-        tk.Button(btn_row, text="Refresh", command=lambda: self._load(log_buffer)).pack(side=tk.LEFT)
+        tk.Button(btn_row, text="Refresh",
+                  command=lambda: self._load(log_buffer)).pack(side=tk.LEFT)
         tk.Button(btn_row, text="Copy All", command=self._copy_all).pack(side=tk.LEFT, padx=4)
         tk.Button(btn_row, text="Close", command=self.destroy).pack(side=tk.RIGHT)
 
@@ -68,7 +69,7 @@ class LogDialog(tk.Toplevel):
                              font=prefs["font_label"],
                              state=tk.DISABLED)
         self._text.pack(fill=tk.BOTH, expand = True)
-        
+
         self._center_on(parent)
         self._load(log_buffer)
 
@@ -87,7 +88,7 @@ class LogDialog(tk.Toplevel):
 
     def _copy_all(self):
         self.clipboard_clear()
-        self.clipboard_append(self._text.get("1.0", tk.END))    
+        self.clipboard_append(self._text.get("1.0", tk.END))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Each pair represents a panel label and the matching data field.
@@ -761,7 +762,7 @@ class BarGauge(tk.Canvas):
         if pct > 0:
             self.create_rectangle(pad_x + 1, fill_top,
                                   w - pad_x - 1, bar_bot - 1,
-                                  fill=color, outline="", 
+                                  fill=color, outline="",
                                   tags="dynamic")
 
         # Value
@@ -1159,18 +1160,18 @@ class DroneViewer(tk.Tk):
         self.bind("<Right>",      lambda e: self._step_fwd())
 
         if PLATFORM_SYSTEM == "Darwin":
-            self._btn_rw    = btn("⏮️", self._go_start)
+            self._btn_rw    = btn("⏮️", self._slow_down)
             self._btn_back  = btn("⏪", self._step_back)
             self._btn_play  = btn("▶️", self._toggle_play)
             self._btn_fwd   = btn("⏩", self._step_fwd)
-            self._btn_ff    = btn("⏭️", self._go_end)
+            self._btn_ff    = btn("⏭️", self.speed_up)
             self.bind("<Command-o>",  lambda e: self._open_file())  # macOS
         else:
-            self._btn_rw    = btn("<<<", self._go_start)
+            self._btn_rw    = btn("<<<", self._slow_down)
             self._btn_back  = btn("<<", self._step_back)
             self._btn_play  = btn(">", self._toggle_play)
             self._btn_fwd   = btn(">>", self._step_fwd)
-            self._btn_ff    = btn(">>>", self._go_end)
+            self._btn_ff    = btn(">>>", self.speed_up)
             self.bind("<Control-o>",  lambda e: self._open_file())  # Windows/Linux
 
         for b in (self._btn_rw, self._btn_back, self._btn_play,
@@ -1229,7 +1230,7 @@ class DroneViewer(tk.Tk):
         self.update_idletasks()
 
         try:
-            records = atom2_parser(path, my_logger)
+            records = atom2_parser(file_name=path, logger=my_logger)
         except Exception as e:
             messagebox.showerror("Parse error", str(e))
             self._set_status("Error loading file.")
@@ -1449,7 +1450,7 @@ class DroneViewer(tk.Tk):
                 continue
             if field[0] is not None and field[0] not in PANEL_SKIP:
                 self.info.update_field(field[0], r.get(field[1], "—"))
- 
+
         elapsed_us = r.get("elapsed (us)", 0)
         elapsed_s  = elapsed_us / 1_000_000
         m, s       = divmod(int(elapsed_s), 60)
@@ -1551,20 +1552,18 @@ class DroneViewer(tk.Tk):
             self._stop_event.wait(timeout=sleep)
 
     def _step_back(self):
-        self._pause()
-        self._update_display(self.current_idx - 1)
+        self._update_display(self.current_idx - 100)
 
     def _step_fwd(self):
-        self._pause()
-        self._update_display(self.current_idx + 1)
+        self._update_display(self.current_idx + 100)
 
-    def _go_start(self):
-        self._pause()
-        self._update_display(0)
+    def _slow_down(self):
+        self._set_speed(self.speed_idx-1)
+        self._speed_var.set(f"{self.SPEEDS[self.speed_idx]}×")
 
-    def _go_end(self):
-        self._pause()
-        self._update_display(self.records_len)
+    def speed_up(self):
+        self._set_speed(self.speed_idx+1)
+        self._speed_var.set(f"{self.SPEEDS[self.speed_idx]}×")
 
     def _on_slider(self, val):
         idx = int(float(val))
@@ -1572,7 +1571,7 @@ class DroneViewer(tk.Tk):
             self._update_display(idx)
 
     def _set_speed(self, idx: int):
-        self.speed_idx = idx
+        self.speed_idx = max(0, min(len(self.SPEEDS)-1, idx))
 
     def _set_status(self, msg: str):
         self._status_var.set(msg)
