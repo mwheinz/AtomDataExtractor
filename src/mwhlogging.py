@@ -2,6 +2,7 @@
 Adds simple color logging, formatted the way I like it.
 """
 import logging
+from logging.handlers import RotatingFileHandler
 import sys
 
 # Public constants for your CLI mapping
@@ -11,9 +12,7 @@ INFO    = logging.INFO
 DEBUG   = logging.DEBUG
 
 class MWHFormatter(logging.Formatter):
-    """
-    Adds some color to the log messages.
-    """
+    """ Adds some color to the log messages. """
     COLORS = {
         logging.DEBUG:    "\033[1;34m",  # Blue
         logging.INFO:     "\033[1;32m",  # Green
@@ -43,74 +42,56 @@ class MWHFormatter(logging.Formatter):
         return base
 
 class MWHLogger(logging.Logger):
-    """
-    Formats log messages the way I like them.
-    """
+    """ Formats log messages the way I like them. """
     handler: logging.Handler = None
 
     def __init__(self, name: str = None):
-
         super().__init__(name=name)
 
-        # Decide color based on TTY
         stream = sys.stderr
-        use_color = stream.isatty()
-
         self.handler = logging.StreamHandler(stream)
-        self.handler.setLevel(DEBUG)  # handler can emit all; logger level gates verbosity
-        self.handler.setFormatter(MWHFormatter(use_color=use_color))
+        self.handler.setFormatter(MWHFormatter(use_color=stream.isatty()))
 
         self.addHandler(self.handler)
-        self.setLevel(INFO)      # default; caller can change with configure_logging()
-        self.propagate = False   # keep logs from duplicating through root
-
+        self.setLevel(INFO)
+        self.propagate = False
         self.file_handle = None
 
-    def configure_logging(self, level: int = None, log_file: str = None, file_handle = None) -> None:
+    def configure_logging(self, level: int = None,
+                          log_file: str = None,
+                          file_handle = None) -> None:
         """
-        Adjust the log level and optionally switches from console output to 
-        outputting plain text to a rotating log file.
+        Adjust the log level and optionally logs to console output, and/or a 
+        log file, and/or a file_handle.
         """
+        if file_handle:
+            self.file_handle = file_handle
+
+            h = logging.StreamHandler(file_handle)
+            h.setFormatter(MWHFormatter(use_color=False))
+            h.setLevel(self.level)
+            self.addHandler(h)
+
+        elif log_file:
+            h = RotatingFileHandler(log_file, maxBytes=2_000_000,
+                                    backupCount=3, encoding="utf-8")
+            # File logs should be plain (no color), include module/line
+            h.setFormatter(MWHFormatter(use_color=False))
+            h.setLevel(self.level)
+            self.addHandler(h)
 
         if level:
             self.setLevel(level)
-            if self.handler is not None:
-                self.handler.setLevel(self.level)
 
-
-        if file_handle:
-            self.file_handle = file_handle
-            #if self.handler is not None:
-                #self.removeHandler(self.handler)
-
-            # Lazy import to avoid overhead when not used
-            from logging import StreamHandler
-            fh = StreamHandler(file_handle)
-            # File logs should be plain (no color), include module/line
-            file_fmt = logging.Formatter(
-                fmt="%(asctime)s %(levelname)-8s %(name)s:%(lineno)-4d %(message)s",
-                datefmt="%H:%M:%S"
-            )
-            fh.setFormatter(file_fmt)
-            fh.setLevel(self.level)
-            self.addHandler(fh)
-            self.handler=fh
-        elif log_file:
-            if self.handler is not None:
-                self.removeHandler(self.handler)
-
-            # Lazy import to avoid overhead when not used
-            from logging.handlers import RotatingFileHandler
-            fh = RotatingFileHandler(log_file, maxBytes=2_000_000, backupCount=3, encoding="utf-8")
-            # File logs should be plain (no color), include module/line
-            file_fmt = logging.Formatter(
-                fmt="%(asctime)s %(levelname)-8s %(name)s:%(lineno)-4d %(message)s",
-                datefmt="%H:%M:%S"
-            )
-            fh.setFormatter(file_fmt)
-            fh.setLevel(self.level)
-            self.addHandler(fh)
-            self.handler=fh
+    def setLevel(self, level:int):
+        self.level = level
+        super().setLevel(level)
+        for h in self.handlers:
+            h.setLevel(self.level)
 
     def print(self, msg):
-        print(msg, file=self.file_handle)
+        """
+        This was added so that adv could report the name of the output file.
+        """
+        if self.file_handle is not None:
+            print(msg, file=self.file_handle)
