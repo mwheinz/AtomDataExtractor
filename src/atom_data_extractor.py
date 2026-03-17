@@ -33,6 +33,19 @@ def write_csv(file_name, records, extended=False, validation=False, destination=
             writer.writerow(row)
     my_logger.print(f"{csv_name} complete.")
 
+def print_stats(records):
+    print("Field                              Min              Max")
+    for field_name in BASIC_DATA:
+        field_range = [r[field_name] for r in records if r.get(field_name) != ""]
+        field_max = max(field_range)
+        field_min = min(field_range)
+        if isinstance(field_min, str):
+            continue
+        if isinstance(field_min, float):
+            field_min = round(field_min,3)
+            field_max = round(field_max,3)
+        print(f"{field_name:18s}: {field_min:17} {field_max:17}")
+
 def main() -> None:
     """ This is the main program. Duh."""
     arg_parser = argparse.ArgumentParser(
@@ -80,6 +93,12 @@ def main() -> None:
     )
 
     arg_parser.add_argument(
+        "-s", "--stats",
+        action="store_true",
+        help="Report the min and max for all the basic fields."
+    )
+
+    arg_parser.add_argument(
         "files",
         nargs="+",
         help="One or more Atom 2 .fc2 files to convert."
@@ -111,6 +130,8 @@ def main() -> None:
                           extended=args.extended,
                           validation=args.validation,
                           destination=args.destination)
+            if args.stats:
+                print_stats(records)
         else:
             my_logger.info("%s appears to be an unsupported file type.", f)
             sys.exit(-1)

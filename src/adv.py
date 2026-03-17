@@ -20,7 +20,7 @@ from tkinter.colorchooser import askcolor
 import tkintermapview
 from PIL import Image, ImageDraw, ImageTk, ImageFont
 from adeversion import _version
-from atom2parser import atom2_parser, is_valid_latlon
+from atom2parser import atom2_parser, is_valid_latlon, BASIC_DATA
 import mwhlogging
 from mwhlogging import MWHLogger
 
@@ -1346,9 +1346,6 @@ class DroneViewer(tk.Tk):
         self._gauge_alt.max_val=self.prefs["max_alt"]
         self._gauge_speed.max_val=self.prefs["max_speed"]
         self._gauge_dist.max_val=self.prefs["max_dist"]
-        #my_logger.debug("Max speed=%s kph, Max dist = %s m, Max alt = %s m",
-        #                self.max_speed, self.max_dist, self.max_alt)
-        #my_logger.debug("Max wind=%s m/s", self.max_wind)
 
         # Get the initial bounding box for the map.
         field_range=[r["lat (deg)"] for r in self.records if r.get("lat (deg)") != ""]
@@ -1364,6 +1361,18 @@ class DroneViewer(tk.Tk):
         self.map_widget.fit_bounding_box((self.max_lat, self.min_lon),
                                          (self.min_lat, self.max_lon))
 
+        if my_logger.level <= mwhlogging.INFO:
+            my_logger.info("Field                              Min              Max")
+            for field_name in BASIC_DATA:
+                field_range = [r[field_name] for r in self.records if r.get(field_name) != ""]
+                field_max = max(field_range)
+                field_min = min(field_range)
+                if isinstance(field_min, str):
+                    continue
+                if isinstance(field_min, float):
+                    field_min = round(field_min,3)
+                    field_max = round(field_max,3)
+                my_logger.info(f"{field_name:18s}: {field_min:17} {field_max:17}")
         self._file_label.configure(text=os.path.basename(path))
         self._set_status(f"Loaded {len(records)} GPS records.")
         self._update_display(0)

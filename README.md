@@ -92,6 +92,7 @@ options:
   -x, --extended        Include extended fields
   -v, --validation      Calcuate some additional fields to compare against the
                         raw data.
+  -s, --stats           Report the min and max for all the basic fields.
 
 Written by Michael Heinz. Based on work done by Michael Heinz, Koen Aerts,
 and Rob Pitt. See README.md for detailed field documentation.
@@ -126,7 +127,7 @@ ADV is a little more complex than ADE. The top of the screen shows the currently
 
 ### Logging
 ![ADV Logging on MacOS](resources/adv-screenshot2.png)
-Speaking of logging, the File->View Log menu item displays and informational or error messages generated while processing the FC2 file. These aren't usually too useful but they can help you understand what's happening if your file doesn't seem to load correctly.
+Speaking of logging, the File->View Log menu item displays and informational or error messages generated while processing the FC2 file. These aren't usually too useful but they can help you understand what's happening if your file doesn't seem to load correctly. In addition, some basic reporting of the minimum and maximum values of many of the fields will be written to the log if INFO or DEBUG logging is enabled.
 
 # Development notes:
 
