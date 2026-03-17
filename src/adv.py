@@ -29,9 +29,9 @@ from mwhlogging import MWHLogger
 #
 # We will load the buffer into a dialog box on request.
 # ─────────────────────────────────────────────────────────────────────────────
-my_logger = MWHLogger("atom_data_viewer")
+my_logger=MWHLogger("atom_data_viewer")
 my_logger.setLevel(mwhlogging.DEBUG)
-my_logging_buf = StringIO()
+my_logging_buf=StringIO()
 my_logger.configure_logging(file_handle=my_logging_buf)
 
 class LogDialog(tk.Toplevel):
@@ -47,28 +47,28 @@ class LogDialog(tk.Toplevel):
         self.transient(parent)
         self.configure(menu=menubar)
 
-        btn_row = tk.Frame(self)
+        btn_row=tk.Frame(self)
         btn_row.pack(fill=tk.X, padx=8, pady=(4, 8), side=tk.BOTTOM)
         tk.Button(btn_row, text="Refresh",
                   command=lambda: self._load(log_buffer)).pack(side=tk.LEFT)
         tk.Button(btn_row, text="Copy All", command=self._copy_all).pack(side=tk.LEFT, padx=4)
         tk.Button(btn_row, text="Close", command=self.destroy).pack(side=tk.RIGHT)
 
-        h_scroll = ttk.Scrollbar(self, orient=tk.HORIZONTAL)
+        h_scroll=ttk.Scrollbar(self, orient=tk.HORIZONTAL)
         h_scroll.pack(fill=tk.X, padx=8, side=tk.BOTTOM)
 
-        text_frame = tk.Frame(self)
-        text_frame.pack(fill = tk.BOTH, expand = True, padx = 8, pady=(8, 4))
+        text_frame=tk.Frame(self)
+        text_frame.pack(fill=tk.BOTH, expand = True, padx = 8, pady=(8, 4))
 
-        scroll_bar = ttk.Scrollbar(text_frame)
-        scroll_bar.pack(side = tk.RIGHT, fill = tk.Y)
+        scroll_bar=ttk.Scrollbar(text_frame)
+        scroll_bar.pack(side=tk.RIGHT, fill = tk.Y)
 
-        self._text = tk.Text(text_frame, wrap=tk.NONE,
+        self._text=tk.Text(text_frame, wrap=tk.NONE,
                              yscrollcommand=scroll_bar.set,
                              xscrollcommand=h_scroll.set,
                              font=prefs["font_label"],
                              state=tk.DISABLED)
-        self._text.pack(fill=tk.BOTH, expand = True)
+        self._text.pack(fill=tk.BOTH, expand=True)
 
         h_scroll.configure(command=self._text.xview)
         scroll_bar.configure(command=self._text.yview)
@@ -77,12 +77,12 @@ class LogDialog(tk.Toplevel):
         self._load(log_buffer)
 
     def _center_on(self, parent):
-        x = parent.winfo_x() + (parent.winfo_width()  - self.winfo_width())  // 2
-        y = parent.winfo_y() + (parent.winfo_height() - self.winfo_height()) // 2
+        x=parent.winfo_x() + (parent.winfo_width()  - self.winfo_width())  // 2
+        y=parent.winfo_y() + (parent.winfo_height() - self.winfo_height()) // 2
         self.geometry(f"+{x}+{y}")
 
     def _load(self, log_buffer: StringIO):
-        contents = log_buffer.getvalue()
+        contents=log_buffer.getvalue()
         self._text.configure(state=tk.NORMAL)
         self._text.delete("1.0", tk.END)
         self._text.insert(tk.END, contents)
@@ -99,7 +99,7 @@ class LogDialog(tk.Toplevel):
 # None by itself will act as a spacer.
 # Items will appear in the panel in the order they are listed.
 # ─────────────────────────────────────────────────────────────────────────────
-PANEL_ITEMS = [
+PANEL_ITEMS=[
     (None, "Time"),
     ("Flt Ctr", "Flight Counter"),
     ("Record #", "rid"),
@@ -173,17 +173,28 @@ PANEL_ITEMS = [
     ("Air pres", "Air Pressure (pascals)"),
     ("Mag X", "Magnetometer X"),
     ("Mag Y", "Magnetometer Y"),
-
 ]
 
-PREFS_FILE = Path.home() / ".atom_data_viewer.json"
+PANEL_SKIP={ "Elapsed", "Lat", "Lon", "H Lat", "H Lon",
+                "Speed", "Distance", "2d Dist", "3d Dist", "2d Speed",
+                "3d Speed"}
 
-DEFAULT_PREFS = {
+PREFS_FILE=Path.home() / ".atom_data_viewer.json"
+
+DEFAULT_PREFS={
     # ─────────────────────────────────────────────────────────────────────────
     # Basic settings.
     # ─────────────────────────────────────────────────────────────────────────
     "window_geometry": "1200x800",
     "log_level"      : "Debug",
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Gauge Limits
+    # ─────────────────────────────────────────────────────────────────────────
+    "max_speed"      : 57,
+    "max_alt"        : 200,
+    "max_dist"       : 500,
+    "max_wind"       : 10,
 
     # ─────────────────────────────────────────────────────────────────────────
     # Color palette
@@ -212,24 +223,24 @@ DEFAULT_PREFS = {
 # ─────────────────────────────────────────────────────────────────────────────
 # Use fonts that should be available on the current platform.
 # ─────────────────────────────────────────────────────────────────────────────
-PLATFORM_SYSTEM = platform.system()
+PLATFORM_SYSTEM=platform.system()
 if PLATFORM_SYSTEM == "Linux":
-    DEFAULT_PREFS["font_label"]  = ("Liberation", 10)
-    DEFAULT_PREFS["font_title"]  = ("Times", 13, "bold")
-    DEFAULT_PREFS["font_marker"] = ""
-    DEFAULT_PREFS["font_small"]  = ("Liberation", 8)
+    DEFAULT_PREFS["font_label"] =("Liberation", 10)
+    DEFAULT_PREFS["font_title"] =("Times", 13, "bold")
+    DEFAULT_PREFS["font_marker"]=""
+    DEFAULT_PREFS["font_small"] =("Liberation", 8)
 elif PLATFORM_SYSTEM == "Darwin":
-    DEFAULT_PREFS["font_label"]  = ("Helvetica Neue", 10)
-    DEFAULT_PREFS["font_title"]  = ("Helvetica Neue", 13, "bold")
-    DEFAULT_PREFS["font_marker"] = "/System/Library/Fonts/HelveticaNeue.ttc"
-    DEFAULT_PREFS["font_small"]  = ("Helvetica Neue", 8)
+    DEFAULT_PREFS["font_label"] =("Helvetica Neue", 10)
+    DEFAULT_PREFS["font_title"] =("Helvetica Neue", 13, "bold")
+    DEFAULT_PREFS["font_marker"]="/System/Library/Fonts/HelveticaNeue.ttc"
+    DEFAULT_PREFS["font_small"] =("Helvetica Neue", 8)
 else:
-    DEFAULT_PREFS["font_label"] = ("Helvetica", 10)
-    DEFAULT_PREFS["font_title"] = ("Times", 13, "bold")
-    DEFAULT_PREFS["font_marker"] = ""
-    DEFAULT_PREFS["font_small"] = ("Helvetica", 8)
+    DEFAULT_PREFS["font_label"]=("Helvetica", 10)
+    DEFAULT_PREFS["font_title"]=("Times", 13, "bold")
+    DEFAULT_PREFS["font_marker"]=""
+    DEFAULT_PREFS["font_small"]=("Helvetica", 8)
 
-LOG_LEVEL_MAP = {
+LOG_LEVEL_MAP={
     "Error": mwhlogging.ERROR,
     "Warning": mwhlogging.WARNING,
     "Info": mwhlogging.INFO,
@@ -241,8 +252,8 @@ def load_prefs() -> dict:
     try:
         if PREFS_FILE.exists():
             with open(PREFS_FILE, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-            prefs = DEFAULT_PREFS.copy()
+                saved=json.load(f)
+            prefs=DEFAULT_PREFS.copy()
             prefs.update(saved)
             return prefs
     except Exception as e:
@@ -270,7 +281,7 @@ class PrefsDialog(tk.Toplevel):
     Edits a copy of prefs and calls on_save(new_prefs) if the user clicks Save.
     """
 
-    COLOR_FIELDS = [
+    COLOR_FIELDS=[
         ("color_bg",       "Background"),
         ("color_gauge_bg", "Gauge Background"),
         ("color_accent",   "Accent"),
@@ -283,11 +294,16 @@ class PrefsDialog(tk.Toplevel):
         ("color_danger",   "Danger"),
     ]
 
-    FONT_FIELDS = [
+    FONT_FIELDS=[
         ("font_label",  "Label Font"),
         ("font_title",  "Title Font"),
         ("font_small",  "Small Font"),
     ]
+
+    # Use this to restrict input on the numeric fields.
+    @staticmethod
+    def _validate_digit(P) -> bool:
+        return (P.isdigit() or P =="")
 
     def __init__(self, parent, prefs: dict, on_save, menubar):
         super().__init__(parent)
@@ -296,13 +312,14 @@ class PrefsDialog(tk.Toplevel):
         self.resizable(False, False)
         self.grab_set()             # make modal
         self.transient(parent)      # keep on top of parent
-        self.menubar = menubar
+        self.menubar=menubar
+        self.validate=parent.register(self._validate_digit)
 
         self.configure(menu=self.menubar)
-        self._prefs   = prefs.copy()
-        self._on_save = on_save
-        self._swatches: dict[str, tk.Label] = {}
-        self._font_vars: dict[str, tuple]   = {}
+        self._prefs  =prefs.copy()
+        self._on_save=on_save
+        self._swatches: dict[str, tk.Label]={}
+        self._font_vars: dict[str, tuple]  ={}
 
         self._build()
         self._center_on(parent)
@@ -310,72 +327,112 @@ class PrefsDialog(tk.Toplevel):
     # ── Layout ────────────────────────────────────────────────────────────
 
     def _build(self):
-        PAD = {"padx" : 10, "pady" : 4}
+        PAD={"padx" : 10, "pady" : 4}
 
         tk.Label(self, text="Some changes will not take effect until restart.",
              font=self._prefs["font_label"]).pack(padx=12, pady=(8, 0),
                                                   anchor="w")
 
+        # ── Limits ────────────────────────────────────────────────────────
+        limits_frame=tk.LabelFrame(self, text="Gauge Limits", padx=6, pady=6)
+        limits_frame.pack(fill=tk.X, padx=4, pady=4)
+
+        tk.Label(limits_frame, text="Max Dist:", anchor="w",
+                width=12).grid(row=0, column=0, sticky="w", padx=4, pady=4)
+        self._max_dist=tk.IntVar(value=self._prefs.get("max_dist", 0))
+        tk.Entry(limits_frame, textvariable=self._max_dist,
+                validatecommand=(self.validate,"%P"), validate="key",
+                width=4).grid(row=0, column=1, padx=4, pady=4, sticky="w")
+        tk.Label(limits_frame, text="meters", anchor="w",
+                width=12).grid(row=0, column=2, sticky="w", padx=4, pady=4)
+
+        tk.Label(limits_frame, text="Max Speed:", anchor="w",
+                width=12).grid(row=0, column=3, sticky="w", padx=4, pady=4)
+        self._max_speed=tk.IntVar(value=self._prefs.get("max_speed", 0))
+        tk.Entry(limits_frame, textvariable=self._max_speed,
+                validatecommand=(self.validate,"%P"), validate="key",
+                 width=4).grid(row=0, column=4, padx=4, pady=4, sticky="w")
+        tk.Label(limits_frame, text="kph", anchor="w",
+                width=12).grid(row=0, column=5, sticky="w", padx=4, pady=4)
+
+        tk.Label(limits_frame, text="Max Alt:", anchor="w",
+                 width=12).grid(row=1, column=0, sticky="w", padx=4, pady=4)
+        self._max_alt=tk.IntVar(value=self._prefs.get("max_alt", 0))
+        tk.Entry(limits_frame, textvariable=self._max_alt,
+                validatecommand=(self.validate,"%P"), validate="key",
+                width=4).grid(row=1, column=1, padx=4, pady=4, sticky="w")
+        tk.Label(limits_frame, text="meters", anchor="w",
+                width=12).grid(row=1, column=2, sticky="w", padx=4, pady=4)
+
+        tk.Label(limits_frame, text="Max Wind:", anchor="w",
+                width=12).grid(row=1, column=3, sticky="w", padx=4, pady=4)
+        self._max_wind=tk.IntVar(value=self._prefs.get("max_wind", 0))
+        tk.Entry(limits_frame, textvariable=self._max_wind,
+                validatecommand=(self.validate,"%P"), validate="key",
+                width=4).grid(row=1, column=4, padx=4, pady=4, sticky="w")
+        tk.Label(limits_frame, text="m/s", anchor="w",
+                width=12).grid(row=1, column=5, sticky="w", padx=4, pady=4)
+
         # ── Colors ────────────────────────────────────────────────────────
-        color_frame = tk.LabelFrame(self, text=" Colors ", padx=6, pady=6)
-        color_frame.pack(fill=tk.X, padx=12, pady=(12, 4))
+        color_frame=tk.LabelFrame(self, text=" Colors ", padx=6, pady=6)
+        color_frame.pack(fill=tk.X, padx=4, pady=4)
 
         for i, (key, label) in enumerate(self.COLOR_FIELDS):
-            row = i // 2
-            col = (i % 2) * 3       # 3 columns per side: label | swatch | button
+            row=i // 2
+            col=(i % 2) * 3       # 3 columns per side: label | swatch | button
 
             tk.Label(color_frame, text=label + ":", anchor="w",
                      width=12).grid(row=row, column=col, sticky="w", **PAD)
 
-            swatch = tk.Label(color_frame, width=3,
+            swatch=tk.Label(color_frame, width=3,
                               bg=self._prefs.get(key, "#000000"),
                               relief=tk.SOLID, bd=1)
             swatch.grid(row=row, column=col + 1, padx=(0, 4), pady=4)
-            self._swatches[key] = swatch
+            self._swatches[key]=swatch
 
             tk.Button(color_frame, text="Choose…",
                       command=lambda k=key: self._pick_color(k),
                       padx=4).grid(row=row, column=col + 2, **PAD)
 
         # ── Fonts ─────────────────────────────────────────────────────────
-        font_frame = tk.LabelFrame(self, text=" Fonts ", padx=6, pady=6)
-        font_frame.pack(fill=tk.X, padx=12, pady=4)
+        font_frame=tk.LabelFrame(self, text=" Fonts ", padx=6, pady=6)
+        font_frame.pack(fill=tk.X, padx=4, pady=4)
 
-        families = self._get_font_families()
+        families=self._get_font_families()
 
         for i, (key, label) in enumerate(self.FONT_FIELDS):
-            current = self._prefs.get(key, ("Helvetica", 10))
+            current=self._prefs.get(key, ("Helvetica", 10))
             # current may be a list if loaded from JSON (JSON turns tuples into lists)
-            current_family = current[0]
-            current_size   = current[1]
-            current_bold   = len(current) > 2 and current[2] == "bold"
+            current_family=current[0]
+            current_size  =current[1]
+            current_bold  =len(current) > 2 and current[2] == "bold"
 
             tk.Label(font_frame, text=label + ":", anchor="w",
                     width=12).grid(row=i, column=0, sticky="w", padx=(10, 4), pady=4)
 
             # Family dropdown
-            family_var = tk.StringVar(value=current_family)
-            family_cb  = ttk.Combobox(font_frame, textvariable=family_var,
+            family_var=tk.StringVar(value=current_family)
+            family_cb =ttk.Combobox(font_frame, textvariable=family_var,
                                     values=families, width=22, state="readonly")
             family_cb.grid(row=i, column=1, padx=4, pady=4)
 
             # Size spinbox
-            size_var = tk.IntVar(value=current_size)
+            size_var=tk.IntVar(value=current_size)
             tk.Spinbox(font_frame, textvariable=size_var,
                     from_=6, to=32, width=4).grid(row=i, column=2, padx=4, pady=4)
 
             # Bold checkbox
-            bold_var = tk.BooleanVar(value=current_bold)
+            bold_var=tk.BooleanVar(value=current_bold)
             tk.Checkbutton(font_frame, text="Bold",
                         variable=bold_var).grid(row=i, column=3, padx=4, pady=4)
 
-            self._font_vars[key] = (family_var, size_var, bold_var)
+            self._font_vars[key]=(family_var, size_var, bold_var)
 
         # Font marker path (separate — it's a file path, not a tkinter font)
         tk.Label(font_frame, text="Marker Font:", anchor="w",
                 width=12).grid(row=len(self.FONT_FIELDS), column=0,
                                 sticky="w", padx=(10, 4), pady=4)
-        self._marker_var = tk.StringVar(value=self._prefs.get("font_marker", ""))
+        self._marker_var=tk.StringVar(value=self._prefs.get("font_marker", ""))
         tk.Entry(font_frame, textvariable=self._marker_var,
                 width=28).grid(row=len(self.FONT_FIELDS), column=1,
                                 columnspan=2, padx=4, pady=4, sticky="w")
@@ -384,18 +441,18 @@ class PrefsDialog(tk.Toplevel):
             row=len(self.FONT_FIELDS), column=3, padx=4, pady=4)
 
         # ── Logging ───────────────────────────────────────────────────────
-        log_frame = tk.LabelFrame(self, text=" Logging ", padx=6, pady=6)
+        log_frame=tk.LabelFrame(self, text=" Logging ", padx=6, pady=6)
         log_frame.pack(fill=tk.X, padx=12, pady=4)
 
         tk.Label(log_frame, text="Log Level:").pack(side=tk.LEFT, padx=(4, 8))
-        self._log_var = tk.StringVar(value=self._prefs.get("log_level", "Info"))
+        self._log_var=tk.StringVar(value=self._prefs.get("log_level", "Info"))
         for level in ("Error", "Warning", "Info", "Debug"):
             tk.Radiobutton(log_frame, text=level,
                            variable=self._log_var, value=level).pack(
                 side=tk.LEFT, padx=4)
 
         # ── Buttons ───────────────────────────────────────────────────────
-        btn_row = tk.Frame(self)
+        btn_row=tk.Frame(self)
         btn_row.pack(fill=tk.X, padx=12, pady=(4, 12))
 
         tk.Button(btn_row, text="Restore Defaults",
@@ -413,7 +470,7 @@ class PrefsDialog(tk.Toplevel):
     # ── Helpers ───────────────────────────────────────────────────────────
 
     def _pick_marker_font(self):
-        path = filedialog.askopenfilename(
+        path=filedialog.askopenfilename(
             title="Select marker font file",
             filetypes=[("Font files", "*.ttf *.ttc *.otf"), ("All files", "*.*")],
             parent=self
@@ -422,32 +479,36 @@ class PrefsDialog(tk.Toplevel):
             self._marker_var.set(path)
 
     def _get_font_families(self) -> list[str]:
-        families = sorted(set(tkf.families()))
+        families=sorted(set(tkf.families()))
         return [f for f in families if not f.startswith("@")]  # skip vertical CJK fonts
 
     def _center_on(self, parent):
         self.update_idletasks()
-        x = parent.winfo_x() + (parent.winfo_width()  - self.winfo_width())  // 2
-        y = parent.winfo_y() + (parent.winfo_height() - self.winfo_height()) // 2
+        x=parent.winfo_x() + (parent.winfo_width()  - self.winfo_width())  // 2
+        y=parent.winfo_y() + (parent.winfo_height() - self.winfo_height()) // 2
         self.geometry(f"+{x}+{y}")
 
     def _pick_color(self, key: str):
-        current = self._prefs.get(key, "#000000")
-        _, hex_color = askcolor(color=current,
+        current=self._prefs.get(key, "#000000")
+        _, hex_color=askcolor(color=current,
                                 title=f"Choose: {key}",
                                 parent=self)
         if hex_color:
-            self._prefs[key] = hex_color
+            self._prefs[key]=hex_color
             self._swatches[key].configure(bg=hex_color)
 
     def _restore_defaults(self):
+        self._max_speed.set(DEFAULT_PREFS.get("max_speed"))
+        self._max_dist.set(DEFAULT_PREFS.get("max_dist"))
+        self._max_alt.set(DEFAULT_PREFS.get("max_alt"))
+        self._max_wind.set(DEFAULT_PREFS.get("max_wind"))
         for key, _ in self.COLOR_FIELDS:
-            default = DEFAULT_PREFS.get(key, "#000000")
-            self._prefs[key] = default
+            default=DEFAULT_PREFS.get(key, "#000000")
+            self._prefs[key]=default
             self._swatches[key].configure(bg=default)
         for key, _ in self.FONT_FIELDS:
-            default = DEFAULT_PREFS.get(key, ("Helvetica", 10))
-            family_var, size_var, bold_var = self._font_vars[key]
+            default=DEFAULT_PREFS.get(key, ("Helvetica", 10))
+            family_var, size_var, bold_var=self._font_vars[key]
             family_var.set(default[0])
             size_var.set(default[1])
             bold_var.set(len(default) > 2 and default[2] == "bold")
@@ -458,14 +519,18 @@ class PrefsDialog(tk.Toplevel):
 
     def _save(self):
         for key, _ in self.FONT_FIELDS:
-            family_var, size_var, bold_var = self._font_vars[key]
+            family_var, size_var, bold_var=self._font_vars[key]
             if bold_var.get():
-                self._prefs[key] = (family_var.get(), size_var.get(), "bold")
+                self._prefs[key]=(family_var.get(), size_var.get(), "bold")
             else:
-                self._prefs[key] = (family_var.get(), size_var.get())
+                self._prefs[key]=(family_var.get(), size_var.get())
 
-        self._prefs["font_marker"] = self._marker_var.get()
-        self._prefs["log_level"] = self._log_var.get()
+        self._prefs["font_marker"]=self._marker_var.get()
+        self._prefs["log_level"]=self._log_var.get()
+        self._prefs["max_speed"]=int(self._max_speed.get())
+        self._prefs["max_dist"]=int(self._max_dist.get())
+        self._prefs["max_alt"]=int(self._max_alt.get())
+        self._prefs["max_wind"]=int(self._max_wind.get())
         self._on_save(self._prefs)
         self.destroy()
 
@@ -480,17 +545,17 @@ class CompassGauge(tk.Canvas):
         super().__init__(parent, width=size, height=size,
                          bg=prefs["color_bg"], highlightthickness=0, **kw)
         my_logger.debug("Creating Compass %s", label)
-        self.prefs = prefs
-        self.label = label
-        self.size = size
-        self.heading = 0.0
+        self.prefs=prefs
+        self.label=label
+        self.size=size
+        self.heading=0.0
         self._draw_static()
         self._draw()
 
     def _draw_static(self):
-        s = self.size
-        cx = cy = s / 2
-        r = s / 2 - 4
+        s=self.size
+        cx=cy = s / 2
+        r=s / 2 - 4
 
         self.delete("all")
 
@@ -499,20 +564,20 @@ class CompassGauge(tk.Canvas):
                          fill=self.prefs["color_gauge_bg"])
 
         for label, angle in [("N", 0), ("E", 90), ("S", 180), ("W", 270)]:
-            rad = math.radians(angle - 90)
-            lx = cx + (r - 14) * math.cos(rad)
-            ly = cy + (r - 14) * math.sin(rad)
-            color = self.prefs["color_danger"] if label == "N" else self.prefs["color_label"]
+            rad=math.radians(angle - 90)
+            lx=cx + (r - 14) * math.cos(rad)
+            ly=cy + (r - 14) * math.sin(rad)
+            color=self.prefs["color_danger"] if label == "N" else self.prefs["color_label"]
             self.create_text(lx, ly, text=label, fill=color,
                              font=self.prefs["font_small"])
 
         for i in range(36):
-            ang = math.radians(i * 10 - 90)
-            inner = r - 6 if i % 9 == 0 else r - 4
-            x1 = cx + inner * math.cos(ang)
-            y1 = cy + inner * math.sin(ang)
-            x2 = cx + r * math.cos(ang)
-            y2 = cy + r * math.sin(ang)
+            ang=math.radians(i * 10 - 90)
+            inner=r - 6 if i % 9 == 0 else r - 4
+            x1=cx + inner * math.cos(ang)
+            y1=cy + inner * math.sin(ang)
+            x2=cx + r * math.cos(ang)
+            y2=cy + r * math.sin(ang)
             self.create_line(x1, y1, x2, y2, fill=self.prefs["color_border"])
 
         self.create_text(cx, cy - r * 0.25,
@@ -524,14 +589,14 @@ class CompassGauge(tk.Canvas):
 
         self.delete("dynamic")
 
-        s = self.size
-        cx = cy = s / 2
-        r = s / 2 - 4
-        needle_rad = math.radians(self.heading - 90)
-        nx = cx + (r - 18) * math.cos(needle_rad)
-        ny = cy + (r - 18) * math.sin(needle_rad)
-        tx = cx - 8 * math.cos(needle_rad)
-        ty = cy - 8 * math.sin(needle_rad)
+        s=self.size
+        cx=cy = s / 2
+        r=s / 2 - 4
+        needle_rad=math.radians(self.heading - 90)
+        nx=cx + (r - 18) * math.cos(needle_rad)
+        ny=cy + (r - 18) * math.sin(needle_rad)
+        tx=cx - 8 * math.cos(needle_rad)
+        ty=cy - 8 * math.sin(needle_rad)
 
         self.create_line(tx, ty, nx, ny, fill=self.prefs["color_accent"],
                          width=2, arrow=tk.LAST, arrowshape=(8,10,3), tags="dynamic")
@@ -542,7 +607,7 @@ class CompassGauge(tk.Canvas):
                          tags="dynamic")
 
     def set_value(self, heading: float):
-        self.heading = heading % 360
+        self.heading=heading % 360
         self._draw()
 
 
@@ -552,30 +617,30 @@ class ArcGauge(tk.Canvas):
     Shows a coloured arc fill + needle + numeric readout.
     """
 
-    def __init__(self, parent, prefs:dict, label, min_val, max_val,
+    def __init__(self, parent, prefs:dict, label=None, min_val=0, max_val=0,
                  unit="", warn_pct=0.5, danger_pct=0.95,
                  size=110, **kw):
         super().__init__(parent, width=size, height=int(size * 0.75),
                          bg=prefs["color_bg"], highlightthickness=0, **kw)
         my_logger.debug("Creating Gauge %s", label)
-        self.prefs     = prefs
-        self.label     = label
-        self.min_val   = min_val
-        self.max_val   = max_val
-        self.unit      = unit
-        self.warn_pct  = warn_pct
+        self.prefs    =prefs
+        self.label    =label
+        self.min_val  =min_val
+        self.max_val  =max_val
+        self.unit     =unit
+        self.warn_pct =warn_pct
         self.danger_pct= danger_pct
-        self.size      = size
-        self.value     = min_val
+        self.size     =size
+        self.value    =min_val
         self._draw_static()
         self._draw()
 
     def _draw_static(self):
-        s = self.size
-        h = int(s * 0.75)
-        cx = s / 2
-        cy = h * 0.88
-        r  = s * 0.42
+        s=self.size
+        h=int(s * 0.75)
+        cx=s / 2
+        cy=h * 0.88
+        r =s * 0.42
 
         self.delete("all")
 
@@ -590,30 +655,30 @@ class ArcGauge(tk.Canvas):
                          font=self.prefs["font_small"])
 
     def _draw(self):
-        s = self.size
-        h = int(s * 0.75)
-        cx = s / 2
-        cy = h * 0.88
-        r  = s * 0.42
+        s=self.size
+        h=int(s * 0.75)
+        cx=s / 2
+        cy=h * 0.88
+        r =s * 0.42
 
         self.delete("dynamic")
 
         # Value
-        val_text = f"{self.value:.1f}{self.unit}"
+        val_text=f"{self.value:.1f}{self.unit}"
         self.create_text(cx, cy - 10, tags="dynamic",
                          text=val_text, fill=self.prefs["color_value"],
                          font=self.prefs["font_label"])
 
         # Colored fill arc
-        pct = (self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
-        pct = max(0.0, min(1.0, pct))
-        extent = pct * 180
+        pct=(self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
+        pct=max(0.0, min(1.0, pct))
+        extent=pct * 180
 
-        color = self.prefs["color_safe"]
+        color=self.prefs["color_safe"]
         if pct >= self.danger_pct:
-            color = self.prefs["color_danger"]
+            color=self.prefs["color_danger"]
         elif pct >= self.warn_pct:
-            color = self.prefs["color_warn"]
+            color=self.prefs["color_warn"]
 
         if extent > 0:
             self.create_arc(cx-r, cy-r, cx+r, cy+r, tags="dynamic",
@@ -621,41 +686,41 @@ class ArcGauge(tk.Canvas):
                             style=tk.ARC, outline=color, width=8)
 
         # Needle
-        needle_angle = math.radians(180 - pct * 180)
-        nx = cx + (r - 2) * math.cos(needle_angle)
-        ny = cy - (r - 2) * math.sin(needle_angle)
+        needle_angle=math.radians(180 - pct * 180)
+        nx=cx + (r - 2) * math.cos(needle_angle)
+        ny=cy - (r - 2) * math.sin(needle_angle)
         self.create_line(cx, cy, nx, ny, fill=self.prefs["color_value"],
                          tags="dynamic", width=2)
         self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=self.prefs["color_value"],
                          tags="dynamic", outline="")
 
     def set_value(self, value: float):
-        self.value = value
+        self.value=value
         self._draw()
 
 
 class StickDisplay(tk.Canvas):
     """
     Renders a single joystick as a 2D crosshair inside a square.
-    x_val, y_val should be in range 0..2048 (centre = 1024).
+    x_val, y_val should be in range 0..2048 (centre=1024).
     """
 
     def __init__(self, parent, prefs, label, size=100, **kw):
         super().__init__(parent, width=size, height=size,
                          bg=prefs["color_bg"], highlightthickness=0, **kw)
         my_logger.debug("Creating Stick %s", label)
-        self.prefs  = prefs
-        self.label  = label
-        self.size   = size
-        self.x_val  = 1024.0   # 0..2048
-        self.y_val  = 1024.0
+        self.prefs =prefs
+        self.label =label
+        self.size  =size
+        self.x_val =1024.0   # 0..2048
+        self.y_val =1024.0
         self._draw_static()
         self._draw()
 
     def _draw_static(self):
-        s = self.size
-        pad = 2
-        inner = s - 2 * pad
+        s=self.size
+        pad=2
+        inner=s - 2 * pad
 
         self.delete("all")
 
@@ -668,7 +733,7 @@ class StickDisplay(tk.Canvas):
         #                 fill=self.prefs["color_gauge_bg"])
 
         # Centre cross
-        mid = s / 2
+        mid=s / 2
         self.create_line(pad, mid, s - pad, mid, fill=self.prefs["color_border"], dash=(2, 3))
         self.create_line(mid, pad, mid, s - pad, fill=self.prefs["color_border"], dash=(2, 3))
 
@@ -677,26 +742,26 @@ class StickDisplay(tk.Canvas):
                          fill=self.prefs["color_label"], font=self.prefs["font_small"])
 
     def _draw(self):
-        s = self.size
-        pad = 2
-        inner = s - 2 * pad
+        s=self.size
+        pad=2
+        inner=s - 2 * pad
 
         self.delete("dynamic")
 
         # Dot position
-        nx = pad + (self.x_val / 2048.0) * inner
-        ny = pad + (1.0 - self.y_val / 2048.0) * inner  # invert Y
+        nx=pad + (self.x_val / 2048.0) * inner
+        ny=pad + (1.0 - self.y_val / 2048.0) * inner  # invert Y
 
         # Glow circle
-        gr = 12
+        gr=12
         self.create_oval(nx - gr, ny - gr, nx + gr, ny + gr, tags="dynamic",
                          fill=self.prefs["color_gauge_bg"], outline="")
         self.create_oval(nx - 5, ny - 5, nx + 5, ny + 5, tags="dynamic",
                          fill=self.prefs["color_accent"], outline="")
 
     def set_values(self, x_val: float, y_val: float):
-        self.x_val = x_val
-        self.y_val = y_val
+        self.x_val=x_val
+        self.y_val=y_val
         self._draw()
 
 
@@ -705,30 +770,32 @@ class BarGauge(tk.Canvas):
 
     def __init__(self, parent, prefs, label="", min_val=0, max_val=10,
                  unit="", size_w=50, size_h=90, warn_low=False,
-                 warn_high=False, **kw):
+                 warn_high=False, danger_low=False, danger_high=False, **kw):
         super().__init__(parent, width=size_w, height=size_h,
                          bg=prefs["color_bg"], highlightthickness=0, **kw)
         my_logger.debug("Creating Bar %s", label)
-        self.prefs   = prefs
-        self.label   = label
-        self.min_val = min_val
-        self.max_val = max_val
-        self.unit    = unit
-        self.size_w  = size_w
-        self.size_h  = size_h
-        self.value   = min_val
-        self.warn_low = warn_low
-        self.warn_high = warn_high
+        self.prefs  =prefs
+        self.label  =label
+        self.min_val=min_val
+        self.max_val=max_val
+        self.unit   =unit
+        self.size_w =size_w
+        self.size_h =size_h
+        self.value  =min_val
+        self.warn_low=warn_low
+        self.warn_high=warn_high
+        self.danger_low=danger_low
+        self.danger_high=danger_high
         self._draw_static()
         self._draw()
 
     def _draw_static(self):
-        w = self.size_w
-        h = self.size_h
-        pad_x = 8
-        bar_top = 18
-        bar_bot = h - 24
-        bar_h   = bar_bot - bar_top
+        w=self.size_w
+        h=self.size_h
+        pad_x=8
+        bar_top=18
+        bar_bot=h - 24
+        bar_h  =bar_bot - bar_top
 
         self.delete("all")
 
@@ -743,25 +810,29 @@ class BarGauge(tk.Canvas):
                          font=self.prefs["font_small"])
 
     def _draw(self):
-        w = self.size_w
-        h = self.size_h
-        pad_x = 8
-        bar_top = 18
-        bar_bot = h - 24
-        bar_h   = bar_bot - bar_top
+        w=self.size_w
+        h=self.size_h
+        pad_x=8
+        bar_top=18
+        bar_bot=h - 24
+        bar_h  =bar_bot - bar_top
 
         self.delete("dynamic")
 
-        pct = (self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
-        pct = max(0.0, min(1.0, pct))
+        pct=(self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
+        pct=max(0.0, min(1.0, pct))
 
-        color = self.prefs["color_safe"]
-        if self.warn_low is not False and pct <= self.warn_low:
-            color = self.prefs["color_danger"]
-        if self.warn_high is not False and pct >= self.warn_high:
-            color = self.prefs["color_danger"]
+        color=self.prefs["color_safe"]
+        if self.danger_low is not False and pct <= self.danger_low:
+            color=self.prefs["color_danger"]
+        elif self.warn_low is not False and pct <= self.warn_low:
+            color=self.prefs["color_warn"]
+        elif self.danger_high is not False and pct >= self.danger_high:
+            color=self.prefs["color_danger"]
+        elif self.warn_high is not False and pct >= self.warn_high:
+            color=self.prefs["color_warn"]
 
-        fill_top = bar_bot - pct * bar_h
+        fill_top=bar_bot - pct * bar_h
         if pct > 0:
             self.create_rectangle(pad_x + 1, fill_top,
                                   w - pad_x - 1, bar_bot - 1,
@@ -777,7 +848,7 @@ class BarGauge(tk.Canvas):
     def set_value(self, value: float):
         # Don't redraw unless the value has changed.
         if self.value != value:
-            self.value = value
+            self.value=value
             self._draw()
 
 
@@ -791,21 +862,21 @@ class InfoPanel(tk.LabelFrame):
     def __init__(self, parent, prefs, fields: list, **kw):
         super().__init__(parent, bg=prefs["color_bg"], **kw)
         my_logger.debug("Creating InfoPanel")
-        self._vars = {}
-        self._labels = []
-        self.prefs = prefs
+        self._vars={}
+        self._labels=[]
+        self.prefs=prefs
 
-        self._canvas = tk.Canvas(self, bg=prefs["color_bg"],
+        self._canvas=tk.Canvas(self, bg=prefs["color_bg"],
                                  highlightthickness=0, height=64)
-        scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL,
+        scrollbar=ttk.Scrollbar(self, orient=tk.VERTICAL,
                                   command=self._canvas.yview)
         self._canvas.configure(yscrollcommand=scrollbar.set)
 
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self._canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self._inner = tk.Frame(self._canvas, bg=prefs["color_bg"])
-        self._window_id = self._canvas.create_window((0,0), window=self._inner,
+        self._inner=tk.Frame(self._canvas, bg=prefs["color_bg"])
+        self._window_id=self._canvas.create_window((0,0), window=self._inner,
                                                      anchor="nw")
 
         # Resize the scroll region whenever the inner frame changes size
@@ -817,22 +888,22 @@ class InfoPanel(tk.LabelFrame):
         self._canvas.bind("<Button-4>",    self._on_mousewheel)      # Linux scroll up
         self._canvas.bind("<Button-5>",    self._on_mousewheel)      # Linux scroll down
 
-        col = 0
-        row = 0
-        ufont = self.prefs["font_label"].copy()
+        col=0
+        row=0
+        ufont=self.prefs["font_label"].copy()
         ufont.append("underline")
 
         for field in fields:
             if field is None:
                 row += 1
-                col = 0
+                col=0
                 continue
 
             if field[0] is None:
                 if col > 0:
                     row += 1
                 if field[1] is not None:
-                    lbl = tk.Label(self._inner, text=field[1],
+                    lbl=tk.Label(self._inner, text=field[1],
                                 bg=self.prefs["color_bg"],
                                 fg=self.prefs["color_accent"],
                                 font=ufont,
@@ -840,17 +911,17 @@ class InfoPanel(tk.LabelFrame):
                     lbl.grid(row=row, column=0, columnspan=4,
                             sticky="ew", padx=6, pady=(6, 1))
                 row += 1
-                col = 0
+                col=0
                 continue
 
-            key_lbl = tk.Label(self._inner, text=field[0] + ":", bg=self.prefs["color_bg"],
+            key_lbl=tk.Label(self._inner, text=field[0] + ":", bg=self.prefs["color_bg"],
                     fg=self.prefs["color_label"],
                     font=self.prefs["font_label"],
                     anchor="w")
             key_lbl.grid(row=row, column=col, sticky="w",
                         padx=(6, 2), pady=1)
-            var = tk.StringVar(value="—")
-            val_lbl = tk.Label(self._inner, textvariable=var,
+            var=tk.StringVar(value="—")
+            val_lbl=tk.Label(self._inner, textvariable=var,
                                 bg=self.prefs["color_bg"],
                                 fg=self.prefs["color_value"],
                                 font=self.prefs["font_label"],
@@ -859,10 +930,10 @@ class InfoPanel(tk.LabelFrame):
                             padx=(2, 6), pady=1)
             col += 2
             if col > 2:
-                col = 0
+                col=0
                 row += 1
 
-            self._vars[field[0]] = var
+            self._vars[field[0]]=var
             self._labels.append((key_lbl, val_lbl))
 
     def _on_inner_configure(self, event):
@@ -910,32 +981,32 @@ class DroneViewer(tk.Tk):
 
         my_logger.debug("Creating DroneViewer window")
 
-        self.prefs = load_prefs()
+        self.prefs=load_prefs()
 
         self.title("Atom 2 Flight Log Viewer")
         self.configure(bg=self.prefs["color_bg"])
         self.minsize(1100, 720)
 
         my_logger.setLevel(LOG_LEVEL_MAP[self.prefs["log_level"]])
-        geometry = self.prefs.get("window_geometry", "1280x800")
+        geometry=self.prefs.get("window_geometry", "1280x800")
 
         self.geometry(geometry)
 
         # ── State ─────────────────────────────────────────────────────────
-        self.records             = []
-        self.current_idx         = 0
-        self.playing             = False
-        self.pending_update      = False
-        self.speed_idx           = 0
-        self.playback_thread     = None
-        self._stop_event         = threading.Event()
+        self.records            =[]
+        self.current_idx        =0
+        self.playing            =False
+        self.pending_update     =False
+        self.speed_idx          =0
+        self.playback_thread    =None
+        self._stop_event        =threading.Event()
 
         # Map markers / path
-        self._path_line          = None
-        self._drone_marker       = None
-        self._home_marker        = None
-        self._played_path        = []         # coords shown so far
-        self._heading            = None
+        self._path_line         =None
+        self._drone_marker      =None
+        self._home_marker       =None
+        self._played_path       =[]         # coords shown so far
+        self._heading           =None
 
         self._build_ui()
         self._apply_styles()
@@ -954,6 +1025,10 @@ class DroneViewer(tk.Tk):
         save_prefs(self.prefs)
         my_logger.setLevel(LOG_LEVEL_MAP[self.prefs["log_level"]])
         # Redraw all canvas gauges so they pick up the new colors immediately
+        self._gauge_speed.max_val=self.prefs["max_speed"]
+        self._gauge_dist.max_val=self.prefs["max_dist"]
+        self._gauge_alt.max_val=self.prefs["max_alt"]
+        self._gauge_wind.max_val=self.prefs["max_wind"]
         for widget in (self._gauge_speed, self._gauge_alt, self._gauge_dist,
                        self._gauge_compass, self._bar_battery, self._bar_sats,
                        self._bar_wind, self._stick_left,
@@ -974,7 +1049,7 @@ class DroneViewer(tk.Tk):
 
     def _on_close(self):
         my_logger.debug("Quitting.")
-        self.prefs["window_geometry"] = self.geometry()
+        self.prefs["window_geometry"]=self.geometry()
         save_prefs(self.prefs)
         self.quit()
 
@@ -984,10 +1059,10 @@ class DroneViewer(tk.Tk):
 
         self.option_add('*tearOff', False)
 
-        self.menubar = tk.Menu(self)
+        self.menubar=tk.Menu(self)
         self.configure(menu=self.menubar)
 
-        file_menu = tk.Menu(self.menubar)
+        file_menu=tk.Menu(self.menubar)
         self.menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Open FC2", command=self._open_file)
         file_menu.add_separator()
@@ -1001,19 +1076,19 @@ class DroneViewer(tk.Tk):
         self.createcommand("tk::mac::Quit", self._on_close)
 
         # ── Top bar ───────────────────────────────────────────────────────
-        top = tk.Frame(self, bg=self.prefs["color_bg"], pady=6)
+        top=tk.Frame(self, bg=self.prefs["color_bg"], pady=6)
         top.pack(fill=tk.X, side=tk.TOP)
 
         tk.Label(top, text="ATOM 2 FLIGHT VIEWER",
                  bg=self.prefs["color_bg"], fg=self.prefs["color_accent"],
                  font=self.prefs["font_title"]).pack(side=tk.LEFT, padx=16)
 
-        self._file_label = tk.Label(top, text="No file loaded",
+        self._file_label=tk.Label(top, text="No file loaded",
                                     bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
                                     font=self.prefs["font_title"])
         self._file_label.pack(side=tk.LEFT, padx=8)
 
-        open_btn = tk.Button(top, text="Open FC2…",
+        open_btn=tk.Button(top, text="Open FC2…",
                              command=self._open_file,
                              fg=self.prefs["color_bg"], relief=tk.FLAT,
                              font=self.prefs["font_label"],
@@ -1021,15 +1096,15 @@ class DroneViewer(tk.Tk):
         open_btn.pack(side=tk.RIGHT, padx=16)
 
         # ── Main paned area ───────────────────────────────────────────────
-        main_pane = tk.PanedWindow(self, orient=tk.HORIZONTAL,
+        main_pane=tk.PanedWindow(self, orient=tk.HORIZONTAL,
                               bg=self.prefs["color_bg"], sashwidth=4, sashrelief=tk.FLAT)
         main_pane.pack(fill=tk.BOTH, expand=True)
 
         # Left: map
-        map_frame = tk.Frame(main_pane, bg=self.prefs["color_bg"])
+        map_frame=tk.Frame(main_pane, bg=self.prefs["color_bg"])
         main_pane.add(map_frame, stretch="always", minsize=500)
 
-        self.map_widget = tkintermapview.TkinterMapView(
+        self.map_widget=tkintermapview.TkinterMapView(
             map_frame, corner_radius=0)
         self.map_widget.pack(fill=tk.BOTH, expand=True)
 
@@ -1037,10 +1112,10 @@ class DroneViewer(tk.Tk):
         # Darwin.
         if PLATFORM_SYSTEM == "Darwin":
             def _map_mouse_zoom(event):
-                relative_x = event.x / self.map_widget.width
-                relative_y = event.y / self.map_widget.height
-                delta = event.delta * 0.01
-                new_zoom = self.map_widget.zoom + delta
+                relative_x=event.x / self.map_widget.width
+                relative_y=event.y / self.map_widget.height
+                delta=event.delta * 0.01
+                new_zoom=self.map_widget.zoom + delta
                 self.map_widget.set_zoom(new_zoom,
                              relative_pointer_x=relative_x,
                              relative_pointer_y=relative_y)
@@ -1048,7 +1123,7 @@ class DroneViewer(tk.Tk):
             self.map_widget.canvas.bind("<MouseWheel>", _map_mouse_zoom)
 
         # Right: gauges + controls
-        right = tk.Frame(main_pane, bg=self.prefs["color_bg"], width=380)
+        right=tk.Frame(main_pane, bg=self.prefs["color_bg"], width=380)
         right.pack_propagate(False)
         main_pane.add(right, stretch="never", minsize=380)
 
@@ -1056,15 +1131,15 @@ class DroneViewer(tk.Tk):
         self._build_controls(right)
 
         # ── Bottom status bar ─────────────────────────────────────────────
-        bot = tk.Frame(self, bg=self.prefs["color_bg"], pady=3)
+        bot=tk.Frame(self, bg=self.prefs["color_bg"], pady=3)
         bot.pack(fill=tk.X, side=tk.BOTTOM)
 
-        self._status_var = tk.StringVar(value="Ready. Open an FC2 file to begin.")
+        self._status_var=tk.StringVar(value="Ready. Open an FC2 file to begin.")
         tk.Label(bot, textvariable=self._status_var,
                  bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
                  font=self.prefs["font_small"]).pack(side=tk.LEFT, padx=10)
 
-        self._progress_var = tk.StringVar(value="0 / 0")
+        self._progress_var=tk.StringVar(value="0 / 0")
         tk.Label(bot, textvariable=self._progress_var,
                  bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
                  font=self.prefs["font_small"]).pack(side=tk.RIGHT, padx=10)
@@ -1075,59 +1150,70 @@ class DroneViewer(tk.Tk):
         my_logger.debug("Building the Gauges")
 
         # ── Section: Arc gauges row ───────────────────────────────────────
-        arc_row = tk.LabelFrame(parent, bg=self.prefs["color_bg"])
+        arc_row=tk.LabelFrame(parent, bg=self.prefs["color_bg"])
         arc_row.pack(fill=tk.X, padx=6, pady=(6, 0))
 
-        self._gauge_speed  = ArcGauge(arc_row, self.prefs, "SPEED",   0, 1, " kph", size=110)
-        self._gauge_alt    = ArcGauge(arc_row, self.prefs, "ALT",     0, 1, " m",  size=110)
-        self._gauge_dist   = ArcGauge(arc_row, self.prefs, "DIST",    0, 1, " m",  size=110)
+        self._gauge_speed =ArcGauge(arc_row, self.prefs, "SPEED", min_val=0,
+                                      max_val=self.prefs["max_speed"],
+                                      unit=" kph",
+                                      warn_pct=0.5, danger_pct=0.8, size=110)
+        self._gauge_alt   =ArcGauge(arc_row, self.prefs, "ALT", min_val=0,
+                                      max_val=self.prefs["max_alt"],
+                                      unit=" m",
+                                      warn_pct=0.5, danger_pct=0.8, size=110)
+        self._gauge_dist  =ArcGauge(arc_row, self.prefs, "DIST", min_val=0,
+                                      max_val=self.prefs["max_dist"],
+                                      unit=" m",
+                                      warn_pct=0.5, danger_pct=0.8, size=110)
 
         for g in (self._gauge_speed, self._gauge_alt, self._gauge_dist):
             g.pack(side=tk.LEFT, expand=True)
 
         # ── Section: Compass + bars ───────────────────────────────────────
-        mid_row = tk.Frame(parent, bg=self.prefs["color_bg"])
+        mid_row=tk.Frame(parent, bg=self.prefs["color_bg"])
         mid_row.pack(fill=tk.X, padx=6, pady=4)
 
-        self._gauge_compass = CompassGauge(mid_row, self.prefs, label="HEADING", size=110)
+        self._gauge_compass=CompassGauge(mid_row, self.prefs, label="HEADING", size=110)
         self._gauge_compass.pack(side=tk.LEFT, padx=(0, 8))
 
-        bars = tk.Frame(mid_row, bg=self.prefs["color_bg"])
+        bars=tk.Frame(mid_row, bg=self.prefs["color_bg"])
         bars.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        self._bar_battery = BarGauge(bars, self.prefs, label="BATT",
+        self._bar_battery=BarGauge(bars, self.prefs, label="BATT",
                                      max_val=100, unit="%", size_w=36,
-                                     size_h=110, warn_low=0.3)
-        self._bar_sats    = BarGauge(bars, self.prefs, label="SATS", max_val=30,
-                                     size_w=36, size_h=110)
-        self._bar_wind    = BarGauge(bars, self.prefs, label="WIND", max_val=15,
+                                     size_h=110, warn_low=0.5, danger_low=0.25)
+        self._bar_sats   =BarGauge(bars, self.prefs, label="SATS", max_val=30,
+                                     size_w=36, size_h=110, warn_low=0.5,
+                                     danger_low=0.3)
+        self._bar_wind   =BarGauge(bars, self.prefs, label="WIND",
+                                     max_val=self.prefs["max_wind"],
                                      unit=" m/s", size_w=36, size_h=110,
-                                     warn_high=0.8)
+                                     warn_high=0.5, danger_high=0.9)
 
         for b in (self._bar_battery, self._bar_sats, self._bar_wind):
             b.pack(side=tk.LEFT, padx=2)
 
-        self._gauge_wind = CompassGauge(mid_row, self.prefs, label="WIND", size=110)
+        self._gauge_wind=CompassGauge(mid_row, self.prefs, label="WIND", size=110)
         self._gauge_wind.pack(side=tk.LEFT, padx=(0, 8))
 
         # ── Section: Text info ────────────────────────────────────────────
-        info_frame = tk.Frame(parent, bg=self.prefs["color_bg"], bd=0)
+        info_frame=tk.Frame(parent, bg=self.prefs["color_bg"], bd=0)
         info_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
 
-        self.info = InfoPanel(info_frame, self.prefs, PANEL_ITEMS)
+        self.info=InfoPanel(info_frame, self.prefs, PANEL_ITEMS)
         self.info.pack(fill=tk.BOTH, expand=True)
 
         # ── Section: RC Sticks ────────────────────────────────────────────
-        sticks_frame = tk.Frame(parent, bg=self.prefs["color_bg"])
+        sticks_frame=tk.Frame(parent, bg=self.prefs["color_bg"])
         sticks_frame.pack(padx=6, pady=6)
 
         tk.Label(sticks_frame, text="CONTROLLER",
                  bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
                  font=self.prefs["font_small"]).pack(padx=8)
 
-        self._stick_left  = StickDisplay(sticks_frame, self.prefs,
+        self._stick_left =StickDisplay(sticks_frame, self.prefs,
                                          "Throttle & Yaw",  size=110)
-        self._stick_right = StickDisplay(sticks_frame, self.prefs,
+        self._stick_right=StickDisplay(sticks_frame, self.prefs,
                                          "Pitch & Bank", size=110)
         self._stick_left.pack(side=tk.LEFT, padx=(0, 4))
         self._stick_right.pack(side=tk.LEFT)
@@ -1137,18 +1223,18 @@ class DroneViewer(tk.Tk):
 
         my_logger.debug("Building the Controls")
 
-        ctrl = tk.LabelFrame(parent, bg=self.prefs["color_bg"], pady=8)
+        ctrl=tk.LabelFrame(parent, bg=self.prefs["color_bg"], pady=8)
         ctrl.pack(fill=tk.X, side=tk.BOTTOM, padx=0, pady=0)
 
         # Slider
-        self._slider_var = tk.IntVar(value=0)
-        self._slider = ttk.Scale(ctrl, from_=0, to=1,
+        self._slider_var=tk.IntVar(value=0)
+        self._slider=ttk.Scale(ctrl, from_=0, to=1,
                                  variable=self._slider_var,
                                  orient=tk.HORIZONTAL,
                                  command=self._on_slider)
         self._slider.pack(fill=tk.X, padx=10, pady=(4, 6))
 
-        btn_row = tk.Frame(ctrl, bg=self.prefs["color_bg"])
+        btn_row=tk.Frame(ctrl, bg=self.prefs["color_bg"])
         btn_row.pack()
 
         def btn(text, cmd, color=self.prefs["color_gauge_bg"], fg=self.prefs["color_value"]):
@@ -1163,18 +1249,18 @@ class DroneViewer(tk.Tk):
         self.bind("<Right>",      lambda e: self._step_fwd())
 
         if PLATFORM_SYSTEM == "Darwin":
-            self._btn_rw    = btn("⏮️", self._slow_down)
-            self._btn_back  = btn("⏪", self._step_back)
-            self._btn_play  = btn("▶️", self._toggle_play)
-            self._btn_fwd   = btn("⏩", self._step_fwd)
-            self._btn_ff    = btn("⏭️", self.speed_up)
+            self._btn_rw   =btn("⏮️", self._slow_down)
+            self._btn_back =btn("⏪", self._step_back)
+            self._btn_play =btn("▶️", self._toggle_play)
+            self._btn_fwd  =btn("⏩", self._step_fwd)
+            self._btn_ff   =btn("⏭️", self._speed_up)
             self.bind("<Command-o>",  lambda e: self._open_file())  # macOS
         else:
-            self._btn_rw    = btn("<<<", self._slow_down)
-            self._btn_back  = btn("<<", self._step_back)
-            self._btn_play  = btn(">", self._toggle_play)
-            self._btn_fwd   = btn(">>", self._step_fwd)
-            self._btn_ff    = btn(">>>", self.speed_up)
+            self._btn_rw   =btn("<<<", self._slow_down)
+            self._btn_back =btn("<<", self._step_back)
+            self._btn_play =btn(">", self._toggle_play)
+            self._btn_fwd  =btn(">>", self._step_fwd)
+            self._btn_ff   =btn(">>>", self._speed_up)
             self.bind("<Control-o>",  lambda e: self._open_file())  # Windows/Linux
 
         for b in (self._btn_rw, self._btn_back, self._btn_play,
@@ -1182,16 +1268,15 @@ class DroneViewer(tk.Tk):
             b.pack(side=tk.LEFT, padx=2)
 
         # Speed selector
-        speed_row = tk.Frame(ctrl, bg=self.prefs["color_bg"])
+        speed_row=tk.Frame(ctrl, bg=self.prefs["color_bg"])
         speed_row.pack(pady=(4, 2))
 
-        self._speed_var = tk.StringVar(value="1×")
-        speeds = ["1×", "2×", "4×", "8×", "16×"]
+        self._speed_var=tk.StringVar(value="1×")
+        speeds=["1×", "2×", "4×", "8×", "16×"]
         for i, label in enumerate(speeds):
-            idx = i
-            rb = tk.Radiobutton(speed_row, text=label,
+            rb=tk.Radiobutton(speed_row, text=label,
                                 variable=self._speed_var, value=label,
-                                command=lambda i=idx: self._set_speed(i),
+                                command=lambda i=i: self._set_speed(i),
                                 bg=self.prefs["color_bg"],
                                 fg=self.prefs["color_label"],
                                 selectcolor=self.prefs["color_bg"],
@@ -1204,9 +1289,9 @@ class DroneViewer(tk.Tk):
             rb.pack(side=tk.LEFT)
 
     def _apply_styles(self):
-        style = ttk.Style(self)
+        style=ttk.Style(self)
         # Use a native-looking theme on each platform
-        available = style.theme_names()
+        available=style.theme_names()
         for preferred in ("aqua", "vista", "clam", "alt", "default"):
             if preferred in available:
                 style.theme_use(preferred)
@@ -1219,7 +1304,7 @@ class DroneViewer(tk.Tk):
     # ── File loading ──────────────────────────────────────────────────────
 
     def _open_file(self):
-        path = filedialog.askopenfilename(
+        path=filedialog.askopenfilename(
             title="Open Atom 2 FC2 Log",
             filetypes=[("FC2 flight logs", "*.fc2"), ("All files", "*.*")]
         )
@@ -1233,22 +1318,22 @@ class DroneViewer(tk.Tk):
         self.update_idletasks()
 
         try:
-            records = atom2_parser(file_name=path, logger=my_logger)
+            records=atom2_parser(file_name=path, logger=my_logger)
         except Exception as e:
             messagebox.showerror("Parse error", str(e))
             self._set_status("Error loading file.")
             return
 
-        self.records = [r for r in records if r.get("GPS Lock") == "Yes"]
+        self.records=[r for r in records if r.get("GPS Lock") == "Yes"]
         if not self.records:
             messagebox.showwarning("No data",
                 "No valid records found in this file.")
             return
-        self.records_len = len(self.records) - 1
+        self.records_len=len(self.records) - 1
 
-        self.coords = [(r["lat (deg)"], r["lon (deg)"]) for r in self.records]
+        self.coords=[(r["lat (deg)"], r["lon (deg)"]) for r in self.records]
 
-        self.current_idx = 0
+        self.current_idx=0
 
         # Slider range
         self._slider.configure(to=len(self.records) - 1)
@@ -1257,35 +1342,21 @@ class DroneViewer(tk.Tk):
         # Draw full path on map
         self._draw_map_path()
 
-        # Get the max for some attributes so I can scale the gauges.
-        field_range = [r["alt (m)"] for r in self.records if r.get("alt (m)") != ""]
-        self.max_alt = max(field_range)
-
-        field_range = [r["3d Derived Speed (m/s)"] for r in self.records if r.get("3d Derived Speed (m/s)") != ""]
-        #field_range = [r["speed (m/s)"] for r in records if r.get("speed (m/s)") != ""]
-        self.max_speed = max(field_range)*3.6 # convert to KPH
-
-        field_range = [r["distance (m)"] for r in self.records if r.get("distance (m)") != ""]
-        self.max_dist = max(field_range)
-
-        field_range = [r["Wind Speed (m/s)"] for r in self.records if r.get("Wind Speed (m/s)") != ""]
-        self.max_wind = max(field_range)
-
-        self._bar_wind.max_val = self.max_wind
-        self._gauge_alt.max_val = self.max_alt
-        self._gauge_speed.max_val = self.max_speed
-        self._gauge_dist.max_val = self.max_dist
-        my_logger.debug("Max speed = %s kph, Max dist = %s m, Max alt = %s m",
-                        self.max_speed, self.max_dist, self.max_alt)
-        my_logger.debug("Max wind = %s m/s", self.max_wind)
+        self._bar_wind.max_val=self.prefs["max_wind"]
+        self._gauge_alt.max_val=self.prefs["max_alt"]
+        self._gauge_speed.max_val=self.prefs["max_speed"]
+        self._gauge_dist.max_val=self.prefs["max_dist"]
+        #my_logger.debug("Max speed=%s kph, Max dist = %s m, Max alt = %s m",
+        #                self.max_speed, self.max_dist, self.max_alt)
+        #my_logger.debug("Max wind=%s m/s", self.max_wind)
 
         # Get the initial bounding box for the map.
-        field_range = [r["lat (deg)"] for r in self.records if r.get("lat (deg)") != ""]
-        self.min_lat = min(field_range)
-        self.max_lat = max(field_range)
-        field_range = [r["lon (deg)"] for r in self.records if r.get("lon (deg)") != ""]
-        self.min_lon = min(field_range)
-        self.max_lon = max(field_range)
+        field_range=[r["lat (deg)"] for r in self.records if r.get("lat (deg)") != ""]
+        self.min_lat=min(field_range)
+        self.max_lat=max(field_range)
+        field_range=[r["lon (deg)"] for r in self.records if r.get("lon (deg)") != ""]
+        self.min_lon=min(field_range)
+        self.max_lon=max(field_range)
 
         # Centre map on first point, scale the map to fit the entire path.
         my_logger.debug("Map bounding box: %s, %s",
@@ -1302,10 +1373,10 @@ class DroneViewer(tk.Tk):
     def _draw_map_path(self):
         if self._path_line:
             self._path_line.delete()
-            self._path_line = None
+            self._path_line=None
 
         if len(self.coords) >= 2:
-            self._path_line = self.map_widget.set_path(
+            self._path_line=self.map_widget.set_path(
                 self.coords, color=self.prefs["color_path"], width=4)
 
     #
@@ -1313,17 +1384,17 @@ class DroneViewer(tk.Tk):
     #
     def _make_drone_icon(self, heading) -> ImageTk.PhotoImage:
         """Draw a simple arrow head rotated to the current heading."""
-        size = 21 # Make this an odd number so we actually have a center pixel.
+        size=21 # Make this an odd number so we actually have a center pixel.
         # Note we add 4 pixels of padding on all sides to make sure there's
         # room for the rotation.
-        pad = 4
-        tsize = size + pad * 2
-        img = Image.new("RGBA", (tsize, tsize), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
+        pad=4
+        tsize=size + pad * 2
+        img=Image.new("RGBA", (tsize, tsize), (0, 0, 0, 0))
+        draw=ImageDraw.Draw(img)
 
-        cx = cy = tsize // 2
+        cx=cy = tsize // 2
 
-        # Draw a simple arrow/chevron pointing "up" (north = 0°)
+        # Draw a simple arrow/chevron pointing "up" (north=0°)
         # Note the 4-pixel pad on the top and left.
         draw.polygon([(cx, pad),
                       (cx + size//2, pad + size),
@@ -1331,16 +1402,16 @@ class DroneViewer(tk.Tk):
                       (cx - size//2, pad + size)],
                     fill=self.prefs["color_danger"], outline=self.prefs["color_border"])
 
-        img = img.rotate(-heading, resample=Image.BICUBIC, expand=False)
+        img=img.rotate(-heading, resample=Image.BICUBIC, expand=False)
 
         return ImageTk.PhotoImage(img)
 
     def _make_home_icon(self) -> ImageTk.PhotoImage:
-        size = 20
-        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
+        size=20
+        img=Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw=ImageDraw.Draw(img)
 
-        cc = size // 2
+        cc=size // 2
 
         if self.prefs["font_marker"] == "":
             # Draw a simple house icon.
@@ -1356,7 +1427,7 @@ class DroneViewer(tk.Tk):
             draw.rectangle([(cc-4, cc), (cc+4, size)],
                            fill=self.prefs["color_border"])
         else:
-            font = ImageFont.truetype(self.prefs["font_marker"], size)
+            font=ImageFont.truetype(self.prefs["font_marker"], size)
             draw.ellipse([(0,0),(size,size)], fill=self.prefs["color_bg"],
                          outline=self.prefs["color_path"])
             draw.text((cc, cc), "H", font=font,
@@ -1370,27 +1441,27 @@ class DroneViewer(tk.Tk):
         Updates the position (and orientation) of the home and drone markers.
         '''
         # Home marker
-        home_lat = record.get("Home Lat (deg)", "")
-        home_lon = record.get("Home Lon (deg)", "")
+        home_lat=record.get("Home Lat (deg)", "")
+        home_lon=record.get("Home Lon (deg)", "")
         if is_valid_latlon(home_lat, home_lon):
             if self._home_marker is None:
-                self._home_marker = self.map_widget.set_marker(
+                self._home_marker=self.map_widget.set_marker(
                     home_lat, home_lon,
                     icon=self._make_home_icon(),
                 )
                 # Make sure the drone is drone on top of the home marker.
                 if self._drone_marker is not None:
                     self._drone_marker.delete()
-                    self._drone_marker = None
+                    self._drone_marker=None
             else:
                 self._home_marker.set_position(home_lat,home_lon)
 
-        lat = record["lat (deg)"]
-        lon = record["lon (deg)"]
-        heading = record["heading (deg)"]
+        lat=record["lat (deg)"]
+        lon=record["lon (deg)"]
+        heading=record["heading (deg)"]
 
         if self._drone_marker is None:
-            self._drone_marker = self.map_widget.set_marker(
+            self._drone_marker=self.map_widget.set_marker(
                 lat, lon,
                 icon=self._make_drone_icon(heading),
             )
@@ -1399,25 +1470,25 @@ class DroneViewer(tk.Tk):
             # Only recreate the drone icon if the heading has changed enough
             # to be noticable.
             if self._heading != round(heading,0):
-                self._heading = round(heading,0)
+                self._heading=round(heading,0)
                 self._drone_marker.change_icon(self._make_drone_icon(self._heading))
 
 
     @staticmethod
     def _deg_to_dms(deg:float) ->str:
-        m = (deg - math.floor(deg))*60
-        s = (m - math.floor(m))*60
-        deg = math.floor(deg)
-        m = math.floor(m)
-        s = round(s,1)
+        m=(deg - math.floor(deg))*60
+        s=(m - math.floor(m))*60
+        deg=math.floor(deg)
+        m=math.floor(m)
+        s=round(s,1)
         return f"{deg}:{m:02d}:{s:04.1f}"
 
     def _update_display(self, idx: int):
         if not self.records:
             return
-        idx = max(0, min(idx, len(self.records) - 1))
-        self.current_idx = idx
-        r = self.records[idx]
+        idx=max(0, min(idx, len(self.records) - 1))
+        self.current_idx=idx
+        r=self.records[idx]
 
         # Gauges
         self._gauge_speed.set_value(r.get("3d Derived Speed (m/s)", 0)*3.6)
@@ -1445,28 +1516,25 @@ class DroneViewer(tk.Tk):
 
         # Update Panel Items. PANEL_SKIP lists items that require special
         # handling.
-        PANEL_SKIP = { "Elapsed", "Lat", "Lon", "H Lat", "H Lon",
-                       "Speed", "Distance", "2d Dist", "3d Dist", "2d Speed",
-                      "3d Speed"}
         for field in PANEL_ITEMS:
             if field is None:
                 continue
             if field[0] is not None and field[0] not in PANEL_SKIP:
                 self.info.update_field(field[0], r.get(field[1], "—"))
 
-        elapsed_us = r.get("elapsed (us)", 0)
-        elapsed_s  = elapsed_us / 1_000_000
-        m, s       = divmod(int(elapsed_s), 60)
+        elapsed_us=r.get("elapsed (us)", 0)
+        elapsed_s =elapsed_us / 1_000_000
+        m, s      =divmod(int(elapsed_s), 60)
         self.info.update_field("Elapsed",     f"{m:02d}:{s:02d}")
 
-        lat = r.get("lat (deg)")
-        lon = r.get("lon (deg)")
+        lat=r.get("lat (deg)")
+        lon=r.get("lon (deg)")
         if is_valid_latlon(lat, lon):
             self.info.update_field("Lat",     self._deg_to_dms(lat))
             self.info.update_field("Lon",     self._deg_to_dms(lon))
 
-        lat = r.get("Home Lat (deg)")
-        lon = r.get("Home Lon (deg)")
+        lat=r.get("Home Lat (deg)")
+        lon=r.get("Home Lon (deg)")
         if is_valid_latlon(lat, lon):
             self.info.update_field("H Lat",    self._deg_to_dms(lat))
             self.info.update_field("H Lon",    self._deg_to_dms(lon))
@@ -1487,7 +1555,7 @@ class DroneViewer(tk.Tk):
         # Map marker
         self._update_markers(r)
 
-        self.pending_update = False
+        self.pending_update=False
 
     # ── Transport controls ────────────────────────────────────────────────
 
@@ -1501,8 +1569,8 @@ class DroneViewer(tk.Tk):
         if not self.records:
             return
         if self.current_idx >= len(self.records) - 1:
-            self.current_idx = 0
-        self.playing = True
+            self.current_idx=0
+        self.playing=True
         if PLATFORM_SYSTEM == "Darwin":
             self._btn_play.configure(text="⏸️", bg=self.prefs["color_warn"],
                                      fg=self.prefs["color_bg"])
@@ -1510,12 +1578,12 @@ class DroneViewer(tk.Tk):
             self._btn_play.configure(text="||", bg=self.prefs["color_warn"],
                                      fg=self.prefs["color_bg"])
         self._stop_event.clear()
-        self.playback_thread = threading.Thread(
+        self.playback_thread=threading.Thread(
             target=self._playback_loop, daemon=True)
         self.playback_thread.start()
 
     def _pause(self):
-        self.playing = False
+        self.playing=False
         self._stop_event.set()
         if PLATFORM_SYSTEM == "Darwin":
             self._btn_play.configure(text="▶️", bg=self.prefs["color_accent"],
@@ -1525,16 +1593,16 @@ class DroneViewer(tk.Tk):
                                      fg=self.prefs["color_bg"])
 
     # Playback speed multipliers
-    SPEEDS = [1, 2, 4, 8, 16]
-    INCREMENTS = [1, 1, 2, 2, 4]
+    SPEEDS=[1, 2, 4, 8, 16]
+    INCREMENTS=[1, 1, 2, 2, 4]
 
     def _playback_loop(self):
         """Background thread that advances frames at the selected rate."""
         while not self._stop_event.is_set():
             # To improve performance, we skip records when running at
             # higher playback speeds.
-            i_cur = self.current_idx
-            i_next = self.current_idx + self.INCREMENTS[self.speed_idx]
+            i_cur=self.current_idx
+            i_next=self.current_idx + self.INCREMENTS[self.speed_idx]
 
             if i_next >= self.records_len:
                 self.after(0, self._pause)
@@ -1542,14 +1610,14 @@ class DroneViewer(tk.Tk):
 
             # Calculate sleep based on elapsed time between records
             # divided by the playback multiplier.
-            r_cur  = self.records[i_cur]
-            r_next = self.records[i_next]
-            dt_us  = r_next.get("elapsed (us)", 0) - r_cur.get("elapsed (us)", 0)
-            dt_us  = dt_us / self.SPEEDS[self.speed_idx]
-            sleep  = max(0.01, dt_us / 1_000_000)
+            r_cur =self.records[i_cur]
+            r_next=self.records[i_next]
+            dt_us =r_next.get("elapsed (us)", 0) - r_cur.get("elapsed (us)", 0)
+            dt_us =dt_us / self.SPEEDS[self.speed_idx]
+            sleep =max(0.01, dt_us / 1_000_000)
 
             if not self.pending_update:
-                self.pending_update = True
+                self.pending_update=True
                 self.after(0, self._update_display, i_next)
 
             self._stop_event.wait(timeout=sleep)
@@ -1564,26 +1632,26 @@ class DroneViewer(tk.Tk):
         self._set_speed(self.speed_idx-1)
         self._speed_var.set(f"{self.SPEEDS[self.speed_idx]}×")
 
-    def speed_up(self):
+    def _speed_up(self):
         self._set_speed(self.speed_idx+1)
         self._speed_var.set(f"{self.SPEEDS[self.speed_idx]}×")
 
     def _on_slider(self, val):
-        idx = int(float(val))
+        idx=int(float(val))
         if idx != self.current_idx:
             self._update_display(idx)
 
     def _set_speed(self, idx: int):
-        self.speed_idx = max(0, min(len(self.SPEEDS)-1, idx))
+        self.speed_idx=max(0, min(len(self.SPEEDS)-1, idx))
 
     def _set_status(self, msg: str):
         self._status_var.set(msg)
 
 def main():
-    app = DroneViewer()
+    app=DroneViewer()
 
     if len(sys.argv) > 1:
-        path = sys.argv[1]
+        path=sys.argv[1]
         if os.path.exists(path):
             app.after(200, lambda: app.load_file(path))
 
