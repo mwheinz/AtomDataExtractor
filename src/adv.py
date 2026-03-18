@@ -20,7 +20,7 @@ from tkinter.colorchooser import askcolor
 import tkintermapview
 from PIL import Image, ImageDraw, ImageTk, ImageFont
 from adeversion import _version
-from atom2parser import atom2_parser, is_valid_latlon, BASIC_DATA
+from atom2parser import atom2_parser, is_valid_latlon, BASIC_DATA, VALIDATION_DATA
 import mwhlogging
 from mwhlogging import MWHLogger
 
@@ -127,9 +127,10 @@ PANEL_ITEMS=[
     ("H Lon", "Home Lon (deg)"),
 
     (None, "Distance"),
-    ("Dist m", "distance (m)"),
-    ("2d m", "2d Derived Distance (m)"),
-    ("3d m", "3d Derived Distance (m)"),
+    ("2d Distance m", "2d Derived Distance (m)"),
+    ("3d Distance m", "3d Derived Distance (m)"),
+    ("2d Travelled m", "2d Travelled Distance (m)"),
+    ("3d Travelled m", "3d Travelled Distance (m)"),
 
     (None, "Orientation"),
     ("Bank Deg", "bank (deg)"),
@@ -967,7 +968,9 @@ class InfoPanel(tk.LabelFrame):
 
     def update_field(self, name: str, value):
         if name in self._vars:
-            self._vars[name].set(str(value))
+            new = str(value)
+            if new != self._vars[name].get():
+                self._vars[name].set(new)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1363,11 +1366,11 @@ class DroneViewer(tk.Tk):
 
         if my_logger.level <= mwhlogging.INFO:
             my_logger.info("Field                              Min              Max")
-            for field_name in BASIC_DATA:
+            for field_name in BASIC_DATA + VALIDATION_DATA:
                 field_range = [r[field_name] for r in self.records if r.get(field_name) != ""]
                 field_max = max(field_range)
                 field_min = min(field_range)
-                if isinstance(field_min, str):
+                if not isinstance(field_min, (int, float)):
                     continue
                 if isinstance(field_min, float):
                     field_min = round(field_min,3)
@@ -1478,8 +1481,9 @@ class DroneViewer(tk.Tk):
             self._drone_marker.set_position(lat,lon)
             # Only recreate the drone icon if the heading has changed enough
             # to be noticable.
-            if self._heading != round(heading,0):
-                self._heading=round(heading,0)
+            h = round(heading,0)
+            if self._heading == None or self._heading//2!=h//2:
+                self._heading=h
                 self._drone_marker.change_icon(self._make_drone_icon(self._heading))
 
 
@@ -1603,23 +1607,19 @@ class DroneViewer(tk.Tk):
 
     # Playback speed multipliers
     SPEEDS=[1, 2, 4, 8, 16]
-    INCREMENTS=[1, 1, 2, 2, 4]
+    # To improve performance, we skip records when running at higher
+    # playback speeds.
+    INCREMENTS=[1, 1, 2, 4, 8]
 
     def _playback_loop(self):
         """Background thread that advances frames at the selected rate."""
         while not self._stop_event.is_set():
-            # To improve performance, we skip records when running at
-            # higher playback speeds.
-            i_cur=self.current_idx
-            i_next=self.current_idx + self.INCREMENTS[self.speed_idx]
 
-            if i_next >= self.records_len:
-                self.after(0, self._pause)
-                break
+            i_next=self.current_idx + self.INCREMENTS[self.speed_idx]
 
             # Calculate sleep based on elapsed time between records
             # divided by the playback multiplier.
-            r_cur =self.records[i_cur]
+            r_cur =self.records[self.current_idx]
             r_next=self.records[i_next]
             dt_us =r_next.get("elapsed (us)", 0) - r_cur.get("elapsed (us)", 0)
             dt_us =dt_us / self.SPEEDS[self.speed_idx]
@@ -1627,9 +1627,16 @@ class DroneViewer(tk.Tk):
 
             if not self.pending_update:
                 self.pending_update=True
+                self.current_idx = i_next
                 self.after(0, self._update_display, i_next)
-
+            
             self._stop_event.wait(timeout=sleep)
+
+            if i_next >= self.records_len:
+                self.after(0, self._pause)
+                break
+
+            
 
     def _step_back(self):
         self._update_display(self.current_idx - 100)
