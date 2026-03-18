@@ -36,7 +36,6 @@ BASIC_DATA = [
     "Home Lat (deg)",
     "Home Lon (deg)",
 
-    "speed (m/s)",
     "Wind Speed (m/s)",
     "Wind (deg)",
     "Thrust",
@@ -93,6 +92,8 @@ VALIDATION_DATA = [
     "Battery (mv)", # Total battery voltage.
     "2d Derived Distance (m)", # 2d distance, derived from position and altitude.
     "3d Derived Distance (m)", # 3d distance, derived from position and altitude.
+    "2d Travelled Distance (m)", # 2d distance, derived from position and altitude.
+    "3d Travelled Distance (m)", # 3d distance, derived from position and altitude.
     "2d Derived Speed (m/s)", # derived from delta X and delta Y.
     "3d Derived Speed (m/s)", # derived from delta X, Y, Z.
     "Date/Time", # derived from elapsed.
@@ -311,7 +312,6 @@ ATOM2_FIELDS = [
     FLFD("delta Y (m/s)", "<f", 312, 4, FLFD.round3),
     FLFD("delta X (m/s)", "<f", 316, 4, FLFD.round3),
     FLFD("delta Z (m/s)", "<f", 332, 4, FLFD.round3),
-    FLFD("speed (m/s)", "<f", 392,4, FLFD.round3),
     FLFD("Wind Speed (m/s)", "<f", 404, 4, FLFD.round3),
     FLFD("Wind (deg)", "<f", 408, 4, FLFD.radian_heading_to_degrees),
     FLFD("Thrust", "<f", 412, 4, FLFD.round3),
@@ -371,7 +371,7 @@ def is_valid_latlon(lat, lon) -> bool:
         return False
     return True
 
-def _add_derived_fields(record):
+def _add_derived_fields(record, prev):
     """
     Adds calculated fields or modifies existing fields based on
     other information.
@@ -394,15 +394,31 @@ def _add_derived_fields(record):
 
     record["Battery (mv)"] = record["Battery V1 (mv)"] + \
         record["Battery V2 (mv)"]
+
     record["2d Derived Distance (m)"] = round(math.sqrt(
             record["Position X (m)"]**2 +
-            record["Position Y (m)"]**2
-        ), 3)
+            record["Position Y (m)"]**2),3)
     record["3d Derived Distance (m)"] = round(math.sqrt(
             record["Position X (m)"]**2 +
             record["Position Y (m)"]**2 +
-            record["alt (m)"]**2
-        ), 3)
+            record["alt (m)"]**2),3)
+
+    if record["2d Derived Distance (m)"] > record["3d Derived Distance (m)"]:
+        print("2d > 3d!")
+
+    if prev is None:
+        record["3d Travelled Distance (m)"] = 0.0
+        record["2d Travelled Distance (m)"] = 0.0
+    else:
+        dX2 = (record["Position X (m)"] - prev["Position X (m)"])**2
+        dY2 = (record["Position Y (m)"] - prev["Position Y (m)"])**2
+        dZ2 = (record["alt (m)"] - prev["alt (m)"])**2
+        record["2d Travelled Distance (m)"] = round(
+            prev["2d Travelled Distance (m)"] +
+            math.sqrt(dX2 + dY2),3)
+        record["3d Travelled Distance (m)"] = round(
+            prev["3d Travelled Distance (m)"] +
+            math.sqrt(dX2 + dY2 + dZ2),3)
 
     record["2d Derived Speed (m/s)"] = round(math.sqrt(
             record["delta X (m/s)"]**2 +
@@ -413,6 +429,7 @@ def _add_derived_fields(record):
             record["delta Y (m/s)"]**2 +
             record["delta Z (m/s)"]**2
         ), 3)
+
     record["Date/Time"] = datetime.datetime.utcfromtimestamp(record["utc (ms)"]/1000)
 
 def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Logger = None) -> list[dict]:
@@ -450,6 +467,7 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
 
         elapsed = 0
         records = []
+        prev_record = None
 
         while True:
             record_count += 1
@@ -519,9 +537,10 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
                 error_count += 1
                 continue
 
-            _add_derived_fields(record)
+            _add_derived_fields(record, prev_record)
 
             records.append(record)
+            prev_record = record
 
     logger.info(
         "%s valid records and %s invalid record(s) in %s.",
