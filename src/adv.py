@@ -713,45 +713,40 @@ class StickDisplay(tk.Canvas):
         self.prefs =prefs
         self.label =label
         self.size  =size
+        self.pad   =2
+        self.inner =size - 2 * self.pad
         self.x_val =1024.0   # 0..2048
         self.y_val =1024.0
+        self.mid   =size / 2
         self._draw_static()
         self._draw()
 
     def _draw_static(self):
-        s=self.size
-        pad=2
-        inner=s - 2 * pad
-
         self.delete("all")
 
         # Box
-        self.create_rectangle(pad, pad, s - pad, s - pad,
-                               outline=self.prefs["color_border"],
-                               fill=self.prefs["color_gauge_bg"])
-        #self.create_oval(pad, pad, s - pad, s - pad,
-        #                 outline=self.prefs["color_border"],
-        #                 fill=self.prefs["color_gauge_bg"])
+        self.create_rectangle(self.pad, self.pad, self.size - self.pad,
+                              self.size - self.pad,
+                              outline=self.prefs["color_border"],
+                              fill=self.prefs["color_gauge_bg"])
 
         # Centre cross
-        mid=s / 2
-        self.create_line(pad, mid, s - pad, mid, fill=self.prefs["color_border"], dash=(2, 3))
-        self.create_line(mid, pad, mid, s - pad, fill=self.prefs["color_border"], dash=(2, 3))
+        self.create_line(self.pad, self.mid, self.size - self.pad, self.mid,
+                         fill=self.prefs["color_border"], dash=(2, 3))
+        self.create_line(self.mid, self.pad, self.mid, self.size - self.pad,
+                         fill=self.prefs["color_border"], dash=(2, 3))
 
         # Label
-        self.create_text(mid, s - 5, text=self.label,
+        self.create_text(self.mid, self.size - 5, text=self.label,
                          fill=self.prefs["color_label"], font=self.prefs["font_small"])
 
     def _draw(self):
-        s=self.size
-        pad=2
-        inner=s - 2 * pad
 
         self.delete("dynamic")
 
         # Dot position
-        nx=pad + (self.x_val / 2048.0) * inner
-        ny=pad + (1.0 - self.y_val / 2048.0) * inner  # invert Y
+        nx=self.pad + (self.x_val / 2048.0) * self.inner
+        ny=self.pad + (1.0 - self.y_val / 2048.0) * self.inner  # invert Y
 
         # Glow circle
         gr=12
@@ -1007,6 +1002,7 @@ class DroneViewer(tk.Tk):
         # Map markers / path
         self._path_line         =None
         self._drone_marker      =None
+        self._drone_cache       ={}
         self._home_marker       =None
         self._played_path       =[]         # coords shown so far
         self._heading           =None
@@ -1470,21 +1466,19 @@ class DroneViewer(tk.Tk):
 
         lat=record["lat (deg)"]
         lon=record["lon (deg)"]
-        heading=record["heading (deg)"]
+        heading=int(record["heading (deg)"])
+
+        if heading not in self._drone_cache:
+            self._drone_cache[heading]=self._make_drone_icon(heading)
 
         if self._drone_marker is None:
             self._drone_marker=self.map_widget.set_marker(
                 lat, lon,
-                icon=self._make_drone_icon(heading),
+                icon=self._drone_cache[heading],
             )
         else:
             self._drone_marker.set_position(lat,lon)
-            # Only recreate the drone icon if the heading has changed enough
-            # to be noticable.
-            h = round(heading,0)
-            if self._heading == None or self._heading//2!=h//2:
-                self._heading=h
-                self._drone_marker.change_icon(self._make_drone_icon(self._heading))
+            self._drone_marker.change_icon(self._drone_cache[heading])
 
 
     @staticmethod
@@ -1616,6 +1610,9 @@ class DroneViewer(tk.Tk):
         while not self._stop_event.is_set():
 
             i_next=self.current_idx + self.INCREMENTS[self.speed_idx]
+            if i_next >= self.records_len:
+                self.after(0, self._pause)
+                break
 
             # Calculate sleep based on elapsed time between records
             # divided by the playback multiplier.
@@ -1629,14 +1626,10 @@ class DroneViewer(tk.Tk):
                 self.pending_update=True
                 self.current_idx = i_next
                 self.after(0, self._update_display, i_next)
-            
+
             self._stop_event.wait(timeout=sleep)
 
-            if i_next >= self.records_len:
-                self.after(0, self._pause)
-                break
 
-            
 
     def _step_back(self):
         self._update_display(self.current_idx - 100)
