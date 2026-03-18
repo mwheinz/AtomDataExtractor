@@ -196,7 +196,7 @@ Fields are all little-endian.
 | 75 | 2 | short | GPS HDOP * 100 | 50% |
 | 304 | 4 | float | How far east or west the drone is from the home point in meters. | ✓ |
 | 308 | 4 | float | How far north or south the drone is from the home point in meters. | ✓ |
-| 328 | 4 | float | Altitude above ground, in meters. Take the absolute value before using... | ✓ |
+| 328 | 4 | float | Altitude above the home point, in meters. Take the absolute value before using... | ✓ |
 | 368 | 4 | float | Roll in radians. | ✓ | 
 | 372 | 4 | float | Pitch in radians. | ✓ | 
 | 376 | 4 | float | Compass heading in radians. (yaw) | ✓ |
@@ -207,7 +207,7 @@ Fields are all little-endian.
 ###  Velocity
 | Byte: | Length: | Format: | Description: | Correct: |
 |-------|---------|---------|--------------|----------|
-| 392 | 4 | float | Ground speed? Doesn't exactly match a calculated 2D or 3D speed from dX, dY, dZ. | | 
+| 392 | 4 | float | Corrolates with speed but is much lower than the calculated 2D or 3D speed from dX, dY, dZ. | 25% | 
 | 404 | 4 | float | Estimate of wind speed? | 75% |
 | 408 | 4 | float | Wind direction in radians. | ✓ |
 | 412 | 4 | float | Related to total thrust? Goes non-zero during launch, drops to zero when all 4 motors are idle.| 75% |
