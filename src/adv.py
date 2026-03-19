@@ -608,8 +608,10 @@ class CompassGauge(tk.Canvas):
                          tags="dynamic")
 
     def set_value(self, heading: float):
-        self.heading=heading % 360
-        self._draw()
+        h = heading % 360
+        if self.heading != h:
+            self.heading = h
+            self._draw()
 
 
 class ArcGauge(tk.Canvas):
@@ -696,8 +698,9 @@ class ArcGauge(tk.Canvas):
                          tags="dynamic", outline="")
 
     def set_value(self, value: float):
-        self.value=value
-        self._draw()
+        if value != self.value:
+            self.value=value
+            self._draw()
 
 
 class StickDisplay(tk.Canvas):
@@ -756,9 +759,10 @@ class StickDisplay(tk.Canvas):
                          fill=self.prefs["color_accent"], outline="")
 
     def set_values(self, x_val: float, y_val: float):
-        self.x_val=x_val
-        self.y_val=y_val
-        self._draw()
+        if x_val != self.x_val or self.y_val != y_val:
+            self.x_val=x_val
+            self.y_val=y_val
+            self._draw()
 
 
 class BarGauge(tk.Canvas):
@@ -791,7 +795,6 @@ class BarGauge(tk.Canvas):
         pad_x=8
         bar_top=18
         bar_bot=h - 24
-        bar_h  =bar_bot - bar_top
 
         self.delete("all")
 
@@ -1002,6 +1005,7 @@ class DroneViewer(tk.Tk):
         # Map markers / path
         self._path_line         =None
         self._drone_marker      =None
+        self._drone_heading     =-1
         self._drone_cache       ={}
         self._home_marker       =None
         self._played_path       =[]         # coords shown so far
@@ -1347,12 +1351,10 @@ class DroneViewer(tk.Tk):
         self._gauge_dist.max_val=self.prefs["max_dist"]
 
         # Get the initial bounding box for the map.
-        field_range=[r["lat (deg)"] for r in self.records if r.get("lat (deg)") != ""]
-        self.min_lat=min(field_range)
-        self.max_lat=max(field_range)
-        field_range=[r["lon (deg)"] for r in self.records if r.get("lon (deg)") != ""]
-        self.min_lon=min(field_range)
-        self.max_lon=max(field_range)
+        field_range=[r[0] for r in self.coords]
+        self.min_lat, self.max_lat=min(field_range),max(field_range)
+        field_range=[r[1] for r in self.coords]
+        self.min_lon, self.max_lon=min(field_range),max(field_range)
 
         # Centre map on first point, scale the map to fit the entire path.
         my_logger.debug("Map bounding box: %s, %s",
@@ -1361,7 +1363,7 @@ class DroneViewer(tk.Tk):
                                          (self.min_lat, self.max_lon))
 
         if my_logger.level <= mwhlogging.INFO:
-            my_logger.info("Field                              Min              Max")
+            my_logger.info("Field                                     Min              Max")
             for field_name in BASIC_DATA + VALIDATION_DATA:
                 field_range = [r[field_name] for r in self.records if r.get(field_name) != ""]
                 field_max = max(field_range)
@@ -1371,7 +1373,7 @@ class DroneViewer(tk.Tk):
                 if isinstance(field_min, float):
                     field_min = round(field_min,3)
                     field_max = round(field_max,3)
-                my_logger.info(f"{field_name:18s}: {field_min:17} {field_max:17}")
+                my_logger.info(f"{field_name:25s}: {field_min:17} {field_max:17}")
         self._file_label.configure(text=os.path.basename(path))
         self._set_status(f"Loaded {len(records)} GPS records.")
         self._update_display(0)
@@ -1476,9 +1478,12 @@ class DroneViewer(tk.Tk):
                 lat, lon,
                 icon=self._drone_cache[heading],
             )
+            self._drone_heading=heading
         else:
             self._drone_marker.set_position(lat,lon)
-            self._drone_marker.change_icon(self._drone_cache[heading])
+            if heading != self._drone_heading:
+                self._drone_heading=heading
+                self._drone_marker.change_icon(self._drone_cache[heading])
 
 
     @staticmethod
