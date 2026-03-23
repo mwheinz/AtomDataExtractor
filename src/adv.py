@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 -O
+#!/usr/bin/env -S python3 -OO
 """
 Atom 2 Flight Log Visualizer
 Displays drone flight path, telemetry gauges, and RC stick positions
