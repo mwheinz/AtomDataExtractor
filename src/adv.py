@@ -623,7 +623,7 @@ class ArcGauge(tk.Canvas):
     def __init__(self, parent, prefs:dict, label=None, min_val=0, max_val=0,
                  unit="", warn_pct=0.5, danger_pct=0.95,
                  size=110, **kw):
-        super().__init__(parent, width=size, height=int(size * 0.75),
+        super().__init__(parent, width=size, height=int(size * 0.6),
                          bg=prefs["color_bg"], highlightthickness=0, **kw)
         my_logger.debug("Creating Gauge %s", label)
         self.prefs    =prefs
@@ -640,7 +640,7 @@ class ArcGauge(tk.Canvas):
 
     def _draw_static(self):
         s=self.size
-        h=int(s * 0.75)
+        h=int(s * 0.6)
         cx=s / 2
         cy=h * 0.88
         r =s * 0.42
@@ -659,7 +659,7 @@ class ArcGauge(tk.Canvas):
 
     def _draw(self):
         s=self.size
-        h=int(s * 0.75)
+        h=int(s * 0.6)
         cx=s / 2
         cy=h * 0.88
         r =s * 0.42
