@@ -129,8 +129,8 @@ PANEL_ITEMS=[
     (None, "Distance"),
     ("2d Dist. m", "2d Derived Distance (m)"),
     ("3d Dist. m", "3d Derived Distance (m)"),
-    ("2d TDist. m", "2d Travelled Distance (m)"),
-    ("3d TDist. m", "3d Travelled Distance (m)"),
+    ("2d T Dist. m", "2d Travelled Distance (m)"),
+    ("3d T Dist. m", "3d Travelled Distance (m)"),
 
     (None, "Orientation"),
     ("Bank Deg", "bank (deg)"),
@@ -1452,13 +1452,11 @@ class DroneViewer(tk.Tk):
 
         return ImageTk.PhotoImage(img)
 
-    def _update_markers(self, record: dict):
+    def _update_markers(self, heading, lat, lon, home_lat, home_lon):
         '''
         Updates the position (and orientation) of the home and drone markers.
         '''
         # Home marker
-        home_lat=record.get("Home Lat (deg)", "")
-        home_lon=record.get("Home Lon (deg)", "")
         if is_valid_latlon(home_lat, home_lon):
             if self._home_marker is None:
                 self._home_marker=self.map_widget.set_marker(
@@ -1471,10 +1469,6 @@ class DroneViewer(tk.Tk):
                     self._drone_marker=None
             else:
                 self._home_marker.set_position(home_lat,home_lon)
-
-        lat=record["lat (deg)"]
-        lon=record["lon (deg)"]
-        heading=int(record["heading (deg)"])
 
         if heading not in self._drone_cache:
             self._drone_cache[heading]=self._make_drone_icon(heading)
@@ -1502,18 +1496,18 @@ class DroneViewer(tk.Tk):
         return f"{deg}:{m:02d}:{s:04.1f}"
 
     def _update_display(self, idx: int):
-        if not self.records:
-            return
         idx=max(0, min(idx, len(self.records) - 1))
         self.current_idx=idx
         r=self.records[idx]
 
-        # Gauges
+        # Gauges - Note that we count on set_value to avoid unnneeded
+        # updates.
         self._gauge_speed.set_value(r.get("3d Derived Speed (m/s)", 0)*3.6)
         #self._gauge_speed.set_value(r.get("speed (m/s)", 0)*3.6)
         self._gauge_alt.set_value(r.get("alt (m)", 0))
         self._gauge_dist.set_value(r.get("distance (m)", 0))
-        self._gauge_compass.set_value(r.get("heading (deg)", 0))
+        heading = r.get("heading (deg)", 0)
+        self._gauge_compass.set_value(heading)
         self._gauge_wind.set_value(r.get("Wind (deg)", 0))
 
         self._bar_battery.set_value(r.get("Battery Level (%)", 0))
@@ -1532,13 +1526,15 @@ class DroneViewer(tk.Tk):
             r.get("rc elevator", 1024)
         )
 
-        # Update Panel Items. This turned out to be surprisingly
-        # expensive..
+        # Update panel items. This turned out to be surprisingly
+        # expensive, so we use an invariant list of items to update and we
+        # count on update_field to only change fields that have changed.
         for field in self.PANEL_UPDATE_ITEMS:
             if field is None:
                 continue
             self.info.update_field(field[0], r.get(field[1], "—"))
 
+        # Handle panel items that have special formatting.
         elapsed_us=r.get("elapsed (us)", 0)
         elapsed_s =elapsed_us / 1_000_000
         m, s      =divmod(int(elapsed_s), 60)
@@ -1550,27 +1546,21 @@ class DroneViewer(tk.Tk):
             self.info.update_field("Lat",     self._deg_to_dms(lat))
             self.info.update_field("Lon",     self._deg_to_dms(lon))
 
-        lat=r.get("Home Lat (deg)")
-        lon=r.get("Home Lon (deg)")
-        if is_valid_latlon(lat, lon):
-            self.info.update_field("H Lat",    self._deg_to_dms(lat))
-            self.info.update_field("H Lon",    self._deg_to_dms(lon))
+        hlat=r.get("Home Lat (deg)")
+        hlon=r.get("Home Lon (deg)")
+        if is_valid_latlon(hlat, hlon):
+            self.info.update_field("H Lat",    self._deg_to_dms(hlat))
+            self.info.update_field("H Lon",    self._deg_to_dms(hlon))
         else:
             self.info.update_field("H Lat","—")
             self.info.update_field("H Lon","—")
-
-        self.info.update_field("Distance",    r.get("distance (m)"))
-        self.info.update_field("2d Dist",     round(r.get("2d Derived Distance (m)"),3))
-        self.info.update_field("3d Dist",     round(r.get("3d Derived Distance (m)"),3))
-        self.info.update_field("2d Speed",    round(r.get("2d Derived Speed (m/s)"),3))
-        self.info.update_field("3d Speed",    round(r.get("3d Derived Speed (m/s)"),3))
 
         # Slider
         self._slider_var.set(idx)
         self._progress_var.set(f"{idx + 1} / {len(self.records)}")
 
         # Map marker
-        self._update_markers(r)
+        self._update_markers(heading, lat, lon, hlat, hlon)
 
         self.pending_update=False
 
