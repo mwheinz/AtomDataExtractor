@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 -O
 """
 Atom 2 Flight Log Visualizer
 Displays drone flight path, telemetry gauges, and RC stick positions
@@ -127,10 +127,10 @@ PANEL_ITEMS=[
     ("H Lon", "Home Lon (deg)"),
 
     (None, "Distance"),
-    ("2d Distance m", "2d Derived Distance (m)"),
-    ("3d Distance m", "3d Derived Distance (m)"),
-    ("2d Travelled m", "2d Travelled Distance (m)"),
-    ("3d Travelled m", "3d Travelled Distance (m)"),
+    ("2d Dist. m", "2d Derived Distance (m)"),
+    ("3d Dist. m", "3d Derived Distance (m)"),
+    ("2d TDist. m", "2d Travelled Distance (m)"),
+    ("3d TDist. m", "3d Travelled Distance (m)"),
 
     (None, "Orientation"),
     ("Bank Deg", "bank (deg)"),
@@ -138,7 +138,6 @@ PANEL_ITEMS=[
     ("Heading Deg", "heading (deg)"),
 
     (None, "Speed"),
-    #("m/s","speed (m/s)"),
     ("2d m/s", "2d Derived Speed (m/s)"),
     ("3d m/s", "3d Derived Speed (m/s)"),
 
@@ -155,7 +154,6 @@ PANEL_ITEMS=[
     ("3 RPM", "Motor 3 RPM"),
     ("4 State", "Motor 4 State"),
     ("4 RPM", "Motor 4 RPM"),
-    ("Thrust", "Thrust"),
 
     (None, "Controls"),
     ("Up/Down", "rc elevator"),
@@ -163,21 +161,22 @@ PANEL_ITEMS=[
     ("Throttle", "rc throttle"),
     ("Bank", "rc aileron"),
 
-    (None, "IMU"),
-    ("X m/s2", "Accelerometer X (m/s2)"),
-    ("Y m/s2", "Accelerometer Y (m/s2)"),
-    ("Z m/s2", "Accelerometer Z (m/s2)"),
-    (None),
-    ("Gyr X d/s", "Gyroscope X (deg/s)"),
-    ("Gyr Y d/s", "Gyroscope Y (deg/s)"),
-    ("Gyr Z d/s", "Gyroscope Z (deg/s)"),
-    ("Air pres", "Air Pressure (pascals)"),
-    ("Mag X", "Magnetometer X"),
-    ("Mag Y", "Magnetometer Y"),
+    #Disabling these for performance reasons.
+    #(None, "IMU"),
+    #("X m/s2", "Accelerometer X (m/s2)"),
+    #("Y m/s2", "Accelerometer Y (m/s2)"),
+    #("Z m/s2", "Accelerometer Z (m/s2)"),
+    #(None),
+    #("Gyr X d/s", "Gyroscope X (deg/s)"),
+    #("Gyr Y d/s", "Gyroscope Y (deg/s)"),
+    #("Gyr Z d/s", "Gyroscope Z (deg/s)"),
+    #("Air pres", "Air Pressure (pascals)"),
+    #("Mag X", "Magnetometer X"),
+    #("Mag Y", "Magnetometer Y"),
 ]
 
 PANEL_SKIP={ "Elapsed", "Lat", "Lon", "H Lat", "H Lon",
-                "Speed", "Distance", "2d Dist", "3d Dist", "2d Speed",
+                "Distance", "2d Dist", "3d Dist", "2d Speed",
                 "3d Speed"}
 
 PREFS_FILE=Path.home() / ".atom_data_viewer.json"
@@ -1014,6 +1013,13 @@ class DroneViewer(tk.Tk):
         self._build_ui()
         self._apply_styles()
 
+        # Make a loop-invariant list of info fields to update.
+        self.PANEL_UPDATE_ITEMS = [
+            (label, key) for (label, key) in
+            (f for f in PANEL_ITEMS if f is not None and f[0] is not None)
+            if label not in PANEL_SKIP
+        ]
+
     # ── UI construction ───────────────────────────────────────────────────
     def _show_prefs(self):
         if self.playing:
@@ -1526,13 +1532,12 @@ class DroneViewer(tk.Tk):
             r.get("rc elevator", 1024)
         )
 
-        # Update Panel Items. PANEL_SKIP lists items that require special
-        # handling.
-        for field in PANEL_ITEMS:
+        # Update Panel Items. This turned out to be surprisingly
+        # expensive..
+        for field in self.PANEL_UPDATE_ITEMS:
             if field is None:
                 continue
-            if field[0] is not None and field[0] not in PANEL_SKIP:
-                self.info.update_field(field[0], r.get(field[1], "—"))
+            self.info.update_field(field[0], r.get(field[1], "—"))
 
         elapsed_us=r.get("elapsed (us)", 0)
         elapsed_s =elapsed_us / 1_000_000
@@ -1553,7 +1558,7 @@ class DroneViewer(tk.Tk):
         else:
             self.info.update_field("H Lat","—")
             self.info.update_field("H Lon","—")
-        self.info.update_field("Speed",       r.get("speed (m/s)"))
+
         self.info.update_field("Distance",    r.get("distance (m)"))
         self.info.update_field("2d Dist",     round(r.get("2d Derived Distance (m)"),3))
         self.info.update_field("3d Dist",     round(r.get("3d Derived Distance (m)"),3))
@@ -1605,16 +1610,16 @@ class DroneViewer(tk.Tk):
                                      fg=self.prefs["color_bg"])
 
     # Playback speed multipliers
-    SPEEDS=[1, 2, 4, 8, 16]
+    PLAYBACK_SPEED=[1, 2, 4, 8, 16]
     # To improve performance, we skip records when running at higher
     # playback speeds.
-    INCREMENTS=[1, 1, 2, 4, 8]
+    PLAYBACK_INCREMENT=[1, 1, 2, 4, 8]
 
     def _playback_loop(self):
         """Background thread that advances frames at the selected rate."""
         while not self._stop_event.is_set():
 
-            i_next=self.current_idx + self.INCREMENTS[self.speed_idx]
+            i_next=self.current_idx + self.PLAYBACK_INCREMENT[self.speed_idx]
             if i_next >= self.records_len:
                 self.after(0, self._pause)
                 break
@@ -1624,7 +1629,7 @@ class DroneViewer(tk.Tk):
             r_cur =self.records[self.current_idx]
             r_next=self.records[i_next]
             dt_us =r_next.get("elapsed (us)", 0) - r_cur.get("elapsed (us)", 0)
-            dt_us =dt_us / self.SPEEDS[self.speed_idx]
+            dt_us =dt_us / self.PLAYBACK_SPEED[self.speed_idx]
             sleep =max(0.01, dt_us / 1_000_000)
 
             if not self.pending_update:
@@ -1644,11 +1649,11 @@ class DroneViewer(tk.Tk):
 
     def _slow_down(self):
         self._set_speed(self.speed_idx-1)
-        self._speed_var.set(f"{self.SPEEDS[self.speed_idx]}×")
+        self._speed_var.set(f"{self.PLAYBACK_SPEED[self.speed_idx]}×")
 
     def _speed_up(self):
         self._set_speed(self.speed_idx+1)
-        self._speed_var.set(f"{self.SPEEDS[self.speed_idx]}×")
+        self._speed_var.set(f"{self.PLAYBACK_SPEED[self.speed_idx]}×")
 
     def _on_slider(self, val):
         idx=int(float(val))
@@ -1656,7 +1661,7 @@ class DroneViewer(tk.Tk):
             self._update_display(idx)
 
     def _set_speed(self, idx: int):
-        self.speed_idx=max(0, min(len(self.SPEEDS)-1, idx))
+        self.speed_idx=max(0, min(len(self.PLAYBACK_SPEED)-1, idx))
 
     def _set_status(self, msg: str):
         self._status_var.set(msg)
