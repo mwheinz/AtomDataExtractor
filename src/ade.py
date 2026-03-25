@@ -167,9 +167,12 @@ class AtomConverterApp(tk.Tk):
 
     def _apply_styles(self):
         style=ttk.Style(self)
+
         # Use a native-looking theme on each platform
         available=style.theme_names()
-        for preferred in ("aqua", "vista", "clam", "alt", "default"):
+        # For some reason, "clam" messes up the radio buttons, so prefer "alt"
+        # over "clam".
+        for preferred in ("aqua", "vista", "alt", "clam", "default"):
             if preferred in available:
                 style.theme_use(preferred)
                 break
@@ -273,7 +276,7 @@ class AtomConverterApp(tk.Tk):
             variable=self.validation_var,
         ).grid(row=3, column=0, columnspan=3, sticky="w")
 
-        ttk.Label(frame, text="Log: level").grid(
+        ttk.Label(frame, text="Log Level:").grid(
             row=4, column=0, sticky="w", pady=(10,0))
         log_level_frame = ttk.Frame(frame)
         log_level_frame.grid(row=4, column=1, columnspan=2, sticky="w", pady=(10, 0))

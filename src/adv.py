@@ -1298,7 +1298,9 @@ class DroneViewer(tk.Tk):
         style=ttk.Style(self)
         # Use a native-looking theme on each platform
         available=style.theme_names()
-        for preferred in ("aqua", "vista", "clam", "alt", "default"):
+        # For some reason, "clam" sometimes messes up the radio buttons in
+        # Ubuntu, so prefer "alt" over "clam".
+        for preferred in ("aqua", "vista", "alt", "clam", "default"):
             if preferred in available:
                 style.theme_use(preferred)
                 break
