@@ -109,7 +109,7 @@ def safe_atom2_parser(file_name: str, extended: bool, validation: bool,
     buf = io.StringIO()
     logger.configure_logging(file_handle = buf)
 
-    records = atom2_parser(file_name, logger)
+    records = atom2_parser(file_name=file_name, logger=logger)
     write_csv(file_name, records,
         extended=extended,
         validation=validation,
