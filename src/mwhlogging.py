@@ -51,6 +51,7 @@ class MWHLogger(logging.Logger):
         stream = sys.stderr
         self.handler = logging.StreamHandler(stream)
         self.handler.setFormatter(MWHFormatter(use_color=stream.isatty()))
+        self.file_handler = None
 
         self.addHandler(self.handler)
         self.setLevel(INFO)
@@ -65,12 +66,16 @@ class MWHLogger(logging.Logger):
         log file, and/or a file_handle.
         """
         if file_handle:
+            if self.file_handler is not None:
+                self.removeHandler(self.file_handler)
+
             self.file_handle = file_handle
 
             h = logging.StreamHandler(file_handle)
             h.setFormatter(MWHFormatter(use_color=False))
             h.setLevel(self.level)
             self.addHandler(h)
+            self.file_handler = h
 
         elif log_file:
             h = RotatingFileHandler(log_file, maxBytes=2_000_000,
@@ -91,7 +96,7 @@ class MWHLogger(logging.Logger):
 
     def print(self, msg):
         """
-        This was added so that adv could report the name of the output file.
+        This was added so that ade could report the name of the output file.
         """
         if self.file_handle is not None:
             print(msg, file=self.file_handle)
