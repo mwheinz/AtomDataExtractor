@@ -30,7 +30,7 @@ from mwhlogging import MWHLogger
 #
 # We will load the buffer into a dialog box on request.
 # ─────────────────────────────────────────────────────────────────────────────
-my_logger=MWHLogger("atom_data_viewer")
+my_logger=MWHLogger("adv")
 my_logger.setLevel(mwhlogging.DEBUG)
 my_logging_buf=StringIO()
 my_logger.configure_logging(file_handle=my_logging_buf)
@@ -177,8 +177,8 @@ PANEL_ITEMS=[
 ]
 
 PANEL_SKIP={ "Elapsed", "Lat", "Lon", "H Lat", "H Lon",
-                "Distance", "2d Dist", "3d Dist", "2d Speed",
-                "3d Speed"}
+             "Distance", "2d Dist", "3d Dist", "2d Speed",
+             "3d Speed"}
 
 PREFS_FILE=Path.home() / ".atom_data_viewer.json"
 
@@ -188,6 +188,7 @@ DEFAULT_PREFS={
     # ─────────────────────────────────────────────────────────────────────────
     "window_geometry": "1200x800",
     "log_level"      : "Debug",
+    "input_dir"      : str(Path.home()),
 
     # ─────────────────────────────────────────────────────────────────────────
     # Gauge Limits
@@ -215,10 +216,10 @@ DEFAULT_PREFS={
     # ─────────────────────────────────────────────────────────────────────────
     # Font palette. May be overridden by the platform type.
     # ─────────────────────────────────────────────────────────────────────────
-    "font_label"     : ("Helvetica", 10),
-    "font_title"     : ("Times", 13, "bold"),
+    "font_label"     : ["TkDefaultFont", 10],
+    "font_title"     : ["TkDefaultFont", 13, "bold"],
     "font_marker"    : "",
-    "font_small"     : ("Helvetica", 8),
+    "font_small"     : ["TkDefaultFont", 8],
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -226,20 +227,15 @@ DEFAULT_PREFS={
 # ─────────────────────────────────────────────────────────────────────────────
 PLATFORM_SYSTEM=platform.system()
 if PLATFORM_SYSTEM == "Linux":
-    DEFAULT_PREFS["font_label"] =("Liberation", 10)
-    DEFAULT_PREFS["font_title"] =("Times", 13, "bold")
+    DEFAULT_PREFS["font_label"] =["Liberation", 10]
+    DEFAULT_PREFS["font_title"] =["Times", 13, "bold"]
     DEFAULT_PREFS["font_marker"]=""
-    DEFAULT_PREFS["font_small"] =("Liberation", 8)
+    DEFAULT_PREFS["font_small"] =["Liberation", 8]
 elif PLATFORM_SYSTEM == "Darwin":
-    DEFAULT_PREFS["font_label"] =("Helvetica Neue", 10)
-    DEFAULT_PREFS["font_title"] =("Helvetica Neue", 13, "bold")
+    DEFAULT_PREFS["font_label"] =["Helvetica Neue", 10]
+    DEFAULT_PREFS["font_title"] =["Helvetica Neue", 13, "bold"]
     DEFAULT_PREFS["font_marker"]="/System/Library/Fonts/HelveticaNeue.ttc"
-    DEFAULT_PREFS["font_small"] =("Helvetica Neue", 8)
-else:
-    DEFAULT_PREFS["font_label"]=("Helvetica", 10)
-    DEFAULT_PREFS["font_title"]=("Times", 13, "bold")
-    DEFAULT_PREFS["font_marker"]=""
-    DEFAULT_PREFS["font_small"]=("Helvetica", 8)
+    DEFAULT_PREFS["font_small"] =["Helvetica Neue", 8]
 
 LOG_LEVEL_MAP={
     "Error": mwhlogging.ERROR,
@@ -1011,8 +1007,8 @@ class DroneViewer(tk.Tk):
         self._played_path       =[]         # coords shown so far
         self._heading           =None
 
-        self._build_ui()
         self._apply_styles()
+        self._build_ui()
 
         # Make a loop-invariant list of info fields to update.
         self.PANEL_UPDATE_ITEMS = [
@@ -1314,13 +1310,17 @@ class DroneViewer(tk.Tk):
     # ── File loading ──────────────────────────────────────────────────────
 
     def _open_file(self):
-        path=filedialog.askopenfilename(
+        file=filedialog.askopenfilename(
             title="Open Atom 2 FC2 Log",
+            initialdir=self.prefs.get("input_dir",""),
             filetypes=[("FC2 flight logs", "*.fc2"), ("All files", "*.*")]
         )
-        if not path:
+        if not file or not Path(file).exists():
             return
-        self.load_file(path)
+
+        self.prefs["input_dir"] = str(Path(file).parent)
+
+        self.load_file(file)
 
     def load_file(self, path: str):
         my_logger.info("Loading %s", path)

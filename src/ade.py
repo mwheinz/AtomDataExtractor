@@ -23,19 +23,18 @@ from atom2parser import atom2_parser, BASIC_DATA, EXTENDED_DATA, \
 from adeversion import _version
 
 # ---------------------------------------------------------------------------
-# Preferences – persisted in a small JSON file in the user's home dir.
+# Preferences are persisted in a small JSON file in the user's home dir.
+# ade and adv share the same preferences file but don't all use the same
+# preferences. 
 # ---------------------------------------------------------------------------
-PREFS_FILE = Path.home() / ".atom_extractor_prefs.json"
-
-DEFAULT_GEOMETRY="800x600"
+PREFS_FILE = Path.home() / ".atom_data_viewer.json"
 
 DEFAULT_PREFS = {
-    "output_dir": "", # empty → same dir as input file
+    "output_dir": str(Path.home()),
+    "input_dir": str(Path.home()),
     "extended": False,
     "validation": False,
-    "last_input_dir": str(Path.home()),
-    "last_output_dir": str(Path.home()),
-    "window_geometry": DEFAULT_GEOMETRY,
+    "window_geometry": "1200x800",
     "log_level": "Debug",
 }
 
@@ -47,6 +46,7 @@ LOG_LEVEL_MAP = {
 }
 
 logger = mwhlogging.MWHLogger("ade")
+logger.setLevel(mwhlogging.DEBUG)
 
 def load_prefs() -> dict:
     try:
@@ -98,8 +98,7 @@ def write_csv(file_name, records, extended=False, validation=False, destination=
     logger.print(f"{csv_name} complete.")
 
 # ---------------------------------------------------------------------------
-# Patched atom2_parser that redirects print() into the log queue and raises
-# exceptions instead of calling sys.exit().
+# Thread-safe call to atom2_parser.
 # ---------------------------------------------------------------------------
 def safe_atom2_parser(file_name: str, extended: bool, validation: bool,
                       destination) -> None:
@@ -118,7 +117,7 @@ def safe_atom2_parser(file_name: str, extended: bool, validation: bool,
         validation=validation,
         destination=destination if destination else None)
 
-    # Relay any captured prints to the log.
+    # Relay any captured text to the log.
     for line in buf.getvalue().splitlines():
         if line.strip():
             log(line)
@@ -126,16 +125,22 @@ def safe_atom2_parser(file_name: str, extended: bool, validation: bool,
 # ---------------------------------------------------------------------------
 # Main Application Window
 # ---------------------------------------------------------------------------
-class AtomConverterApp:
+class AtomConverterApp(tk.Tk):
     '''
         Main application window.
     '''
 
     # ---- construction -------------------------------------------------------
 
-    def __init__(self, root: tk.Tk):
-        self.root = root
+    def __init__(self):
+        super().__init__()
+
         self.prefs = load_prefs()
+
+        geom = self.prefs.get("window_geometry", "1280x800")
+        self.geometry(geom)
+        self.resizable(True,True)
+
         self.file_list: list[str] = []       # files queued for conversion
         self.converting = False
 
@@ -151,37 +156,39 @@ class AtomConverterApp:
         self.log_text = None
 
         self._build_ui()
-        self._restore_geometry()
+
+        self.update_idletasks()
         self._poll_log_queue()
+
+        self.createcommand("tk::mac::Quit", self.on_close)
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # ---- UI construction ----------------------------------------------------
 
-    def _build_ui(self):
-        self.root.title("Atom 2 Flight Log Converter")
-        self.root.minsize(620, 500)
-        self.root.resizable(True, True)
-
-        menubar = tk.Menu(self.root)
-        help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label="About…", command=self._show_about)
-        menubar.add_cascade(label="Help", menu=help_menu)
-        self.root.config(menu=menubar)
-
-        # ---- styling ----
-        style = ttk.Style()
+    def _apply_styles(self):
+        style=ttk.Style(self)
         # Use a native-looking theme on each platform
-        available = style.theme_names()
+        available=style.theme_names()
         for preferred in ("aqua", "vista", "clam", "alt", "default"):
             if preferred in available:
                 style.theme_use(preferred)
                 break
 
-        style.configure("Drop.TFrame", relief="solid", borderwidth=2)
-        style.configure("Convert.TButton", padding=6)
-        style.configure("Header.TLabel", font=("TkDefaultFont", 11, "bold"))
+    def _build_ui(self):
+        self.title("Atom 2 Flight Log Converter")
+        self.minsize(640, 480)
+        self.resizable(True, True)
+
+        self._apply_styles()
+
+        menubar = tk.Menu(self)
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="About…", command=self._show_about)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        self.config(menu=menubar)
 
         # ---- main layout ----
-        main_frame = ttk.Frame(self.root, padding=10)
+        main_frame = ttk.Frame(self, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(2, weight=1)   # log area expands
@@ -337,21 +344,8 @@ class AtomConverterApp:
 
     # ---- geometry -----------------------------------------------------------
 
-    def _restore_geometry(self):
-        geom = self.prefs.get("window_geometry", "")
-        if geom:
-            try:
-                self.root.geometry(geom)
-            except Exception:
-                self.root.geometry(DEFAULT_GEOMETRY)
-        else:
-            self.root.geometry(DEFAULT_GEOMETRY)
-
-        self.root.update_idletasks()
-        self.root.resizable(True,True)
-
     def _save_geometry(self):
-        self.prefs["window_geometry"] = self.root.geometry()
+        self.prefs["window_geometry"] = self.geometry()
 
     # ---- file management ----------------------------------------------------
 
@@ -364,22 +358,21 @@ class AtomConverterApp:
                 if Path(p).exists():
                     self.file_list.append(p)
                     self.file_listbox.insert(tk.END, Path(p).name)
-                    # remember last used directory
-                    self.prefs["last_input_dir"] = str(Path(p).parent)
                 else:
                     self._log_msg(f"File not found: {p}", tag="error")
             elif p and not p.lower().endswith(".fc2"):
                 self._log_msg(f"Skipped (not .fc2): {Path(p).name}", tag="error")
 
     def _browse_add_files(self):
-        start = self.prefs.get("last_input_dir", str(Path.home()))
+        path = self.prefs.get("input_dir", str(Path.home()))
         files = filedialog.askopenfilenames(
             title="Select Atom 2 flight log files",
-            initialdir=start,
+            initialdir=path,
             filetypes=[("Atom 2 flight logs", "*.fc2"), ("All files", "*.*")],
         )
         if files:
             self._add_files(list(files))
+            self.prefs["input_dir"] = str(Path(files[0]).parent)
 
     def _remove_selected(self):
         selected = list(self.file_listbox.curselection())
@@ -394,14 +387,14 @@ class AtomConverterApp:
     # ---- output dir ---------------------------------------------------------
 
     def _browse_output_dir(self):
-        start = self.prefs.get("last_output_dir", str(Path.home()))
+        start = self.prefs.get("output_dir", str(Path.home()))
         directory = filedialog.askdirectory(
             title="Choose output folder for CSV files",
             initialdir=start,
         )
         if directory:
             self.output_dir_var.set(directory)
-            self.prefs["last_output_dir"] = directory
+            self.prefs["output_dir"] = directory
 
     # ---- conversion ---------------------------------------------------------
 
@@ -542,7 +535,7 @@ class AtomConverterApp:
         except queue.Empty:
             pass
 
-        self.root.after(100, self._poll_log_queue)
+        self.after(100, self._poll_log_queue)
 
     # ---- open output folder -------------------------------------------------
 
@@ -577,7 +570,7 @@ class AtomConverterApp:
                 return
         self._save_geometry()
         save_prefs(self.prefs)
-        self.root.destroy()
+        self.destroy()
 
     def _show_about(self):
         messagebox.showinfo(
@@ -590,12 +583,8 @@ class AtomConverterApp:
         )
 
 def main():
-    root = tk.Tk()
-
-    app = AtomConverterApp(root)
-    root.createcommand("tk::mac::Quit", app.on_close)
-    root.protocol("WM_DELETE_WINDOW", app.on_close)
-    root.mainloop()
+    app = AtomConverterApp()
+    app.mainloop()
 
 if __name__ == "__main__":
     main()
