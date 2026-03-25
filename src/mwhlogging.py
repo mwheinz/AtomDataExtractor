@@ -80,7 +80,7 @@ class MWHLogger(logging.Logger):
             h.setLevel(self.level)
             self.addHandler(h)
 
-        if level:
+        if level is not None:
             self.setLevel(level)
 
     def setLevel(self, level:int):

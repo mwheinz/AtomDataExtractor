@@ -20,7 +20,8 @@ from tkinter.colorchooser import askcolor
 import tkintermapview
 from PIL import Image, ImageDraw, ImageTk, ImageFont
 from adeversion import _version
-from atom2parser import atom2_parser, is_valid_latlon, BASIC_DATA, VALIDATION_DATA
+from atom2parser import atom2_parser, log_stats, is_valid_latlon, BASIC_DATA, \
+    EXTENDED_DATA, VALIDATION_DATA
 import mwhlogging
 from mwhlogging import MWHLogger
 
@@ -1369,17 +1370,8 @@ class DroneViewer(tk.Tk):
                                          (self.min_lat, self.max_lon))
 
         if my_logger.level <= mwhlogging.INFO:
-            my_logger.info("Field                                     Min              Max")
-            for field_name in BASIC_DATA + VALIDATION_DATA:
-                field_range = [r[field_name] for r in self.records if r.get(field_name) != ""]
-                field_max = max(field_range)
-                field_min = min(field_range)
-                if not isinstance(field_min, (int, float)):
-                    continue
-                if isinstance(field_min, float):
-                    field_min = round(field_min,3)
-                    field_max = round(field_max,3)
-                my_logger.info(f"{field_name:25s}: {field_min:17} {field_max:17}")
+            log_stats(my_logger, records)
+
         self._file_label.configure(text=os.path.basename(path))
         self._set_status(f"Loaded {len(records)} GPS records.")
         self._update_display(0)

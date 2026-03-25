@@ -9,7 +9,8 @@ import argparse
 import csv
 import mwhlogging
 from mwhlogging import MWHLogger
-from atom2parser import atom2_parser, BASIC_DATA, EXTENDED_DATA, VALIDATION_DATA
+from atom2parser import atom2_parser, BASIC_DATA, EXTENDED_DATA, \
+        VALIDATION_DATA, log_stats
 
 my_logger = MWHLogger("csv_extractor")
 
@@ -32,24 +33,6 @@ def write_csv(file_name, records, extended=False, validation=False, destination=
             row = [record.get(field,"") for field in header]
             writer.writerow(row)
     my_logger.print(f"{csv_name} complete.")
-
-def print_stats(records, extended, validation):
-    field_list = BASIC_DATA + \
-        (EXTENDED_DATA if extended else []) + \
-        (VALIDATION_DATA if validation else [])
-    print("Field                                     Min              Max")
-    for field_name in field_list:
-        field_range = [r[field_name] for r in records if r.get(field_name) != ""]
-        if len(field_range) == 0:
-            continue
-        field_max = max(field_range)
-        field_min = min(field_range)
-        if not isinstance(field_min, (int,float)):
-            continue
-        if isinstance(field_min, float):
-            field_min = round(field_min,3)
-            field_max = round(field_max,3)
-        print(f"{field_name:25s}: {field_min:17} {field_max:17}")
 
 def main() -> None:
     """ This is the main program. Duh."""
@@ -136,9 +119,7 @@ def main() -> None:
                           validation=args.validation,
                           destination=args.destination)
             if args.stats:
-                print_stats(records,
-                            extended=args.extended,
-                            validation=args.validation)
+                log_stats(my_logger, records)
         else:
             my_logger.info("%s appears to be an unsupported file type.", f)
             sys.exit(-1)

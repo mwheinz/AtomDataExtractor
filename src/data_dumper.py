@@ -281,7 +281,7 @@ DUMPER_FIELDS = [
 
     # (458-461) Float. across all test flights ranged from 0.00 to 14.99.
     # Median was 4.38, average was 4.11. Possibly an estimate of wind speed.
-    FLFD("Wind Speed (m/s)", "<f", 458, 4, FLFD.round3),
+    FLFD("Wind Speed 2 (m/s)", "<f", 458, 4, FLFD.round3),
 
     # (462-463) Possibly RC signal quality. I don't see a good corrolation of
     # this and distance though.

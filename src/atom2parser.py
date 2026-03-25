@@ -167,7 +167,7 @@ class FLFD:
     def fix_time(data) -> str:
         """Convert the relative timestamp to an absolute timestamp."""
         if TIME_STAMP is None:
-            return None # error case.
+            raise BadData("TIME_STAMP is unset.")
         dt = TIME_STAMP + data/1000
         return dt
 
@@ -403,9 +403,6 @@ def _add_derived_fields(record, prev):
             record["Position Y (m)"]**2 +
             record["alt (m)"]**2),3)
 
-    if record["2d Derived Distance (m)"] > record["3d Derived Distance (m)"]:
-        print("2d > 3d!")
-
     if prev is None:
         record["3d Travelled Distance (m)"] = 0.0
         record["2d Travelled Distance (m)"] = 0.0
@@ -470,7 +467,6 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
         prev_record = None
 
         while True:
-            record_count += 1
             data = flight_file.read(ATOM_RECORD_LEN)
             if len(data) == 0:
                 break
@@ -478,6 +474,7 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
                 logger.warning("Record %s truncated.", record_count)
                 break
 
+            record_count += 1
             record = {}
             try:
                 for field in fields:
@@ -549,3 +546,19 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
         file_name
     )
     return records
+
+def log_stats(logger:Logger, records):
+    stats = {}
+
+    # Build the min/max for every numeric field.
+    for r in records:
+        for field_name, value in r.items():
+            if  value != "" and isinstance(value, (int, float)):
+                field_min, field_max = stats.get(field_name, (value, value))
+                stats[field_name] = (min(field_min, value), max(field_max, value))
+
+    logger.info("Field                                     Min              Max")
+    for field_name in stats:
+        field_min, field_max = stats[field_name]
+        logger.info(f"{field_name:25s}: {field_min:17} {field_max:17}")
+

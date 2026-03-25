@@ -18,7 +18,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import mwhlogging
-from atom2parser import atom2_parser, BASIC_DATA, EXTENDED_DATA, VALIDATION_DATA
+from atom2parser import atom2_parser, BASIC_DATA, EXTENDED_DATA, \
+        VALIDATION_DATA, log_stats
 from adeversion import _version
 
 # ---------------------------------------------------------------------------
@@ -110,6 +111,8 @@ def safe_atom2_parser(file_name: str, extended: bool, validation: bool,
     logger.configure_logging(file_handle = buf)
 
     records = atom2_parser(file_name=file_name, logger=logger)
+    log_stats(logger, records)
+
     write_csv(file_name, records,
         extended=extended,
         validation=validation,
