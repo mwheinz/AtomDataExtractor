@@ -293,7 +293,7 @@ class AtomConverterApp:
             height=8,
             state=tk.DISABLED,
             wrap=tk.WORD,
-            font=("TkFixedFont", 10),
+            font="TkFixedFont",
             background="#1e1e1e",
             foreground="#d4d4d4",
             insertbackground="white",

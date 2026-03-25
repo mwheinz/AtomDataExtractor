@@ -67,7 +67,7 @@ class LogDialog(tk.Toplevel):
         self._text=tk.Text(text_frame, wrap=tk.NONE,
                              yscrollcommand=scroll_bar.set,
                              xscrollcommand=h_scroll.set,
-                             font=prefs["font_label"],
+                             font="TkFixedFont",
                              state=tk.DISABLED)
         self._text.pack(fill=tk.BOTH, expand=True)
 
