@@ -19,7 +19,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import mwhlogging
 from atom2parser import atom2_parser, BASIC_DATA, EXTENDED_DATA, \
-        VALIDATION_DATA, log_stats
+        DERIVED_DATA, log_stats
 from adeversion import _version
 
 # ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ DEFAULT_PREFS = {
     "output_dir": str(Path.home()),
     "input_dir": str(Path.home()),
     "extended": False,
-    "validation": False,
+    "derived": False,
     "window_geometry": "1200x800",
     "log_level": "Debug",
 }
@@ -78,7 +78,8 @@ log_queue: queue.Queue = queue.Queue()
 def log(msg: str) -> None:
     log_queue.put(msg)
 
-def write_csv(file_name, records, extended=False, validation=False, destination=None):
+def write_csv(file_name, records, extended=False, derived=False,
+              destination=None) -> str:
     base_name, _ = os.path.splitext(os.path.basename(file_name))
     directory = (destination if destination is not None else os.path.dirname(file_name))
 
@@ -89,18 +90,18 @@ def write_csv(file_name, records, extended=False, validation=False, destination=
         writer = csv.writer(csv_file)
         header = BASIC_DATA + \
             (EXTENDED_DATA if extended else []) + \
-            (VALIDATION_DATA if validation else [])
+            (DERIVED_DATA if derived else [])
         writer.writerow(header)
 
         for record in records:
             row = [record.get(field,"") for field in header]
             writer.writerow(row)
-    log(f"{csv_name} complete.")
+    return csv_name
 
 # ---------------------------------------------------------------------------
 # Thread-safe call to atom2_parser.
 # ---------------------------------------------------------------------------
-def safe_atom2_parser(file_name: str, extended: bool, validation: bool,
+def safe_atom2_parser(file_name: str, extended: bool, derived: bool,
                       destination) -> None:
     '''
         Wrapper around atom2_parser() that captures print() output → log queue
@@ -112,15 +113,16 @@ def safe_atom2_parser(file_name: str, extended: bool, validation: bool,
     records = atom2_parser(file_name=file_name, logger=logger)
     log_stats(logger, records)
 
-    write_csv(file_name, records,
+    csv_name = write_csv(file_name, records,
         extended=extended,
-        validation=validation,
+        derived=derived,
         destination=destination if destination else None)
 
     # Relay any captured text to the log.
     for line in buf.getvalue().splitlines():
         if line.strip():
             log(line)
+    log(f"{csv_name} complete.")
 
 # ---------------------------------------------------------------------------
 # Main Application Window
@@ -147,7 +149,7 @@ class AtomConverterApp(tk.Tk):
         self.file_listbox = None
         self.output_dir_var = None
         self.extended_var = False
-        self.validation_var = False
+        self.derived_var = False
         self.log_level_var = None
         self.progress = None
         self.status_var = None
@@ -262,7 +264,7 @@ class AtomConverterApp(tk.Tk):
 
         # Checkboxes
         self.extended_var = tk.BooleanVar(value=self.prefs.get("extended", False))
-        self.validation_var = tk.BooleanVar(value=self.prefs.get("validation", False))
+        self.derived_var = tk.BooleanVar(value=self.prefs.get("derived", False))
 
         ttk.Checkbutton(
             frame,
@@ -272,8 +274,8 @@ class AtomConverterApp(tk.Tk):
 
         ttk.Checkbutton(
             frame,
-            text="Include validation fields (derived distance & speed calculations)",
-            variable=self.validation_var,
+            text="Include derived fields (derived distance & speed calculations)",
+            variable=self.derived_var,
         ).grid(row=3, column=0, columnspan=3, sticky="w")
 
         ttk.Label(frame, text="Log Level:").grid(
@@ -425,7 +427,7 @@ class AtomConverterApp(tk.Tk):
             return
 
         extended = self.extended_var.get()
-        validation = self.validation_var.get()
+        derived = self.derived_var.get()
         log_level_str = self.log_level_var.get()
         log_level_int = LOG_LEVEL_MAP.get(log_level_str, 1)
         logger.setLevel(log_level_int)
@@ -435,7 +437,7 @@ class AtomConverterApp(tk.Tk):
         # Persist prefs
         self.prefs["output_dir"] = out_dir
         self.prefs["extended"] = extended
-        self.prefs["validation"] = validation
+        self.prefs["derived"] = derived
         self.prefs["log_level"] = log_level_str
         save_prefs(self.prefs)
 
@@ -451,12 +453,12 @@ class AtomConverterApp(tk.Tk):
         # Run in a background thread so the GUI stays responsive.
         thread = threading.Thread(
             target=self._conversion_worker,
-            args=(files, out_dir, extended, validation),
+            args=(files, out_dir, extended, derived),
             daemon=True,
         )
         thread.start()
 
-    def _conversion_worker(self, files, out_dir, extended, validation):
+    def _conversion_worker(self, files, out_dir, extended, derived):
         """Background worker — do NOT touch tkinter widgets directly."""
         success_count = 0
         fail_count = 0
@@ -467,7 +469,7 @@ class AtomConverterApp(tk.Tk):
                 safe_atom2_parser(
                     f,
                     extended=extended,
-                    validation=validation,
+                    derived=derived,
                     destination=out_dir,
                 )
                 success_count += 1
@@ -540,6 +542,8 @@ class AtomConverterApp(tk.Tk):
                         tag = "error"
                     elif "DEBUG" in item:
                         tag = "debug"
+                    elif "complete" in item:
+                        tag = "success"
 
                     self._log_msg(item, tag=tag)
 

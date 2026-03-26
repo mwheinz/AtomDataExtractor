@@ -92,7 +92,7 @@ options:
   -L, --logfile LOGFILE
                         Redirect logging output to a file.
   -x, --extended        Include extended fields
-  -v, --validation      Calcuate some additional fields to compare against the
+  -d, --derived         Calcuate some additional fields to compare against the
                         raw data.
   -s, --stats           Report the min and max for all the basic fields.
 

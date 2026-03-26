@@ -21,7 +21,7 @@ import tkintermapview
 from PIL import Image, ImageDraw, ImageTk, ImageFont
 from adeversion import _version
 from atom2parser import atom2_parser, log_stats, is_valid_latlon, BASIC_DATA, \
-    EXTENDED_DATA, VALIDATION_DATA
+    EXTENDED_DATA, DERIVED_DATA
 import mwhlogging
 from mwhlogging import MWHLogger
 

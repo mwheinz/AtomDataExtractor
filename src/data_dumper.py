@@ -37,7 +37,7 @@ DUMPER_FIELDS = [
     # (Data Dumper isn't meant for generating TO videos, but the videos are
     # very handy for comparing data with what the drone was doing at the
     # time...)
-    FLFD("utc (ms)", "<Q", 5, 8, FLFD.fix_time), # Absolute time in ms.
+    FLFD("utc (ms)", "<Q", 5, 8), # Absolute time in ms.
     FLFD("elapsed (us)", "<Q", 5, 8), # Relative time in microseconds.
 
     # (13-14) Starts as zero but occasionally changes to one of a few distinct
@@ -346,7 +346,7 @@ def write_csv(file_name, records, destination=None):
         for record in records:
             row = [record.get(field,"") for field in header]
             writer.writerow(row)
-    my_logger.print(f"{csv_name} complete.")
+    print(f"{csv_name} complete.")
 
 def main() -> None:
     """ This is the main program. Duh."""

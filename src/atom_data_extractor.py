@@ -10,11 +10,11 @@ import csv
 import mwhlogging
 from mwhlogging import MWHLogger
 from atom2parser import atom2_parser, BASIC_DATA, EXTENDED_DATA, \
-        VALIDATION_DATA, log_stats
+        DERIVED_DATA, log_stats
 
 my_logger = MWHLogger("csv_extractor")
 
-def write_csv(file_name, records, extended=False, validation=False, destination=None):
+def write_csv(file_name, records, extended=False, derived=False, destination=None):
     """ Convert a list of parsed records into a CSV file. """
     base_name, _ = os.path.splitext(os.path.basename(file_name))
     directory = (destination if destination is not None else os.path.dirname(file_name))
@@ -26,13 +26,13 @@ def write_csv(file_name, records, extended=False, validation=False, destination=
         writer = csv.writer(csv_file)
         header = BASIC_DATA + \
             (EXTENDED_DATA if extended else []) + \
-            (VALIDATION_DATA if validation else [])
+            (DERIVED_DATA if derived else [])
         writer.writerow(header)
 
         for record in records:
             row = [record.get(field,"") for field in header]
             writer.writerow(row)
-    my_logger.print(f"{csv_name} complete.")
+    my_logger.info(f"{csv_name} complete.")
 
 def main() -> None:
     """ This is the main program. Duh."""
@@ -75,7 +75,7 @@ def main() -> None:
     )
 
     arg_parser.add_argument(
-        "-v","--validation",
+        "-d","--derived",
         action="store_true",
         help="Calcuate some additional fields to compare against the raw data."
     )
@@ -116,7 +116,7 @@ def main() -> None:
             if records is not None:
                 write_csv(f, records,
                           extended=args.extended,
-                          validation=args.validation,
+                          derived=args.derived,
                           destination=args.destination)
             if args.stats:
                 log_stats(my_logger, records)

@@ -83,7 +83,7 @@ EXTENDED_DATA = [
 ]
 
 """ These are derived from data in the file in order to compare results. """
-VALIDATION_DATA = [
+DERIVED_DATA = [
     "Battery (mv)", # Total battery voltage.
     "2d Derived Distance (m)", # 2d distance, derived from position and altitude.
     "3d Derived Distance (m)", # 3d distance, derived from position and altitude.
@@ -479,7 +479,7 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
             record_count += 1
             record = {}
             try:
-                for field in fields:
+                for field in corrected_fields:
                     field_data = field.get_field(data)
                     if field_data is None:
                         raise BadData(f"Illegal value for {field.name}")
