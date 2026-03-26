@@ -95,7 +95,7 @@ def write_csv(file_name, records, extended=False, validation=False, destination=
         for record in records:
             row = [record.get(field,"") for field in header]
             writer.writerow(row)
-    logger.print(f"{csv_name} complete.")
+    log(f"{csv_name} complete.")
 
 # ---------------------------------------------------------------------------
 # Thread-safe call to atom2_parser.
@@ -315,9 +315,11 @@ class AtomConverterApp(tk.Tk):
         self.log_text.grid(row=0, column=0, sticky="nsew")
         log_scroll.grid(row=0, column=1, sticky="ns")
 
-        self.log_text.tag_configure("error", foreground="#f48771")
-        self.log_text.tag_configure("success", foreground="#4ec9b0")
-        self.log_text.tag_configure("info", foreground="#9cdcfe")
+        self.log_text.tag_configure("error", foreground="#ff8080")
+        self.log_text.tag_configure("warning", foreground="#ffc080")
+        self.log_text.tag_configure("success", foreground="#80ff80")
+        self.log_text.tag_configure("debug", foreground="#a8a8a8")
+        self.log_text.tag_configure("info", foreground="#d4d4d4")
 
         ttk.Button(frame, text="Clear Log",
                    command=self._clear_log).grid(row=1, column=0, sticky="e",
@@ -426,7 +428,7 @@ class AtomConverterApp(tk.Tk):
         validation = self.validation_var.get()
         log_level_str = self.log_level_var.get()
         log_level_int = LOG_LEVEL_MAP.get(log_level_str, 1)
-        logger.configure_logging(level=log_level_int)
+        logger.setLevel(log_level_int)
 
         files = list(self.file_list)
 
@@ -499,8 +501,9 @@ class AtomConverterApp(tk.Tk):
     # ---- poll the queue (runs on main thread via after()) -------------------
 
     def _poll_log_queue(self):
+        MAX_POLL_ITEMS = 20
         try:
-            while True:
+            for _ in range(MAX_POLL_ITEMS):
                 item = log_queue.get_nowait()
 
                 if isinstance(item, tuple):
@@ -529,10 +532,15 @@ class AtomConverterApp(tk.Tk):
                 else:
                     # Plain string log message
                     tag = ""
-                    if "✓" in item:
-                        tag = "success"
-                    elif "✗" in item or "error" in item.lower():
+                    if "INFO" in item:
+                        tag = "info"
+                    elif "WARNING" in item:
+                        tag = "warning"
+                    elif "ERROR" in item:
                         tag = "error"
+                    elif "DEBUG" in item:
+                        tag = "debug"
+
                     self._log_msg(item, tag=tag)
 
         except queue.Empty:
