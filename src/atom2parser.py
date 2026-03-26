@@ -9,11 +9,6 @@ import math
 import datetime
 from logging import Logger
 
-# This is a hack - we need to extract the start time of the data from the
-# file name - but it needs to be used inside code that can't see the value
-# unless it is passed globally.
-TIME_STAMP: float = None
-
 """ The list of fields to include in the basic report. """
 BASIC_DATA = [
     "rid",
@@ -123,6 +118,8 @@ class FLFD:
     scale
             An optional conversion or formatting function.
     """
+    __slots__ = ("name", "fmt_string", "start_pos", "length", "scale")
+
     def __init__(self, name, fmt_string, start_pos, length, scale=None):
         self.name = name
         self.fmt_string = fmt_string
@@ -162,14 +159,6 @@ class FLFD:
     def fix_hdop(data) -> float:
         """Scale the HDOP value."""
         return data/100.0
-
-    @staticmethod
-    def fix_time(data) -> str:
-        """Convert the relative timestamp to an absolute timestamp."""
-        if TIME_STAMP is None:
-            raise BadData("TIME_STAMP is unset.")
-        dt = TIME_STAMP + data/1000
-        return dt
 
     @staticmethod
     def flight_mode(data) -> str:
@@ -268,7 +257,7 @@ ATOM2_FIELDS = [
     #
     # (0-3) Record id.
     FLFD("rid", "<i", 0, 4),
-    FLFD("utc (ms)", "<Q", 5, 8, FLFD.fix_time), # Absolute time in ms.
+    FLFD("utc (ms)", "<Q", 5, 8), # Absolute time in ms.
     FLFD("elapsed (us)", "<Q", 5, 8), # Relative time in microseconds.
     FLFD("Flight Counter", "<H", 17, 2), # Number of flights.
     FLFD("Drone Mode (text)", "<B", 428, 1, FLFD.drone_mode),
@@ -439,7 +428,13 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
         logger: a running instance of the Logger class.
     """
 
-    global TIME_STAMP
+    timestamp_ms = None
+    def fix_time(data) -> str:
+        """Convert the relative timestamp to an absolute timestamp."""
+        if timestamp_ms is None:
+            raise BadData("Absolute time stamp is unset.")
+        dt = timestamp_ms + data/1000
+        return dt
 
     if file_name is None:
         raise BadData("You must provide a file name.")
@@ -450,13 +445,12 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
     base_name, _ = os.path.splitext(os.path.basename(file_name))
 
     try:
-        TIME_STAMP = datetime.datetime.strptime(
+        timestamp_ms = datetime.datetime.strptime(
             re.sub("-.*", "", base_name),
             "%Y%m%d%H%M%S"
         ).timestamp() * 1000
     except ValueError:
-        logger.critical("Could not parse timestamp from filename: %s", base_name)
-        raise
+        raise BadData(f"Could not parse timestamp from filename: \"{base_name}\"")
 
     with open(file_name, mode="rb") as flight_file:
         record_count = 0
@@ -465,6 +459,14 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
         elapsed = 0
         records = []
         prev_record = None
+
+        # Replace any references to utc with a version that has
+        # the timestamp conversion.
+        corrected_fields = [
+            FLFD(f.name, f.fmt_string, f.start_pos, f.length,
+                 fix_time if f.name == "utc (ms)" else f.scale)
+            for f in fields
+        ]
 
         while True:
             data = flight_file.read(ATOM_RECORD_LEN)
@@ -507,8 +509,8 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
                 logger.warning(
                     "Time went backwards at record %s. Trying to fix.",
                     record_count)
-                TIME_STAMP = TIME_STAMP + elapsed/1000
-                record["utc (ms)"] = TIME_STAMP
+                timestamp_ms = timestamp_ms + elapsed/1000
+                record["utc (ms)"] = timestamp_ms
                 error_count += 1
             elapsed = current
 
