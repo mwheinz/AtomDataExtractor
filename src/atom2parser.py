@@ -483,7 +483,7 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
                         raise BadData(f"Illegal value for {field.name}")
                     record[field.name] = field_data
             except BadData as e:
-                logger.warning(
+                logger.debug(
                     "Skipping record %s due to error %s",
                     record_count,
                     e
@@ -527,7 +527,7 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
                 continue
             if record["GPS Lock"] == "Yes" and not is_valid_latlon(record["lat (deg)"],
                                     record["lon (deg)"]):
-                logger.warning(
+                logger.debug(
                     "Skipping record %s due to invalid GPS data.",
                     record_count
                 )
