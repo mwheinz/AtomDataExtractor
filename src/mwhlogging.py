@@ -93,10 +93,3 @@ class MWHLogger(logging.Logger):
         super().setLevel(level)
         for h in self.handlers:
             h.setLevel(self.level)
-
-    def print(self, msg):
-        """
-        This was added so that ade could report the name of the output file.
-        """
-        if self.file_handle is not None:
-            print(msg, file=self.file_handle)
