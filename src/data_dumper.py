@@ -180,8 +180,8 @@ DUMPER_FIELDS = [
     FLFD("u384", "<f", 384,4, FLFD.round3),
     FLFD("u388", "<f", 388,4, FLFD.round3),
 
-    # (392-396) Correlated with the GPS-derived drone speed but not perfectly.
-    FLFD("speed (m/s)", "<f", 392,4, FLFD.round3),
+    # (392-396) Unknown.
+    FLFD("u392", "<f", 392,4, FLFD.round3),
 
     # (396-400) Unknown.
     FLFD("f396", "<f", 396,4),
@@ -281,7 +281,7 @@ DUMPER_FIELDS = [
 
     # (458-461) Float. across all test flights ranged from 0.00 to 14.99.
     # Median was 4.38, average was 4.11. Possibly an estimate of wind speed.
-    FLFD("Wind Speed 2 (m/s)", "<f", 458, 4, FLFD.round3),
+    FLFD("u458", "<f", 458, 4, FLFD.round3),
 
     # (462-463) Possibly RC signal quality. I don't see a good corrolation of
     # this and distance though.

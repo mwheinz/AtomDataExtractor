@@ -73,7 +73,6 @@ EXTENDED_DATA = [
     "delta Z (m/s)",
     "Position X (m)",
     "Position Y (m)",
-    "Wind Speed 2 (m/s)",
 
     "Battery V1 (mv)",
     "Battery V2 (mv)",
@@ -304,7 +303,6 @@ ATOM2_FIELDS = [
     FLFD("Wind Speed (m/s)", "<f", 404, 4, FLFD.round3),
     FLFD("Wind (deg)", "<f", 408, 4, FLFD.radian_heading_to_degrees),
     FLFD("Thrust", "<f", 412, 4, FLFD.round3),
-    FLFD("Wind Speed 2 (m/s)", "<f", 458, 4, FLFD.round3),
 
     #
     # Compass

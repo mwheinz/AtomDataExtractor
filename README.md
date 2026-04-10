@@ -204,10 +204,10 @@ Fields are all little-endian.
 | 316 | 4 | float | Velocity E/W (negative is east) (m/s) | ✓ |
 | 332 | 4 | float | Velocity U/D (negative is up) (m/s) | ✓ |
 | 392 | 4 | float | Corrolates with speed but is much lower than the calculated 2D or 3D speed from dX, dY, dZ. | 25% | 
-| 404 | 4 | float | Estimate of wind speed? | 75% |
+| 404 | 4 | float | Estimate of wind speed | ✓ |
 | 408 | 4 | float | Wind direction in radians. | ✓ |
 | 412 | 4 | float | Related to total thrust? Goes non-zero during launch, drops to zero when all 4 motors are idle.| 75% |
-| 458 | 4 | float | Estimated wind speed? | 75%|
+| 458 | 4 | float | Corrolated with wind speed? Seems to be non-linear. | |
 
 ###  Compass
 | Byte: | Length: | Format: | Description: | Correct: |
