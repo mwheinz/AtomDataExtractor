@@ -878,10 +878,6 @@ class InfoPanel(tk.LabelFrame):
         self._inner.bind("<Configure>", self._on_inner_configure)
         # Stretch the inner frame to fill canvas width
         self._canvas.bind("<Configure>", self._on_canvas_configure)
-        # Mouse wheel scrolling
-        self._canvas.bind("<MouseWheel>",  self._on_mousewheel)      # Windows/macOS
-        self._canvas.bind("<Button-4>",    self._on_mousewheel)      # Linux scroll up
-        self._canvas.bind("<Button-5>",    self._on_mousewheel)      # Linux scroll down
 
         col=0
         row=0
@@ -930,6 +926,15 @@ class InfoPanel(tk.LabelFrame):
 
             self._vars[field[0]]=var
             self._labels.append((key_lbl, val_lbl))
+
+        self._bind_mousewheel(self._inner)
+
+    def _bind_mousewheel(self, widget):
+        widget.bind("<MouseWheel>",  self._on_mousewheel)      # Windows/macOS
+        widget.bind("<Button-4>",    self._on_mousewheel)      # Linux scroll up
+        widget.bind("<Button-5>",    self._on_mousewheel)      # Linux scroll down
+        for child in widget.winfo_children():
+            self._bind_mousewheel(child)
 
     def _on_inner_configure(self, event):
         """Update scroll region when inner frame resizes."""
