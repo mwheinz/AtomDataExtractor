@@ -78,6 +78,8 @@ EXTENDED_DATA = [
     "Battery V2 (mv)",
     "Battery Current (ma)",
     "Battery Temp (c)",
+    "Battery Cycles",
+
     "Auto",
 ]
 
@@ -330,6 +332,7 @@ ATOM2_FIELDS = [
     FLFD("Battery Current (ma)", "<h", 444, 2, abs),
     FLFD("Battery Temp (c)", "<B", 446, 1),
     FLFD("Battery Level (%)", "<B", 451, 1),
+    FLFD("Battery Cycles", "<H", 494, 2),
 
     #
     # Controls. Raw values range frrom -1.0 to 1.0 but that Telemetry Overlay

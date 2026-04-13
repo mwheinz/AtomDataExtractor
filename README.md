@@ -236,6 +236,7 @@ Fields are all little-endian.
 | 444 | 2 | short | Battery current (ma) | ✓ |
 | 446 | 1 | byte | Battery Temp (celsius) | ✓ |
 | 451 | 1 | byte | Battery Level (%) | ✓ |
+| 494 | 2 | short | The number of times the battery has been "cycled" (drained to 25% or less then recharged past 75%) | ✓ |
 
 ### Thumb Sticks
 | Byte: | Length: | Format: | Description: | Correct: |

@@ -321,7 +321,10 @@ DUMPER_FIELDS = [
     FLFD("Motor RPM 4", "<H", 480, 2),
 
     FLFD("u482","<Q", 482, 8, lambda x: FLFD.hex_dump(x,8)),
-    FLFD("u490","<Q", 490, 8, lambda x: FLFD.hex_dump(x,8)),
+    FLFD("u490","<I", 490, 4, lambda x: FLFD.hex_dump(x,4)),
+    FLFD("Battery Cycles","<H", 494, 2),
+    FLFD("u496","<B", 496, 1, lambda x: FLFD.hex_dump(x,1)),
+    FLFD("u497","<B", 497, 1, lambda x: FLFD.hex_dump(x,1)),
     FLFD("u498","<Q", 498, 8, lambda x: FLFD.hex_dump(x,8)),
     FLFD("u506","<I", 506, 4, lambda x: FLFD.hex_dump(x,4)),
     FLFD("u510","<H", 510, 2, lambda x: FLFD.hex_dump(x,2)),
