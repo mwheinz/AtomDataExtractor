@@ -8,6 +8,7 @@ A cross-platform GUI front-end for atom_data_extractor.py.
 import os
 import sys
 import json
+import platform
 import threading
 import subprocess
 import queue
@@ -164,6 +165,13 @@ class AtomConverterApp(tk.Tk):
 
         self.createcommand("tk::mac::Quit", self.on_close)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        if platform.system() == "Darwin":
+            self.createcommand('::tk::mac::OpenDocument',
+                self.mac_handle_doubleclick)
+
+    def mac_handle_doubleclick(self, *filenames):
+        self.after(100, lambda: self._add_files(filenames))
 
     # ---- UI construction ----------------------------------------------------
 
@@ -599,6 +607,11 @@ class AtomConverterApp(tk.Tk):
 
 def main():
     app = AtomConverterApp()
+
+    if len(sys.argv) > 1:
+        files=sys.argv[1:]
+        app.after(200, lambda: app._add_files(files))
+
     app.mainloop()
 
 if __name__ == "__main__":

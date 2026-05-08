@@ -1022,6 +1022,14 @@ class DroneViewer(tk.Tk):
             if label not in PANEL_SKIP
         ]
 
+        # Adding support for double-clicking on fc2 files.
+        if platform.system() == "Darwin":
+            self.createcommand('::tk::mac::OpenDocument', 
+                self.mac_handle_doubleclick)
+
+    def mac_handle_doubleclick(self, *filenames):
+        self.after(100, lambda: self.load_file(filenames[0]))
+
     # ── UI construction ───────────────────────────────────────────────────
     def _show_prefs(self):
         if self.playing:
@@ -1663,6 +1671,8 @@ def main():
         path=sys.argv[1]
         if os.path.exists(path):
             app.after(200, lambda: app.load_file(path))
+        else:
+            my_logger.error(f"{path} does not exist.")
 
     app.mainloop()
 
