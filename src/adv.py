@@ -1469,20 +1469,21 @@ class DroneViewer(tk.Tk):
             else:
                 self._home_marker.set_position(home_lat,home_lon)
 
-        if heading not in self._drone_cache:
-            self._drone_cache[heading]=self._make_drone_icon(heading)
+        h2 = round(heading/5,0)*5
+        if h2 not in self._drone_cache:
+            self._drone_cache[h2]=self._make_drone_icon(h2)
 
         if self._drone_marker is None:
             self._drone_marker=self.map_widget.set_marker(
                 lat, lon,
-                icon=self._drone_cache[heading],
+                icon=self._drone_cache[h2],
             )
-            self._drone_heading=heading
+            self._drone_heading=h2
         else:
             self._drone_marker.set_position(lat,lon)
-            if heading != self._drone_heading:
-                self._drone_heading=heading
-                self._drone_marker.change_icon(self._drone_cache[heading])
+            if h2 != self._drone_heading:
+                self._drone_heading=h2
+                self._drone_marker.change_icon(self._drone_cache[h2])
 
 
     @staticmethod
