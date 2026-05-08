@@ -1023,9 +1023,11 @@ class DroneViewer(tk.Tk):
         ]
 
         # Adding support for double-clicking on fc2 files.
-        if platform.system() == "Darwin":
+        if PLATFORM_SYSTEM == "Darwin":
             self.createcommand('::tk::mac::OpenDocument', 
                 self.mac_handle_doubleclick)
+        self.createcommand('tkAboutDialog',
+            self._show_about)
 
     def mac_handle_doubleclick(self, *filenames):
         self.after(100, lambda: self.load_file(filenames[0]))
@@ -1087,7 +1089,8 @@ class DroneViewer(tk.Tk):
         file_menu.add_separator()
         file_menu.add_command(label="Preferences…", command=self._show_prefs)  # ← add this
         file_menu.add_separator()
-        file_menu.add_command(label="About", command=self._show_about)
+        if PLATFORM_SYSTEM != "Darwin":
+            file_menu.add_command(label="About", command=self._show_about)
         file_menu.add_command(label="View Log…", command=self._show_log)
         file_menu.add_command(label="Quit", command=self._on_close)
 

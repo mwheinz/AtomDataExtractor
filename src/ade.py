@@ -169,6 +169,8 @@ class AtomConverterApp(tk.Tk):
         if platform.system() == "Darwin":
             self.createcommand('::tk::mac::OpenDocument',
                 self.mac_handle_doubleclick)
+        self.createcommand('tkAboutDialog',
+            self._show_about)
 
     def mac_handle_doubleclick(self, *filenames):
         self.after(100, lambda: self._add_files(filenames))
@@ -195,10 +197,9 @@ class AtomConverterApp(tk.Tk):
         self._apply_styles()
 
         menubar = tk.Menu(self)
-        help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label="About…", command=self._show_about)
-        menubar.add_cascade(label="Help", menu=help_menu)
         self.config(menu=menubar)
+        if platform.system() != "Darwin":
+            help_menu.add_command(label="About…", command=self._show_about)
 
         # ---- main layout ----
         main_frame = ttk.Frame(self, padding=10)
