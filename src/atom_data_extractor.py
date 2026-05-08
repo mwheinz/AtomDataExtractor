@@ -8,11 +8,10 @@ import sys
 import argparse
 import csv
 import mwhlogging
-from mwhlogging import MWHLogger
 from atom2parser import atom2_parser, BASIC_DATA, EXTENDED_DATA, \
         DERIVED_DATA, log_stats
 
-my_logger = MWHLogger("csv_extractor")
+my_logger = mwhlogging.MWHLogger("csv_extractor")
 
 def write_csv(file_name, records, extended=False, derived=False, destination=None):
     """ Convert a list of parsed records into a CSV file. """
