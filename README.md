@@ -18,27 +18,41 @@ This app would not exist if Koen Aerts and Rob Pitt hadn't already written the [
 
 # Using AtomDataExtractor
 
+##Compatibility##
+At this time, the AtomDataExtractor tools only support the Atom-2 drone. Supporting other models requires sample data logs and proper documentation of the new field structure, which should be submitted as an issue or PR.
+
 ## Requirements
-1. At this time, AtomDataExtractor only supports the Atom-2 drone. It could support other Atom models if someone provides me with sample data logs from them or, even better, does the leg work to document another model and submits it as an issue or a pull request.
-2. AtomDataExtractor requires python3 and has been tested with Python 3.9.2 and 3.14.3, but it should work with other versions as well. The command line version does not require any other packages. The GUI apps require tkinter, tkintermapview, and pyinstaller. (See below.)
-3. You don't need anything else if all you want to do is look at the telemetry data from your drone, but if you want to use these apps to make cool videos, you're going to need [Telemetry Overlay](https://goprotelemetryextractor.com). 
+
+1.  **Python Environment:** The tools require `python3` and have been tested with Python 3.9.2 and 3.14.3. The GUI applications require additional Python packages, listed in requirements.txt. (See Building, below.)
+2.  **Telemetry Overlay:** If you want to use the output from AtomDataExtractor to create cool videos, take a look at [Telemetry Overlay](https://goprotelemetryextractor.com).
 
 ## Building
-If you know your way around MacOS Terminal, or Windows Shell, or the Linux terminal app of your choice, and you want to use the CLI version, download the latest release from [github](https://github.com/mwheinz/AtomDataExtractor) and copy atom_data_extractor.py to your personal bin directory. 
 
-To build the GUI apps, start in the main AtomDataExtractor directory:
+If you want to use the CLI version of the tools, just grab the latest release and copy atom_data_extractor.py to your preferred bin directory. 
+
+To build the GUI apps, follow these steps:
+
+**Prerequisites:**
+First, create and activate a virtual environment and install all dependencies using the centralized `requirements.txt` file:
+```bash
+# 1. Create a virtual environment
+python3 -m venv ade-venv
+# 2. Activate it
+source ade-venv/bin/activate
+# 3. Install all packages
+pip install -r requirements.txt
 ```
-$ python3 -m venv ade-venv
-$ source ade-venv/bin/activate
-$ pip install tk
+*(Note: On Ubuntu, you may need to run `sudo apt install python3-tk` before step 3.)*
+
+**Building Steps:**
+Navigate into the `src` directory and run the build script:
+```bash
+# 4. Change directory to source code
+cd src
+# 5. Run the build process
+./build.sh
 ```
-(on Ubuntu you may need `sudo apt install python3-tk` instead.)
-```
-$ pip install tkintermapview pyinstaller
-$ cd src
-$ ./build.sh
-```
-The final executables will be in the AtomDataExtractor/src/dist directory.
+The final executables will be in the `AtomDataExtractor/src/dist` directory.
 
 ## Getting Telemetry Data From Your Atom 2 Drone
 ### PTD-1 Controller with SD card
