@@ -14,7 +14,6 @@ import platform
 from pathlib import Path
 import tkinter as tk
 import tkinter.font as tkf
-from io import StringIO
 from tkinter import ttk, filedialog, messagebox
 from tkinter.colorchooser import askcolor
 import tkintermapview
@@ -26,73 +25,12 @@ import mwhlogging
 from mwhlogging import MWHLogger
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Configure the logger to write to a buffer as well as the console.
-#
-# We will load the buffer into a dialog box on request.
+# ─────────────────────────────────────────────────────────────────────────────
+# Logger — the logger's window will be attached later in DroneViewer.__init__,
+# once the Tk root exists.
 # ─────────────────────────────────────────────────────────────────────────────
 my_logger=MWHLogger("adv")
 my_logger.setLevel(mwhlogging.DEBUG)
-my_logging_buf=StringIO()
-my_logger.configure_logging(file_handle=my_logging_buf)
-
-class LogDialog(tk.Toplevel):
-    '''
-        Display the contents of the my_logger buffer.
-    '''
-
-    def __init__(self, parent, log_buffer: StringIO, prefs, menubar):
-        super().__init__(parent)
-        self.title("Atom Data Viewer Log")
-        self.geometry("640x480")
-        self.resizable(True, True)
-        self.transient(parent)
-        self.configure(menu=menubar)
-
-        btn_row=tk.Frame(self)
-        btn_row.pack(fill=tk.X, padx=8, pady=(4, 8), side=tk.BOTTOM)
-        tk.Button(btn_row, text="Refresh",
-                  command=lambda: self._load(log_buffer)).pack(side=tk.LEFT)
-        tk.Button(btn_row, text="Copy All", command=self._copy_all).pack(side=tk.LEFT, padx=4)
-        tk.Button(btn_row, text="Close", command=self.destroy).pack(side=tk.RIGHT)
-
-        h_scroll=ttk.Scrollbar(self, orient=tk.HORIZONTAL)
-        h_scroll.pack(fill=tk.X, padx=8, side=tk.BOTTOM)
-
-        text_frame=tk.Frame(self)
-        text_frame.pack(fill=tk.BOTH, expand = True, padx = 8, pady=(8, 4))
-
-        scroll_bar=ttk.Scrollbar(text_frame)
-        scroll_bar.pack(side=tk.RIGHT, fill = tk.Y)
-
-        self._text=tk.Text(text_frame, wrap=tk.NONE,
-                             yscrollcommand=scroll_bar.set,
-                             xscrollcommand=h_scroll.set,
-                             font="TkFixedFont",
-                             state=tk.DISABLED)
-        self._text.pack(fill=tk.BOTH, expand=True)
-
-        h_scroll.configure(command=self._text.xview)
-        scroll_bar.configure(command=self._text.yview)
-
-        self._center_on(parent)
-        self._load(log_buffer)
-
-    def _center_on(self, parent):
-        x=parent.winfo_x() + (parent.winfo_width()  - self.winfo_width())  // 2
-        y=parent.winfo_y() + (parent.winfo_height() - self.winfo_height()) // 2
-        self.geometry(f"+{x}+{y}")
-
-    def _load(self, log_buffer: StringIO):
-        contents=log_buffer.getvalue()
-        self._text.configure(state=tk.NORMAL)
-        self._text.delete("1.0", tk.END)
-        self._text.insert(tk.END, contents)
-        self._text.configure(state=tk.DISABLED)
-        self._text.see(tk.END)  # scroll to bottom
-
-    def _copy_all(self):
-        self.clipboard_clear()
-        self.clipboard_append(self._text.get("1.0", tk.END))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Each pair represents a panel label and the matching data field.
@@ -1022,6 +960,12 @@ class DroneViewer(tk.Tk):
             if label not in PANEL_SKIP
         ]
 
+        # Attach the tkinter log window now that the Tk root exists.
+        my_logger.configure_logging(
+            tk_parent=self,
+            tk_title="Atom Data Viewer Log"
+        )
+
         # Adding support for double-clicking on fc2 files.
         if PLATFORM_SYSTEM == "Darwin":
             self.createcommand('::tk::mac::OpenDocument', 
@@ -1039,7 +983,9 @@ class DroneViewer(tk.Tk):
         PrefsDialog(self, self.prefs, self._on_prefs_saved, self.menubar)
 
     def _show_log(self):
-        LogDialog(self, my_logging_buf, self.prefs, self.menubar)
+        """Open the log window, or raise it if already open."""
+        if my_logger._tk_window:
+            my_logger._tk_window.show()
 
     def _on_prefs_saved(self, new_prefs: dict):
         self.prefs.update(new_prefs)
@@ -1134,6 +1080,7 @@ class DroneViewer(tk.Tk):
         # Darwin.
         if PLATFORM_SYSTEM == "Darwin":
             def _map_mouse_zoom(event):
+                my_logger.debug("Mouse Zoom Event.")
                 relative_x=event.x / self.map_widget.width
                 relative_y=event.y / self.map_widget.height
                 delta=event.delta * 0.01
