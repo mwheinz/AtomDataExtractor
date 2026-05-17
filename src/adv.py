@@ -175,13 +175,6 @@ elif PLATFORM_SYSTEM == "Darwin":
     DEFAULT_PREFS["font_marker"]="/System/Library/Fonts/HelveticaNeue.ttc"
     DEFAULT_PREFS["font_small"] =["Helvetica Neue", 8]
 
-LOG_LEVEL_MAP={
-    "Error": mwhlogging.ERROR,
-    "Warning": mwhlogging.WARNING,
-    "Info": mwhlogging.INFO,
-    "Debug": mwhlogging.DEBUG,
-}
-
 def load_prefs() -> dict:
     my_logger.debug("Loading preferences from %s", PREFS_FILE)
     try:
@@ -927,7 +920,7 @@ class DroneViewer(tk.Tk):
         self.configure(bg=self.prefs["color_bg"])
         self.minsize(1100, 720)
 
-        my_logger.setLevel(LOG_LEVEL_MAP[self.prefs["log_level"]])
+        my_logger.setLevel(mwhlogging.LOG_LEVEL_MAP[self.prefs["log_level"]])
         geometry=self.prefs.get("window_geometry", "1280x800")
 
         self.geometry(geometry)
@@ -989,7 +982,7 @@ class DroneViewer(tk.Tk):
     def _on_prefs_saved(self, new_prefs: dict):
         self.prefs.update(new_prefs)
         save_prefs(self.prefs)
-        my_logger.setLevel(LOG_LEVEL_MAP[self.prefs["log_level"]])
+        my_logger.setLevel(mwhlogging.LOG_LEVEL_MAP[self.prefs["log_level"]])
         # Redraw all canvas gauges so they pick up the new colors immediately
         self._gauge_speed.max_val=self.prefs["max_speed"]
         self._gauge_dist.max_val=self.prefs["max_dist"]
