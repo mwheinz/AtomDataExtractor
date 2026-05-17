@@ -963,6 +963,7 @@ class DroneViewer(tk.Tk):
         # Attach the tkinter log window now that the Tk root exists.
         my_logger.configure_logging(
             tk_parent=self,
+            tk_menubar=self.menubar,
             tk_title="Atom Data Viewer Log"
         )
 
@@ -983,9 +984,7 @@ class DroneViewer(tk.Tk):
         PrefsDialog(self, self.prefs, self._on_prefs_saved, self.menubar)
 
     def _show_log(self):
-        """Open the log window, or raise it if already open."""
-        if my_logger._tk_window:
-            my_logger._tk_window.show()
+        my_logger._tk_window.show()
 
     def _on_prefs_saved(self, new_prefs: dict):
         self.prefs.update(new_prefs)

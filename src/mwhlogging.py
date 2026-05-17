@@ -133,13 +133,14 @@ class _TkLogWindow:
     FONT_SIZE = 11
     MAX_LINES = 2_000           # trim oldest lines when exceeded
 
-    def __init__(self, parent, title: str = "Log"):
+    def __init__(self, parent, menubar, title: str = "Log"):
         import tkinter as tk  # imported here to keep the module lightweight
         self._tk   = tk
         self._root = parent
         self._win  = None
         self._text = None
         self._title = title
+        self._menubar = menubar
         self._pending: list[str] = []   # messages queued before window exists
 
     # ── public ───────────────────────────────────────────────────────────────
@@ -183,26 +184,12 @@ class _TkLogWindow:
         win = tk.Toplevel(self._root)
         win.title(self._title)
         win.geometry("900x400")
-        win.configure(bg=self.BG)
+        win.configure(bg=self.BG, menu=self._menubar)
+        win.withdraw()
 
         # ── toolbar ──────────────────────────────────────────────────────────
         toolbar = tk.Frame(win, bg=self.BG)
         toolbar.pack(side="top", fill="x", padx=4, pady=(4, 0))
-
-        tk.Button(
-            toolbar, text="Clear", bg="#333", fg=self.FG,
-            relief="flat", padx=8,
-            command=self._clear
-        ).pack(side="left")
-
-        self._autoscroll_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(
-            toolbar, text="Auto-scroll",
-            variable=self._autoscroll_var,
-            bg=self.BG, fg=self.FG, selectcolor="#333",
-            activebackground=self.BG, activeforeground=self.FG,
-            relief="flat"
-        ).pack(side="left", padx=8)
 
         # ── text widget + scrollbar ───────────────────────────────────────────
         frame = tk.Frame(win, bg=self.BG)
@@ -288,16 +275,7 @@ class _TkLogWindow:
             widget.delete("1.0", f"{line_count - self.MAX_LINES}.0")
             widget.configure(state="disabled")
 
-        if self._autoscroll_var.get():
-            widget.see("end")
-
-    def _clear(self) -> None:
-        if self._text is None:
-            return
-        self._text.configure(state="normal")
-        self._text.delete("1.0", "end")
-        self._text.configure(state="disabled")
-
+        widget.see("end")
 
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
@@ -370,6 +348,7 @@ class MWHLogger(logging.Logger):
         self,
         level:      int  = None,
         tk_parent        = None,
+        tk_menubar       = None,
         tk_title:   str  = None,
     ) -> None:
         """
@@ -380,6 +359,7 @@ class MWHLogger(logging.Logger):
         level       : New log level (DEBUG, INFO, WARNING, ERROR).
         tk_parent   : A tk.Tk or tk.Toplevel instance. Passing this opens
                       (or reuses) the tkinter log window.
+        tk_menubar  : the parent instance's menu bar.
         tk_title    : Title for the tkinter log window.
         """
 
@@ -387,12 +367,12 @@ class MWHLogger(logging.Logger):
             tk_title = self.name
 
         if tk_parent is not None:
-            self.open_tk_window(tk_parent, tk_title)
+            self.open_tk_window(tk_parent, tk_menubar, tk_title)
 
         if level is not None:
             self.setLevel(level)
 
-    def open_tk_window(self, parent, title: str) -> None:
+    def open_tk_window(self, parent, menubar, title: str) -> None:
         """Create the tkinter log window and attach its handler."""
         if self._tk_handler is not None:
             # Already open; just raise the window.
@@ -400,7 +380,7 @@ class MWHLogger(logging.Logger):
                 self._tk_window._win.lift()
             return
 
-        self._tk_window = _TkLogWindow(parent, title=title)
+        self._tk_window = _TkLogWindow(parent, menubar, title=title)
         h = _TkHandler(self._tk_window)
         # Use ANSI formatter — the Tk handler's _parse_ansi() strips the codes
         # and converts them to Tk tags, so the Text widget gets real colors.
