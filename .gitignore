@@ -4,4 +4,4 @@ src/__pycache__/**
 src/build/**
 src/dist/**
 data/**
-src/adeversion.py
+src/advversion.py
