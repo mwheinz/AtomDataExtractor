@@ -22,10 +22,18 @@ Keyboard shortcuts (non-Mac)
   Ctrl+O   Import FC2 file(s)
   Ctrl+E   Export current file to CSV
   Ctrl+Q   Quit
+
+  Ctrl+F   Show Flight Summary
+  Ctrl+L   Show Log
+
+  Ctrl+0   Zoom map to fit window.
+  
   Space    Play / Pause
   Left     Step back  (100 records)
   Right    Step forward (100 records)
+
   Delete   Remove selected file from list
+  Backspc  Remove selected file from list
 
 Author: Michael Heinz
 """
@@ -689,7 +697,9 @@ class FileListPane(tk.Frame):
         sb.config(command=self._listbox.yview)
         self._listbox.pack(fill=tk.BOTH, expand=True)
 
-        self._listbox.bind("<<ListboxSelect>>", self._on_select)
+        # Disabled to avoid conflict with play/pause and to limit accidental
+        # re-loads. Use double-click to load a file.
+        #self._listbox.bind("<<ListboxSelect>>", self._on_select)
         self._listbox.bind("<Delete>",          self._remove_selected)
         self._listbox.bind("<BackSpace>",       self._remove_selected)
         self._listbox.bind("<Double-Button-1>", self._on_select)
