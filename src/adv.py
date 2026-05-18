@@ -112,14 +112,14 @@ FILELIST_FILE = Path.home() / ".atom2_viewer_files.json"
 # Each tuple: (display_label, data_key, unit, format_spec)
 # ─────────────────────────────────────────────────────────────────────────────
 DASHBOARD_METRICS = [
-    ("Speed",    "3d Derived Speed (m/s)", " m/s", ".1f"),
-    ("Alt",      "alt (m)",                " m",   ".1f"),
-    ("Dist",     "2d Derived Distance (m)","m",    ".0f"),
-    ("Heading",  "heading (deg)",          "°",    ".1f"),
-    ("Battery",  "Battery Level (%)",      "%",    ".0f"),
-    ("Sats",     "Satellites",             "",     "d"),
-    ("Wind",     "Wind Speed (m/s)",       " m/s", ".1f"),
-    ("Mode",     "Flight Mode (text)",     "",     "s"),
+    ("Speed",    "3d Derived Speed (m/s)", " m/s", ".1f", "max_speed"),
+    ("Alt",      "alt (m)",                " m",   ".1f", "max_alt"),
+    ("Dist",     "2d Derived Distance (m)","m",    ".0f", "max_dist"),
+    ("Heading",  "heading (deg)",          "°",    ".1f", None),
+    ("Battery",  "Battery Level (%)",      "%",    ".0f", None),
+    ("Sats",     "Satellites",             "",     "d", None),
+    ("Wind",     "Wind Speed (m/s)",       " m/s", ".1f", "max_wind"),
+    ("Mode",     "Flight Mode (text)",     "",     "s", None),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -606,13 +606,14 @@ class DashboardStrip(tk.Frame):
         super().__init__(parent, bg=bg, **kw)
         self.prefs = prefs
         self._vars: dict[str, tk.StringVar] = {}
+        self._labels: dict[str, tk.Label] = {}
         self._build()
 
     def _build(self):
         prefs = self.prefs
         bg    = prefs["color_panel_bg"]
 
-        for i, (label, key, unit, fmt) in enumerate(DASHBOARD_METRICS):
+        for i, (label, key, unit, fmt, limit) in enumerate(DASHBOARD_METRICS):
             tile = tk.Frame(self, bg=bg, padx=8, pady=4,
                             relief=tk.FLAT, bd=0)
             tile.grid(row=0, column=i, sticky="nsew", padx=1)
@@ -624,9 +625,11 @@ class DashboardStrip(tk.Frame):
 
             var = tk.StringVar(value="—")
             self._vars[key] = var
-            tk.Label(tile, textvariable=var,
+            label = tk.Label(tile, textvariable=var,
                      bg=bg, fg=prefs["color_value"],
-                     font=prefs["font_metric"]).pack()
+                     font=prefs["font_metric"])
+            label.pack()
+            self._labels[key] = label
 
         # Thin accent border at the bottom
         tk.Frame(self, bg=prefs["color_border"], height=1).grid(
@@ -634,9 +637,24 @@ class DashboardStrip(tk.Frame):
 
     def update_record(self, record: dict):
         """Push a new telemetry record into the dashboard tiles."""
-        for label, key, unit, fmt in DASHBOARD_METRICS:
+        for label, key, unit, fmt, limit in DASHBOARD_METRICS:
             value = record.get(key)
             self._vars[key].set(_fmt(value, fmt, unit))
+            if limit is not None:
+                max_val = int(self.prefs[limit])
+                if value > max_val * 0.9:
+                    self._labels[key].config(fg=self.prefs["color_danger"])
+                elif value > max_val *0.5:
+                    self._labels[key].config(fg=self.prefs["color_warn"])
+                else:
+                    self._labels[key].config(fg=self.prefs["color_safe"])
+            elif label == "Battery":
+                if value < 25:
+                    self._labels[key].config(fg=self.prefs["color_danger"])
+                elif value < 50:
+                    self._labels[key].config(fg=self.prefs["color_warn"])
+                else:
+                    self._labels[key].config(fg=self.prefs["color_safe"])
 
     def clear(self):
         for var in self._vars.values():
