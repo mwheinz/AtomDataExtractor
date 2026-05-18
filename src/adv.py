@@ -282,7 +282,6 @@ class PrefsDialog(tk.Toplevel):
 
     COLOR_FIELDS=[
         ("color_bg",       "Background"),
-        ("color_gauge_bg", "Gauge Background"),
         ("color_accent",   "Accent"),
         ("color_border",   "Border"),
         ("color_value",    "Values"),
@@ -588,7 +587,7 @@ def _fmt(value, fmt_spec: str, unit: str) -> str:
 #  A horizontal row of labeled metric tiles.
 #  Each tile shows a label and a value that updates during playback.
 #
-#  Skeleton: tiles are plain tk.Label pairs; future work can replace them
+#  TODO: tiles are plain tk.Label pairs; future work can replace them
 #  with canvas-drawn arc gauges copied from adv.py.
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -796,7 +795,7 @@ class PlaybackControls(tk.Frame):
 
     def _build(self):
         prefs = self.prefs
-        bg    = prefs["color_bg"]
+        bg    = prefs["color_button_bg"]
 
         # Progress label row
         lbl_row = tk.Frame(self, bg=bg)
@@ -1283,7 +1282,7 @@ class FlightSummaryWindow(tk.Toplevel):
             self._tree.heading(col_id, text=label,
                                command=lambda c=col_id: self._sort_by(c))
             self._tree.column(col_id, anchor=anchor,
-                              minwidth=minwidth, stretch=stretch)
+                              minwidth=minwidth, width=minwidth, stretch=stretch)
 
         # Alternating row colours
         self._tree.tag_configure("odd",  background=panel_bg)
@@ -1526,7 +1525,6 @@ class Atom2Viewer(tk.Tk):
             self.createcommand("tk::mac::Quit", self._on_close)
         except Exception:
             pass
-        my_logger.debug("complete.")
 
     def _mac_open(self, *filenames):
         my_logger.debug("_mac_open")
@@ -1540,11 +1538,6 @@ class Atom2Viewer(tk.Tk):
         style = ttk.Style(self)
         preferred = self.prefs["theme"]
         style.theme_use(preferred)
-        #for preferred in ("aqua", "vista", "alt", "clam", "default"):
-        #    if preferred in style.theme_names():
-        #        my_logger.debug(f"Using {preferred} theme.")
-        #        style.theme_use(preferred)
-        #        break
 
     def _save_prefs(self,prefs):
         self.prefs=prefs
@@ -1641,9 +1634,6 @@ class Atom2Viewer(tk.Tk):
             m.add_command(label="About",
                           command=self._show_about,
                           underline=0)
-        m.add_command(label="View Log…",
-                      command=self._show_log,
-                      underline=5)
         m.add_separator()
         m.add_command(label="Quit",
                       command=self._on_close,
@@ -1654,11 +1644,15 @@ class Atom2Viewer(tk.Tk):
         m = tk.Menu(self._menubar)
         self._menubar.add_cascade(label="View", menu=m, underline=0)
 
+        acc = "Command" if PLATFORM_SYSTEM == "Darwin" else "Ctrl"
+
         m.add_command(label="Flight Summary…",
                       command=self._show_summary,
+                      accelerator=f"{acc}+F",
                       underline=0)
-        m.add_command(label="Log Window…",
+        m.add_command(label="Log…",
                       command=self._show_log,
+                      accelerator=f"{acc}+L",
                       underline=0)
         m.add_separator()
         m.add_command(label="Fit Map to Path",
@@ -1706,13 +1700,23 @@ class Atom2Viewer(tk.Tk):
 
     def _bind_keys(self):
         if PLATFORM_SYSTEM == "Darwin":
+            # File Menu
             self.bind("<Command-o>", lambda e: self._import_files())
             self.bind("<Command-e>", lambda e: self._export_csv_current())
             self.bind("<Command-q>", lambda e: self._on_close())
+            # View Menu
+            self.bind("<Command-f>", lambda e: self._show_summary())
+            self.bind("<Command-l>", lambda e: self._show_log())
+            self.bind("<Command-0>", lambda e: self._fit_map())
         else:
+            # File Menu
             self.bind("<Control-o>", lambda e: self._import_files())
             self.bind("<Control-e>", lambda e: self._export_csv_current())
             self.bind("<Control-q>", lambda e: self._on_close())
+            # View Menu
+            self.bind("<Control-f>", lambda e: self._show_summary())
+            self.bind("<Control-l>", lambda e: self._show_log())
+            self.bind("<Control-0>", lambda e: self._fit_map())
 
         self.bind("<space>", lambda e: self._toggle_play())
         self.bind("<Left>",  lambda e: self._step_back())
@@ -1995,7 +1999,8 @@ class Atom2Viewer(tk.Tk):
     def _show_log(self):
         try:
             my_logger._tk_window.show()
-        except Exception:
+        except Exception as e:
+            my_logger.error(str(e))
             messagebox.showinfo("Log", "Log window is not available.")
 
     def _fit_map(self):

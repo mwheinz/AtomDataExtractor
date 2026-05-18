@@ -164,6 +164,7 @@ class _TkLogWindow:
             self._win.deiconify()
             self._win.lift()
             self._win.focus_force()
+            self._center_on(self._root)
 
     def _append_threadsafe(self, message: str) -> None:
         """Schedule a write via after() so Tk is only touched on main thread."""
@@ -175,6 +176,11 @@ class _TkLogWindow:
         self._write(message + "\n")
 
     # ── private ──────────────────────────────────────────────────────────────
+
+    def _center_on(self, parent):
+        x=parent.winfo_x() + (parent.winfo_width()  - self._win.winfo_width())  // 2
+        y=parent.winfo_y() + (parent.winfo_height() - self._win.winfo_height()) // 2
+        self._win.geometry(f"+{x}+{y}")
 
     def _ensure_window(self) -> None:
         """Build the window the first time it is needed."""
