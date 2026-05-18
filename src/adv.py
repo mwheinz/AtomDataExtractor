@@ -161,23 +161,23 @@ DEFAULT_PREFS = {
     "font_metric": ["TkDefaultFont", 12],
     "font_marker": "",
 
-    # --- CSV export options ---
+    # ─── CSV export options ───
     "csv_extended": False,
     "csv_derived": True,
 
-    # --- System Theme
+    # ─── System Theme ───
     "theme": "default",
 }
 
 DARK_MODE_PREFS = {
-    # --- Basic Settings ---
+    # ─── Basic Settings ───
     "window_geometry": "1400x860",
     "sash_position": 280,
     "log_level": "Info",
     "last_import_dir": str(Path.home()),
     "last_export_dir": str(Path.home()),
 
-    # --- Gauge Limits ---
+    # ─── Gauge Limits ───
     "max_speed": 57,
     "max_alt": 200,
     "max_dist": 500,
@@ -205,11 +205,11 @@ DARK_MODE_PREFS = {
     "font_metric": ["TkDefaultFont", 14, "bold"],
     "font_marker": "",
 
-    # --- CSV export options ---
+    # ─── CSV export options ───
     "csv_extended": False,
     "csv_derived": True,
 
-    # --- System Theme
+    # ─── System Theme ───
     "theme": "default",
 }
 
@@ -647,7 +647,7 @@ class DashboardStrip(tk.Frame):
 #  FileListPane  –  left panel with persistent fc2 file list
 #
 #  Scrollable list of fc2 files.  Fires on_select(path) when the user
-#  clicks a row.  The list is persisted across sessions.
+#  double-clicks a row.  The list is persisted across sessions.
 # ─────────────────────────────────────────────────────────────────────────────
 
 class FileListPane(tk.Frame):
@@ -719,6 +719,7 @@ class FileListPane(tk.Frame):
         for p in paths:
             p = str(Path(p).resolve())
             if p not in self._paths and Path(p).exists():
+                my_logger.debug(f"Adding {p} to the file list.")
                 self._paths.append(p)
                 self._listbox.insert(tk.END, Path(p).name)
                 added += 1
@@ -755,6 +756,7 @@ class FileListPane(tk.Frame):
         if not sel:
             return
         idx = sel[0]
+        my_logger.debug(f"Deleting item {sel[0]}: {self._paths[idx]}")
         self._listbox.delete(idx)
         del self._paths[idx]
         self._save()
@@ -763,6 +765,7 @@ class FileListPane(tk.Frame):
     def _load_persisted(self):
         paths = load_file_list()
         for p in paths:
+            my_logger.debug(f"Adding {p} to the file list.")
             self._paths.append(p)
             self._listbox.insert(tk.END, Path(p).name)
         self._update_count()
@@ -977,18 +980,6 @@ class MapPane(tk.Frame):
             self.map_widget = tkintermapview.TkinterMapView(
                 map_container, corner_radius=0)
             self.map_widget.pack(fill=tk.BOTH, expand=True)
-
-            # Darwin scroll-wheel fix
-            if PLATFORM_SYSTEM == "Darwin":
-                def _map_zoom(event):
-                    rx = event.x / self.map_widget.width
-                    ry = event.y / self.map_widget.height
-                    self.map_widget.set_zoom(
-                        self.map_widget.zoom + event.delta * 0.01,
-                        relative_pointer_x=rx,
-                        relative_pointer_y=ry,
-                    )
-                self.map_widget.canvas.bind("<MouseWheel>", _map_zoom)
         else:
             # Fallback placeholder
             self.map_widget = None
