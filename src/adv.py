@@ -1,213 +1,278 @@
 #!/usr/bin/env -S python3 -OO
 """
-Atom 2 Flight Log Visualizer
-Displays drone flight path, telemetry gauges, and RC stick positions
-with playback controls. Uses tkinter + tkintermapview.
+atom2_viewer.py  –  Atom 2 Flight Log Viewer & Exporter
+========================================================
+Combined replacement for adv.py (visualizer) and atom_data_extractor.py (CSV export).
+
+Layout
+------
+  Left  : persistent file list (fc2 files, survives restarts)
+  Right : animated dashboard (top) + map (middle) + playback controls (bottom)
+
+Menus
+-----
+  File   : Import FC2…  |  Import Directory…  | ──  | Export CSV…  | Export All CSV…
+           ── | Preferences… | ── | View Log… | ── | Quit
+  View   : Show Flight Summary  |  Show Log Window  |  Fit Map to Path
+  Playback : Play/Pause  |  Step Back  |  Step Forward  |  Rewind  |  Speed ←  |  Speed →
+  Help   : About
+
+Keyboard shortcuts (non-Mac)
+-----------------------------
+  Ctrl+O   Import FC2 file(s)
+  Ctrl+E   Export current file to CSV
+  Ctrl+Q   Quit
+  Space    Play / Pause
+  Left     Step back  (100 records)
+  Right    Step forward (100 records)
+  Delete   Remove selected file from list
+
+Author: Michael Heinz
 """
 
-import os
-import sys
-import math
-import threading
+# ─────────────────────────────────────────────────────────────────────────────
+# Standard library
+# ─────────────────────────────────────────────────────────────────────────────
+import csv
 import json
+import math
+import os
 import platform
+import sys
+import threading
 from pathlib import Path
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tkinter
+# ─────────────────────────────────────────────────────────────────────────────
 import tkinter as tk
 import tkinter.font as tkf
-from tkinter import ttk, filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from tkinter.colorchooser import askcolor
-import tkintermapview
-from PIL import Image, ImageDraw, ImageTk, ImageFont
-from advversion import _version
-from atom2parser import atom2_parser, log_stats, is_valid_latlon, BASIC_DATA, \
-    EXTENDED_DATA, DERIVED_DATA
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Third-party – install with:
+#   pip install tkintermapview pillow
+# ─────────────────────────────────────────────────────────────────────────────
+try:
+    import tkintermapview
+    HAS_MAP = True
+except ImportError:
+    HAS_MAP = False
+
+try:
+    from PIL import Image, ImageDraw, ImageFont, ImageTk
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Local modules (same directory as this file)
+# ─────────────────────────────────────────────────────────────────────────────
+from atom2parser import (
+    BASIC_DATA,
+    DERIVED_DATA,
+    EXTENDED_DATA,
+    atom2_parser,
+    is_valid_latlon,
+    log_stats,
+)
 import mwhlogging
 from mwhlogging import MWHLogger
 
+try:
+    from advversion import _version
+except ImportError:
+    _version = "unknown"
+
 # ─────────────────────────────────────────────────────────────────────────────
+# Module-level logger  (window will be attached after Tk root exists)
 # ─────────────────────────────────────────────────────────────────────────────
-# Logger — the logger's window will be attached later in DroneViewer.__init__,
-# once the Tk root exists.
-# ─────────────────────────────────────────────────────────────────────────────
-my_logger=MWHLogger("adv")
+my_logger = MWHLogger("atom2_viewer")
 my_logger.setLevel(mwhlogging.DEBUG)
 
+PLATFORM_SYSTEM = platform.system()
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Each pair represents a panel label and the matching data field.
-# Section headers begin with None and the second field is the header label.
-# None by itself will act as a spacer.
-# Items will appear in the panel in the order they are listed.
+# Persistent state files
 # ─────────────────────────────────────────────────────────────────────────────
-PANEL_ITEMS=[
-    (None, "Time"),
-    ("Flt Ctr", "Flight Counter"),
-    ("Record #", "rid"),
-    ("Elapsed", "elapsed (us)"),
+PREFS_FILE   = Path.home() / ".atom2_viewer_prefs.json"
+FILELIST_FILE = Path.home() / ".atom2_viewer_files.json"
 
-    (None, "Status"),
-    ("Drn Mode", "Drone Mode (text)"),
-    ("Flt Mode", "Flight Mode (text)"),
-    ("Pos Mode", "Positioning Mode (text)"),
-
-    (None, "Battery"),
-    ("Batt. mV", "Battery (mv)"),
-    ("Batt. mA", "Battery Current (ma)"),
-    ("Batt. Temp", "Battery Temp (c)"),
-    ("Batt. %", "Battery Level (%)"),
-
-    (None, "Position"),
-    ("GPS", "GPS Lock"),
-    ("Sats", "Satellites"),
-    ("Lat", "lat (deg)"),
-    ("Lon", "lon (deg)"),
-    ("Alt m", "alt (m)"),
-    ("HDOP", "HDOP"),
-    ("H Lat", "Home Lat (deg)"),
-    ("H Lon", "Home Lon (deg)"),
-
-    (None, "Distance"),
-    ("2d Dist. m", "2d Derived Distance (m)"),
-    ("3d Dist. m", "3d Derived Distance (m)"),
-    ("2d T Dist. m", "2d Travelled Distance (m)"),
-    ("3d T Dist. m", "3d Travelled Distance (m)"),
-
-    (None, "Orientation"),
-    ("Bank Deg", "bank (deg)"),
-    ("Pitch Deg", "pitch angle (deg)"),
-    ("Heading Deg", "heading (deg)"),
-
-    (None, "Speed"),
-    ("2d m/s", "2d Derived Speed (m/s)"),
-    ("3d m/s", "3d Derived Speed (m/s)"),
-
-    (None, "Wind"),
-    ("Wind Deg", "Wind (deg)"),
-    ("Wind m/s", "Wind Speed (m/s)"),
-
-    (None, "Motor"),
-    ("1 State", "Motor 1 State"),
-    ("1 RPM", "Motor 1 RPM"),
-    ("2 State", "Motor 2 State"),
-    ("2 RPM", "Motor 2 RPM"),
-    ("3 State", "Motor 3 State"),
-    ("3 RPM", "Motor 3 RPM"),
-    ("4 State", "Motor 4 State"),
-    ("4 RPM", "Motor 4 RPM"),
-
-    (None, "Controls"),
-    ("Up/Down", "rc elevator"),
-    ("Turn", "rc rudder"),
-    ("Throttle", "rc throttle"),
-    ("Bank", "rc aileron"),
-
-    #Disabling these for performance reasons.
-    #(None, "IMU"),
-    #("X m/s2", "Accelerometer X (m/s2)"),
-    #("Y m/s2", "Accelerometer Y (m/s2)"),
-    #("Z m/s2", "Accelerometer Z (m/s2)"),
-    #(None),
-    #("Gyr X d/s", "Gyroscope X (deg/s)"),
-    #("Gyr Y d/s", "Gyroscope Y (deg/s)"),
-    #("Gyr Z d/s", "Gyroscope Z (deg/s)"),
-    #("Air pres", "Air Pressure (pascals)"),
-    #("Mag X", "Magnetometer X"),
-    #("Mag Y", "Magnetometer Y"),
+# ─────────────────────────────────────────────────────────────────────────────
+# Dashboard metrics shown in the animated header strip.
+# Each tuple: (display_label, data_key, unit, format_spec)
+# ─────────────────────────────────────────────────────────────────────────────
+DASHBOARD_METRICS = [
+    ("Speed",    "3d Derived Speed (m/s)", " m/s", ".1f"),
+    ("Alt",      "alt (m)",                " m",   ".1f"),
+    ("Dist",     "2d Derived Distance (m)","m",    ".0f"),
+    ("Heading",  "heading (deg)",          "°",    ".1f"),
+    ("Battery",  "Battery Level (%)",      "%",    ".0f"),
+    ("Sats",     "Satellites",             "",     "d"),
+    ("Wind",     "Wind Speed (m/s)",       " m/s", ".1f"),
+    ("Mode",     "Flight Mode (text)",     "",     "s"),
 ]
 
-PANEL_SKIP={ "Elapsed", "Lat", "Lon", "H Lat", "H Lon",
-             "Distance", "2d Dist", "3d Dist", "2d Speed",
-             "3d Speed"}
+# ─────────────────────────────────────────────────────────────────────────────
+# Application defaults
+# ─────────────────────────────────────────────────────────────────────────────
+DEFAULT_PREFS = {
+    # ─── Basic Settings ───
+    "window_geometry": "1400x860",
+    "sash_position": 280,           # Width of the left pane.
+    "log_level": "Info",
+    "last_import_dir": str(Path.home()),
+    "last_export_dir": str(Path.home()),
 
-PREFS_FILE=Path.home() / ".atom_data_viewer.json"
+    # ─── Gauge Limits ───
+    "max_speed": 57,
+    "max_alt": 200,
+    "max_dist": 500,
+    "max_wind": 10,
 
-DEFAULT_PREFS={
-    # ─────────────────────────────────────────────────────────────────────────
-    # Basic settings.
-    # ─────────────────────────────────────────────────────────────────────────
-    "window_geometry": "1200x800",
-    "log_level"      : "Debug",
-    "input_dir"      : str(Path.home()),
+    # ─── Color palette ───
+    "color_bg":         "#ffffff",  # Main background (White)
+    "color_panel_bg":   "#f8f9fa",  # Lighter background for containers (Off-white)
+    "color_button_bg":  "#e9ecef",  # Button background (Very light gray)
+    "color_button_fg":  "#333333",  # Button text color (Dark gray)
+    "color_accent":     "#007bff",  # Primary interactive highlight (Classic Blue)
+    "color_border":     "#dee2e6",  # Separator lines (Light gray)
+    "color_value":      "#212529",  # Text value color (Near black)
+    "color_label":      "#6c757d",  # Label color (Medium gray)
+    "color_path":       "#28a745",  # Success/Path (Standard Green)
+    "color_safe":       "#28a745",  # Safe (Standard Green)
+    "color_warn":       "#ffc107",  # Warning (Standard Amber)
+    "color_danger":     "#dc3545",  # Danger (Standard Red)
+    "color_select":     "#dfdfff",  # Selected List Item
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Gauge Limits
-    # ─────────────────────────────────────────────────────────────────────────
-    "max_speed"      : 57,
-    "max_alt"        : 200,
-    "max_dist"       : 500,
-    "max_wind"       : 10,
+    # ─── Font palette ───
+    "font_ui": ["TkDefaultFont", 10],
+    "font_title": ["TkDefaultFont", 12, "bold"],
+    "font_small": ["TkDefaultFont", 8],
+    "font_metric": ["TkDefaultFont", 12],
+    "font_marker": "",
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Color palette
-    # ─────────────────────────────────────────────────────────────────────────
-    "color_bg"       : "#0d1117",
-    "color_gauge_bg" : "#161b22",
-    "color_accent"   : "#58a6ff",
-    "color_border"   : "#30363d",
-    "color_value"    : "#e6edf3",
-    "color_label"    : "#8b949e",
-    "color_path"     : "#3fb950",
-
-    "color_safe"     : "#3fb950",
-    "color_warn"     : "#d29922",
-    "color_danger"   : "#f85149",
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # Font palette. May be overridden by the platform type.
-    # ─────────────────────────────────────────────────────────────────────────
-    "font_label"     : ["TkDefaultFont", 10],
-    "font_title"     : ["TkDefaultFont", 13, "bold"],
-    "font_marker"    : "",
-    "font_small"     : ["TkDefaultFont", 8],
+    # --- CSV export options ---
+    "csv_extended": False,
+    "csv_derived": True,
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Use fonts that should be available on the current platform.
-# ─────────────────────────────────────────────────────────────────────────────
-PLATFORM_SYSTEM=platform.system()
+DARK_MODE_PREFS = {
+    # --- Basic Settings ---
+    "window_geometry": "1400x860",
+    "sash_position": 280,
+    "log_level": "Info",
+    "last_import_dir": str(Path.home()),
+    "last_export_dir": str(Path.home()),
+
+    # --- Gauge Limits ---
+    "max_speed": 57,
+    "max_alt": 200,
+    "max_dist": 500,
+    "max_wind": 10,
+
+    # ─── Color palette ───
+    "color_bg":         "#121212",  # Main background (Near black)
+    "color_panel_bg":   "#1e1e2d",  # Panel background (Deep midnight blue/gray)
+    "color_button_bg":  "#252526",  # Button background (Slightly different from panel)
+    "color_button_fg":  "#121212",  # Button text color (Deep black)
+    "color_accent":     "#64b5ff",  # Primary interactive highlight (Bright Cyan/Sky Blue)
+    "color_border":     "#333333",  # Separator lines (Medium dark gray)
+    "color_value":      "#e0e0e0",  # Text value color (Off-white/Light gray)
+    "color_label":      "#9e9e9e",  # Label color (Medium gray)
+    "color_path":       "#4caf50",  # Success/Path (Vibrant Green)
+    "color_safe":       "#4caf50",  # Safe (Vibrant Green)
+    "color_warn":       "#ff9800",  # Warning (Vibrant Orange/Amber)
+    "color_danger":     "#f44336",  # Danger (Vibrant Red)
+    "color_select":     "#1f6feb",  # Selected List Item
+
+    # ─── Font palette ───
+    "font_ui": ["TkDefaultFont", 10],
+    "font_title": ["TkDefaultFont", 12, "bold"],
+    "font_small": ["TkDefaultFont", 8],
+    "font_metric": ["TkDefaultFont", 14, "bold"],
+    "font_marker": "",
+
+    # --- CSV export options ---
+    "csv_extended": False,
+    "csv_derived": True,
+}
+
 if PLATFORM_SYSTEM == "Linux":
-    DEFAULT_PREFS["font_label"] =["Liberation", 10]
-    DEFAULT_PREFS["font_title"] =["Times", 13, "bold"]
-    DEFAULT_PREFS["font_marker"]=""
-    DEFAULT_PREFS["font_small"] =["Liberation", 8]
+    DEFAULT_PREFS["font_ui"]    = ["Liberation", 10]
+    DEFAULT_PREFS["font_title"] = ["Times", 12, "bold"]
+    DEFAULT_PREFS["font_small"] = ["Liberation", 8]
+    DEFAULT_PREFS["font_metric"]= ["Liberation", 12]
 elif PLATFORM_SYSTEM == "Darwin":
-    DEFAULT_PREFS["font_label"] =["Helvetica Neue", 10]
-    DEFAULT_PREFS["font_title"] =["Helvetica Neue", 13, "bold"]
+    DEFAULT_PREFS["font_ui"]    = ["Helvetica Neue", 10]
+    DEFAULT_PREFS["font_title"] = ["Helvetica Neue", 12, "bold"]
+    DEFAULT_PREFS["font_small"] = ["Helvetica Neue", 8]
+    DEFAULT_PREFS["font_metric"]= ["Helvetica Neue", 12]
     DEFAULT_PREFS["font_marker"]="/System/Library/Fonts/HelveticaNeue.ttc"
-    DEFAULT_PREFS["font_small"] =["Helvetica Neue", 8]
+    DARK_MODE_PREFS["font_ui"]    = ["Helvetica Neue", 10]
+    DARK_MODE_PREFS["font_title"] = ["Helvetica Neue", 12, "bold"]
+    DARK_MODE_PREFS["font_small"] = ["Helvetica Neue", 8]
+    DARK_MODE_PREFS["font_metric"]= ["Helvetica Neue", 12]
+    DARK_MODE_PREFS["font_marker"]="/System/Library/Fonts/HelveticaNeue.ttc"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Preference persistence
+# ─────────────────────────────────────────────────────────────────────────────
 
 def load_prefs() -> dict:
-    my_logger.debug("Loading preferences from %s", PREFS_FILE)
+    my_logger.debug("Loading preferences.")
+    prefs = DEFAULT_PREFS.copy()
     try:
         if PREFS_FILE.exists():
-            with open(PREFS_FILE, "r", encoding="utf-8") as f:
-                saved=json.load(f)
-            prefs=DEFAULT_PREFS.copy()
-            prefs.update(saved)
-            return prefs
-    except Exception as e:
-        messagebox.showerror("Failed to load the saved preferences.", str(e))
-        my_logger.error("Failed to load the saved preferences: %s", str(e))
+            with open(PREFS_FILE, encoding="utf-8") as f:
+                prefs.update(json.load(f))
+    except Exception as exc:
+        my_logger.error("Could not load prefs: %s", exc)
+    return prefs
 
-    return DEFAULT_PREFS.copy()
 
 def save_prefs(prefs: dict) -> None:
-    my_logger.debug("Saving preferences to %s", PREFS_FILE)
+    my_logger.debug("Saving preferences.")
     try:
         with open(PREFS_FILE, "w", encoding="utf-8") as f:
             json.dump(prefs, f, indent=2)
-    except Exception as e:
-        messagebox.showerror("Failed to save the preferences.", str(e))
-        my_logger.error("Failed to save the preferences: %s", str(e))
+    except Exception as exc:
+        my_logger.error("Could not save prefs: %s", exc)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Preferences Dialog
+# File-list persistence
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_file_list() -> list[str]:
+    my_logger.debug("Loading file list.")
+    try:
+        if FILELIST_FILE.exists():
+            with open(FILELIST_FILE, encoding="utf-8") as f:
+                paths = json.load(f)
+                paths.sort()
+            return [p for p in paths if Path(p).exists()]
+    except Exception as exc:
+        my_logger.error("Could not load file list: %s", exc)
+    return []
+
+
+def save_file_list(paths: list[str]) -> None:
+    my_logger.debug("Saving file list.")
+    try:
+        with open(FILELIST_FILE, "w", encoding="utf-8") as f:
+            json.dump(paths, f, indent=2)
+    except Exception as exc:
+        my_logger.error("Could not save file list: %s", exc)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Displays the current preferences and allows updating them.
+# Supports two sets of defaults - normal and dark mode.
 # ─────────────────────────────────────────────────────────────────────────────
 
 class PrefsDialog(tk.Toplevel):
-    """
-    Modal dialog for editing the application preferences.
-    Edits a copy of prefs and calls on_save(new_prefs) if the user clicks Save.
-    """
 
     COLOR_FIELDS=[
         ("color_bg",       "Background"),
@@ -220,12 +285,14 @@ class PrefsDialog(tk.Toplevel):
         ("color_safe",     "Safe"),
         ("color_warn",     "Warning"),
         ("color_danger",   "Danger"),
+        ("color_select",   "Selected"),
     ]
 
     FONT_FIELDS=[
-        ("font_label",  "Label Font"),
+        ("font_ui",  "Label Font"),
         ("font_title",  "Title Font"),
         ("font_small",  "Small Font"),
+        ("font_metric",  "Gauge Font"),
     ]
 
     # Use this to restrict input on the numeric fields.
@@ -234,13 +301,14 @@ class PrefsDialog(tk.Toplevel):
         return (P.isdigit() or P =="")
 
     def __init__(self, parent, prefs: dict, on_save, menubar):
+        my_logger.debug("Creating Prefs Dialog.")
         super().__init__(parent)
-        my_logger.debug("Creating the Prefs dialog")
+
         self.title("Preferences")
         self.resizable(False, False)
-        self.grab_set()             # make modal
         self.transient(parent)      # keep on top of parent
         self.menubar=menubar
+        self._center_on(parent)
         self.validate=parent.register(self._validate_digit)
 
         self.configure(menu=self.menubar)
@@ -250,23 +318,25 @@ class PrefsDialog(tk.Toplevel):
         self._font_vars: dict[str, tuple]  ={}
 
         self._build()
-        self._center_on(parent)
 
-    # ── Layout ────────────────────────────────────────────────────────────
+        self.protocol("WM_DELETE_WINDOW", self.withdraw)
+
+    # ── Layout ─────────────────────────────────────────────────────────
 
     def _build(self):
         PAD={"padx" : 10, "pady" : 4}
 
-        tk.Label(self, text="Some changes will not take effect until restart.",
-             font=self._prefs["font_label"]).pack(padx=12, pady=(8, 0),
+        tk.Label(self, text="Most changes will not take effect until restart.",
+                 font=self._prefs["font_ui"]).pack(padx=12, pady=(8, 0),
                                                   anchor="w")
 
-        # ── Limits ────────────────────────────────────────────────────────
+        # ── Limits ──────────────────────────────────────────────────────────
+
         limits_frame=tk.LabelFrame(self, text="Gauge Limits", padx=6, pady=6)
         limits_frame.pack(fill=tk.X, padx=4, pady=4)
 
-        tk.Label(limits_frame, text="Max Dist:", anchor="w",
-                width=12).grid(row=0, column=0, sticky="w", padx=4, pady=4)
+        # (Limit widgets setup remains identical)
+        tk.Label(limits_frame, text="Max Dist:", anchor="w", width=12).grid(row=0, column=0, sticky="w", padx=4, pady=4)
         self._max_dist=tk.IntVar(value=self._prefs.get("max_dist", 0))
         tk.Entry(limits_frame, textvariable=self._max_dist,
                 validatecommand=(self.validate,"%P"), validate="key",
@@ -274,8 +344,7 @@ class PrefsDialog(tk.Toplevel):
         tk.Label(limits_frame, text="meters", anchor="w",
                 width=12).grid(row=0, column=2, sticky="w", padx=4, pady=4)
 
-        tk.Label(limits_frame, text="Max Speed:", anchor="w",
-                width=12).grid(row=0, column=3, sticky="w", padx=4, pady=4)
+        tk.Label(limits_frame, text="Max Speed:", anchor="w", width=12).grid(row=0, column=3, sticky="w", padx=4, pady=4)
         self._max_speed=tk.IntVar(value=self._prefs.get("max_speed", 0))
         tk.Entry(limits_frame, textvariable=self._max_speed,
                 validatecommand=(self.validate,"%P"), validate="key",
@@ -283,8 +352,7 @@ class PrefsDialog(tk.Toplevel):
         tk.Label(limits_frame, text="kph", anchor="w",
                 width=12).grid(row=0, column=5, sticky="w", padx=4, pady=4)
 
-        tk.Label(limits_frame, text="Max Alt:", anchor="w",
-                 width=12).grid(row=1, column=0, sticky="w", padx=4, pady=4)
+        tk.Label(limits_frame, text="Max Alt:", anchor="w", width=12).grid(row=1, column=0, sticky="w", padx=4, pady=4)
         self._max_alt=tk.IntVar(value=self._prefs.get("max_alt", 0))
         tk.Entry(limits_frame, textvariable=self._max_alt,
                 validatecommand=(self.validate,"%P"), validate="key",
@@ -292,8 +360,7 @@ class PrefsDialog(tk.Toplevel):
         tk.Label(limits_frame, text="meters", anchor="w",
                 width=12).grid(row=1, column=2, sticky="w", padx=4, pady=4)
 
-        tk.Label(limits_frame, text="Max Wind:", anchor="w",
-                width=12).grid(row=1, column=3, sticky="w", padx=4, pady=4)
+        tk.Label(limits_frame, text="Max Wind:", anchor="w", width=12).grid(row=1, column=3, sticky="w", padx=4, pady=4)
         self._max_wind=tk.IntVar(value=self._prefs.get("max_wind", 0))
         tk.Entry(limits_frame, textvariable=self._max_wind,
                 validatecommand=(self.validate,"%P"), validate="key",
@@ -307,10 +374,9 @@ class PrefsDialog(tk.Toplevel):
 
         for i, (key, label) in enumerate(self.COLOR_FIELDS):
             row=i // 2
-            col=(i % 2) * 3       # 3 columns per side: label | swatch | button
+            col=(i % 2) * 3
 
-            tk.Label(color_frame, text=label + ":", anchor="w",
-                     width=12).grid(row=row, column=col, sticky="w", **PAD)
+            tk.Label(color_frame, text=label + ":", anchor="w", width=12).grid(row=row, column=col, sticky="w", **PAD)
 
             swatch=tk.Label(color_frame, width=3,
                               bg=self._prefs.get(key, "#000000"),
@@ -322,7 +388,8 @@ class PrefsDialog(tk.Toplevel):
                       command=lambda k=key: self._pick_color(k),
                       padx=4).grid(row=row, column=col + 2, **PAD)
 
-        # ── Fonts ─────────────────────────────────────────────────────────
+        # ── Fonts ─────────────────────────────────────────────────────
+
         font_frame=tk.LabelFrame(self, text=" Fonts ", padx=6, pady=6)
         font_frame.pack(fill=tk.X, padx=4, pady=4)
 
@@ -330,7 +397,6 @@ class PrefsDialog(tk.Toplevel):
 
         for i, (key, label) in enumerate(self.FONT_FIELDS):
             current=self._prefs.get(key, ("Helvetica", 10))
-            # current may be a list if loaded from JSON (JSON turns tuples into lists)
             current_family=current[0]
             current_size  =current[1]
             current_bold  =len(current) > 2 and current[2] == "bold"
@@ -356,19 +422,7 @@ class PrefsDialog(tk.Toplevel):
 
             self._font_vars[key]=(family_var, size_var, bold_var)
 
-        # Font marker path (separate — it's a file path, not a tkinter font)
-        tk.Label(font_frame, text="Marker Font:", anchor="w",
-                width=12).grid(row=len(self.FONT_FIELDS), column=0,
-                                sticky="w", padx=(10, 4), pady=4)
-        self._marker_var=tk.StringVar(value=self._prefs.get("font_marker", ""))
-        tk.Entry(font_frame, textvariable=self._marker_var,
-                width=28).grid(row=len(self.FONT_FIELDS), column=1,
-                                columnspan=2, padx=4, pady=4, sticky="w")
-        tk.Button(font_frame, text="Browse…",
-                command=self._pick_marker_font).grid(
-            row=len(self.FONT_FIELDS), column=3, padx=4, pady=4)
-
-        # ── Logging ───────────────────────────────────────────────────────
+        # ── Logging ──────────────────────────────────────────────
         log_frame=tk.LabelFrame(self, text=" Logging ", padx=6, pady=6)
         log_frame.pack(fill=tk.X, padx=12, pady=4)
 
@@ -379,32 +433,28 @@ class PrefsDialog(tk.Toplevel):
                            variable=self._log_var, value=level).pack(
                 side=tk.LEFT, padx=4)
 
-        # ── Buttons ───────────────────────────────────────────────────────
+        # ── Buttons ──────────────────────────────────────────────────────
         btn_row=tk.Frame(self)
         btn_row.pack(fill=tk.X, padx=12, pady=(4, 12))
 
-        tk.Button(btn_row, text="Restore Defaults",
-                  command=self._restore_defaults).pack(side=tk.LEFT)
-        tk.Button(btn_row, text="Cancel",
-                  command=self.destroy).pack(side=tk.RIGHT, padx=(4, 0))
+        tk.Button(btn_row, text="Light Mode",
+                  command=self._light_mode).pack(side=tk.LEFT)
+        tk.Button(btn_row, text="Dark Mode",
+                  command=self._dark_mode).pack(side=tk.LEFT)
         tk.Button(btn_row, text="Save",
                   command=self._save,
                   default=tk.ACTIVE).pack(side=tk.RIGHT)
+        tk.Button(btn_row, text="Cancel",
+                  command=self.destroy).pack(side=tk.RIGHT, padx=(4, 0))
 
         # Allow Enter to save and Escape to cancel
         self.bind("<Return>",  lambda e: self._save())
-        self.bind("<Escape>",  lambda e: self.destroy())
+        self.bind("<Escape>",  lambda e: self.withdraw())
 
-    # ── Helpers ───────────────────────────────────────────────────────────
 
-    def _pick_marker_font(self):
-        path=filedialog.askopenfilename(
-            title="Select marker font file",
-            filetypes=[("Font files", "*.ttf *.ttc *.otf"), ("All files", "*.*")],
-            parent=self
-        )
-        if path:
-            self._marker_var.set(path)
+    # ──────────────────────────────────────────────────────────────────────────
+    # Helper Functions
+    # ──────────────────────────────────────────────────────────────────────────
 
     def _get_font_families(self) -> list[str]:
         families=sorted(set(tkf.families()))
@@ -425,27 +475,67 @@ class PrefsDialog(tk.Toplevel):
             self._prefs[key]=hex_color
             self._swatches[key].configure(bg=hex_color)
 
-    def _restore_defaults(self):
-        self._max_speed.set(DEFAULT_PREFS.get("max_speed"))
-        self._max_dist.set(DEFAULT_PREFS.get("max_dist"))
-        self._max_alt.set(DEFAULT_PREFS.get("max_alt"))
-        self._max_wind.set(DEFAULT_PREFS.get("max_wind"))
+    def _light_mode(self):
+        """Resets all widgets based on the default theme."""
+        default_prefs = DEFAULT_PREFS
+
+        # 1. Restore Limits
+        self._max_speed.set(default_prefs.get("max_speed"))
+        self._max_dist.set(default_prefs.get("max_dist"))
+        self._max_alt.set(default_prefs.get("max_alt"))
+        self._max_wind.set(default_prefs.get("max_wind"))
+
+        # 2. Restore Colors
         for key, _ in self.COLOR_FIELDS:
-            default=DEFAULT_PREFS.get(key, "#000000")
+            default=default_prefs.get(key, "#000000")
             self._prefs[key]=default
             self._swatches[key].configure(bg=default)
+
+        # 3. Restore Fonts
         for key, _ in self.FONT_FIELDS:
-            default=DEFAULT_PREFS.get(key, ("Helvetica", 10))
+            default=default_prefs.get(key, ("Helvetica", 10))
             family_var, size_var, bold_var=self._font_vars[key]
             family_var.set(default[0])
             size_var.set(default[1])
             bold_var.set(len(default) > 2 and default[2] == "bold")
-        self._marker_var.set(DEFAULT_PREFS.get("font_marker", ""))
-        self._log_var.set(DEFAULT_PREFS.get("log_level", "Info"))
+        self._marker_var.set(default_prefs.get("font_marker", ""))
+        self._log_var.set(default_prefs.get("log_level", "Info"))
+
+        # 4. Update internal state to match the theme
+        self._prefs.update(default_prefs)
         self.update_idletasks()
 
+    def _dark_mode(self):
+        """Resets all widgets based on the dark theme."""
+        default_prefs = DARK_MODE_PREFS
+
+        # 1. Restore Limits
+        self._max_speed.set(default_prefs.get("max_speed"))
+        self._max_dist.set(default_prefs.get("max_dist"))
+        self._max_alt.set(default_prefs.get("max_alt"))
+        self._max_wind.set(default_prefs.get("max_wind"))
+
+        # 2. Restore Colors
+        for key, _ in self.COLOR_FIELDS:
+            default=default_prefs.get(key, "#000000")
+            self._prefs[key]=default
+            self._swatches[key].configure(bg=default)
+
+        # 3. Restore Fonts
+        for key, _ in self.FONT_FIELDS:
+            default=default_prefs.get(key, ("Helvetica", 10))
+            family_var, size_var, bold_var=self._font_vars[key]
+            family_var.set(default[0])
+            size_var.set(default[1])
+            bold_var.set(len(default) > 2 and default[2] == "bold")
+        self._log_var.set(default_prefs.get("log_level", "Info"))
+
+        # 4. Update internal state to match the theme
+        self._prefs.update(default_prefs)
+        self.update_idletasks()
 
     def _save(self):
+        """Saves all current widget values and the selected theme."""
         for key, _ in self.FONT_FIELDS:
             family_var, size_var, bold_var=self._font_vars[key]
             if bold_var.get():
@@ -453,945 +543,576 @@ class PrefsDialog(tk.Toplevel):
             else:
                 self._prefs[key]=(family_var.get(), size_var.get())
 
-        self._prefs["font_marker"]=self._marker_var.get()
         self._prefs["log_level"]=self._log_var.get()
         self._prefs["max_speed"]=int(self._max_speed.get())
         self._prefs["max_dist"]=int(self._max_dist.get())
         self._prefs["max_alt"]=int(self._max_alt.get())
         self._prefs["max_wind"]=int(self._max_wind.get())
+
         self._on_save(self._prefs)
-        self.destroy()
+        self.withdraw()
+
+    def show(self):
+        self.deiconify()
+        self.lift()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Canvas-based gauge widgets
+# Helper: format a single metric value for the dashboard
 # ─────────────────────────────────────────────────────────────────────────────
 
-class CompassGauge(tk.Canvas):
-
-    def __init__(self, parent, prefs:dict, label="", size=120, **kw):
-        super().__init__(parent, width=size, height=size,
-                         bg=prefs["color_bg"], highlightthickness=0, **kw)
-        my_logger.debug("Creating Compass %s", label)
-        self.prefs=prefs
-        self.label=label
-        self.size=size
-        self.heading=0.0
-        self._draw_static()
-        self._draw()
-
-    def _draw_static(self):
-        s=self.size
-        cx=cy = s / 2
-        r=s / 2 - 4
-
-        self.delete("all")
-
-        self.create_oval(cx-r, cy-r, cx+r, cy+r,
-                         outline=self.prefs["color_border"], width=2,
-                         fill=self.prefs["color_gauge_bg"])
-
-        for label, angle in [("N", 0), ("E", 90), ("S", 180), ("W", 270)]:
-            rad=math.radians(angle - 90)
-            lx=cx + (r - 14) * math.cos(rad)
-            ly=cy + (r - 14) * math.sin(rad)
-            color=self.prefs["color_danger"] if label == "N" else self.prefs["color_label"]
-            self.create_text(lx, ly, text=label, fill=color,
-                             font=self.prefs["font_small"])
-
-        for i in range(36):
-            ang=math.radians(i * 10 - 90)
-            inner=r - 6 if i % 9 == 0 else r - 4
-            x1=cx + inner * math.cos(ang)
-            y1=cy + inner * math.sin(ang)
-            x2=cx + r * math.cos(ang)
-            y2=cy + r * math.sin(ang)
-            self.create_line(x1, y1, x2, y2, fill=self.prefs["color_border"])
-
-        self.create_text(cx, cy - r * 0.25,
-                         text=self.label, fill=self.prefs["color_label"],
-                         font=self.prefs["font_small"])
-
-
-    def _draw(self):
-
-        self.delete("dynamic")
-
-        s=self.size
-        cx=cy = s / 2
-        r=s / 2 - 4
-        needle_rad=math.radians(self.heading - 90)
-        nx=cx + (r - 18) * math.cos(needle_rad)
-        ny=cy + (r - 18) * math.sin(needle_rad)
-        tx=cx - 8 * math.cos(needle_rad)
-        ty=cy - 8 * math.sin(needle_rad)
-
-        self.create_line(tx, ty, nx, ny, fill=self.prefs["color_accent"],
-                         width=2, arrow=tk.LAST, arrowshape=(8,10,3), tags="dynamic")
-        self.create_oval(cx-3, cy-3, cx+3, cy+3,
-                         fill=self.prefs["color_accent"], outline="", tags="dynamic")
-        self.create_text(cx, s-8, text=f"{self.heading:.1f}°",
-                         fill=self.prefs["color_value"], font=self.prefs["font_small"],
-                         tags="dynamic")
-
-    def set_value(self, heading: float):
-        h = heading % 360
-        if self.heading != h:
-            self.heading = h
-            self._draw()
-
-
-class ArcGauge(tk.Canvas):
-    """
-    Semi-circular arc gauge for a single numeric value.
-    Shows a coloured arc fill + needle + numeric readout.
-    """
-
-    def __init__(self, parent, prefs:dict, label=None, min_val=0, max_val=0,
-                 unit="", warn_pct=0.5, danger_pct=0.95,
-                 size=110, **kw):
-        super().__init__(parent, width=size, height=int(size * 0.6),
-                         bg=prefs["color_bg"], highlightthickness=0, **kw)
-        my_logger.debug("Creating Gauge %s", label)
-        self.prefs    =prefs
-        self.label    =label
-        self.min_val  =min_val
-        self.max_val  =max_val
-        self.unit     =unit
-        self.warn_pct =warn_pct
-        self.danger_pct= danger_pct
-        self.size     =size
-        self.value    =min_val
-        self._draw_static()
-        self._draw()
-
-    def _draw_static(self):
-        s=self.size
-        h=int(s * 0.6)
-        cx=s / 2
-        cy=h * 0.88
-        r =s * 0.42
-
-        self.delete("all")
-
-        # Background arc (180°)
-        self.create_arc(cx-r, cy-r, cx+r, cy+r,
-                        start=0, extent=180,
-                        style=tk.ARC, outline=self.prefs["color_border"], width=8)
-
-        # Label
-        self.create_text(cx, cy - r * 0.5,
-                         text=self.label, fill=self.prefs["color_label"],
-                         font=self.prefs["font_small"])
-
-    def _draw(self):
-        s=self.size
-        h=int(s * 0.6)
-        cx=s / 2
-        cy=h * 0.88
-        r =s * 0.42
-
-        self.delete("dynamic")
-
-        # Value
-        val_text=f"{self.value:.1f}{self.unit}"
-        self.create_text(cx, cy - 10, tags="dynamic",
-                         text=val_text, fill=self.prefs["color_value"],
-                         font=self.prefs["font_label"])
-
-        # Colored fill arc
-        pct=(self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
-        pct=max(0.0, min(1.0, pct))
-        extent=pct * 180
-
-        color=self.prefs["color_safe"]
-        if pct >= self.danger_pct:
-            color=self.prefs["color_danger"]
-        elif pct >= self.warn_pct:
-            color=self.prefs["color_warn"]
-
-        if extent > 0:
-            self.create_arc(cx-r, cy-r, cx+r, cy+r, tags="dynamic",
-                            start=180 - extent, extent=extent,
-                            style=tk.ARC, outline=color, width=8)
-
-        # Needle
-        needle_angle=math.radians(180 - pct * 180)
-        nx=cx + (r - 2) * math.cos(needle_angle)
-        ny=cy - (r - 2) * math.sin(needle_angle)
-        self.create_line(cx, cy, nx, ny, fill=self.prefs["color_value"],
-                         tags="dynamic", width=2)
-        self.create_oval(cx-3, cy-3, cx+3, cy+3, fill=self.prefs["color_value"],
-                         tags="dynamic", outline="")
-
-    def set_value(self, value: float):
-        if value != self.value:
-            self.value=value
-            self._draw()
-
-
-class StickDisplay(tk.Canvas):
-    """
-    Renders a single joystick as a 2D crosshair inside a square.
-    x_val, y_val should be in range 0..2048 (centre=1024).
-    """
-
-    def __init__(self, parent, prefs, label, size=100, **kw):
-        super().__init__(parent, width=size, height=size,
-                         bg=prefs["color_bg"], highlightthickness=0, **kw)
-        my_logger.debug("Creating Stick %s", label)
-        self.prefs =prefs
-        self.label =label
-        self.size  =size
-        self.pad   =2
-        self.inner =size - 2 * self.pad
-        self.x_val =1024.0   # 0..2048
-        self.y_val =1024.0
-        self.mid   =size / 2
-        self._draw_static()
-        self._draw()
-
-    def _draw_static(self):
-        self.delete("all")
-
-        # Box
-        self.create_rectangle(self.pad, self.pad, self.size - self.pad,
-                              self.size - self.pad,
-                              outline=self.prefs["color_border"],
-                              fill=self.prefs["color_gauge_bg"])
-
-        # Centre cross
-        self.create_line(self.pad, self.mid, self.size - self.pad, self.mid,
-                         fill=self.prefs["color_border"], dash=(2, 3))
-        self.create_line(self.mid, self.pad, self.mid, self.size - self.pad,
-                         fill=self.prefs["color_border"], dash=(2, 3))
-
-        # Label
-        self.create_text(self.mid, self.size - 5, text=self.label,
-                         fill=self.prefs["color_label"], font=self.prefs["font_small"])
-
-    def _draw(self):
-
-        self.delete("dynamic")
-
-        # Dot position
-        nx=self.pad + (self.x_val / 2048.0) * self.inner
-        ny=self.pad + (1.0 - self.y_val / 2048.0) * self.inner  # invert Y
-
-        # Glow circle
-        gr=12
-        self.create_oval(nx - gr, ny - gr, nx + gr, ny + gr, tags="dynamic",
-                         fill=self.prefs["color_gauge_bg"], outline="")
-        self.create_oval(nx - 5, ny - 5, nx + 5, ny + 5, tags="dynamic",
-                         fill=self.prefs["color_accent"], outline="")
-
-    def set_values(self, x_val: float, y_val: float):
-        if x_val != self.x_val or self.y_val != y_val:
-            self.x_val=x_val
-            self.y_val=y_val
-            self._draw()
-
-
-class BarGauge(tk.Canvas):
-    """Vertical bar gauge (e.g. battery, satellites)."""
-
-    def __init__(self, parent, prefs, label="", min_val=0, max_val=10,
-                 unit="", size_w=50, size_h=90, warn_low=False,
-                 warn_high=False, danger_low=False, danger_high=False, **kw):
-        super().__init__(parent, width=size_w, height=size_h,
-                         bg=prefs["color_bg"], highlightthickness=0, **kw)
-        my_logger.debug("Creating Bar %s", label)
-        self.prefs  =prefs
-        self.label  =label
-        self.min_val=min_val
-        self.max_val=max_val
-        self.unit   =unit
-        self.size_w =size_w
-        self.size_h =size_h
-        self.value  =min_val
-        self.warn_low=warn_low
-        self.warn_high=warn_high
-        self.danger_low=danger_low
-        self.danger_high=danger_high
-        self._draw_static()
-        self._draw()
-
-    def _draw_static(self):
-        w=self.size_w
-        h=self.size_h
-        pad_x=8
-        bar_top=18
-        bar_bot=h - 24
-
-        self.delete("all")
-
-        # Background
-        self.create_rectangle(pad_x, bar_top, w - pad_x, bar_bot,
-                              outline=self.prefs["color_border"],
-                              fill=self.prefs["color_gauge_bg"])
-
-        # Label
-        self.create_text(w / 2, 9, text=self.label,
-                         fill=self.prefs["color_label"],
-                         font=self.prefs["font_small"])
-
-    def _draw(self):
-        w=self.size_w
-        h=self.size_h
-        pad_x=8
-        bar_top=18
-        bar_bot=h - 24
-        bar_h  =bar_bot - bar_top
-
-        self.delete("dynamic")
-
-        pct=(self.value - self.min_val) / max(self.max_val - self.min_val, 1e-9)
-        pct=max(0.0, min(1.0, pct))
-
-        color=self.prefs["color_safe"]
-        if self.danger_low is not False and pct <= self.danger_low:
-            color=self.prefs["color_danger"]
-        elif self.warn_low is not False and pct <= self.warn_low:
-            color=self.prefs["color_warn"]
-        elif self.danger_high is not False and pct >= self.danger_high:
-            color=self.prefs["color_danger"]
-        elif self.warn_high is not False and pct >= self.warn_high:
-            color=self.prefs["color_warn"]
-
-        fill_top=bar_bot - pct * bar_h
-        if pct > 0:
-            self.create_rectangle(pad_x + 1, fill_top,
-                                  w - pad_x - 1, bar_bot - 1,
-                                  fill=color, outline="",
-                                  tags="dynamic")
-
-        # Value
-        self.create_text(w / 2, h - 10, tags="dynamic",
-                         text=f"{self.value:.0f}{self.unit}",
-                         fill=self.prefs["color_value"],
-                         font=self.prefs["font_small"])
-
-    def set_value(self, value: float):
-        # Don't redraw unless the value has changed.
-        if self.value != value:
-            self.value=value
-            self._draw()
+def _fmt(value, fmt_spec: str, unit: str) -> str:
+    """Format a telemetry value; returns '—' if value is None."""
+    if value is None:
+        return "—"
+    try:
+        if fmt_spec == "s":
+            return str(value)
+        elif fmt_spec == "d":
+            return f"{int(value)}{unit}"
+        else:
+            return f"{float(value):{fmt_spec}}{unit}"
+    except (TypeError, ValueError):
+        return str(value)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Text info panel
+#  DashboardStrip  –  animated metric tiles above the map
+#
+#  A horizontal row of labeled metric tiles.
+#  Each tile shows a label and a value that updates during playback.
+#
+#  Skeleton: tiles are plain tk.Label pairs; future work can replace them
+#  with canvas-drawn arc gauges copied from adv.py.
 # ─────────────────────────────────────────────────────────────────────────────
 
-class InfoPanel(tk.LabelFrame):
-    """Key/value text readout for status fields."""
+class DashboardStrip(tk.Frame):
+    def __init__(self, parent, prefs: dict, **kw):
+        my_logger.debug("Creating Dashboard Strip.")
+        bg = prefs["color_panel_bg"]
+        super().__init__(parent, bg=bg, **kw)
+        self.prefs = prefs
+        self._vars: dict[str, tk.StringVar] = {}
+        self._build()
 
-    def __init__(self, parent, prefs, fields: list, **kw):
-        super().__init__(parent, bg=prefs["color_bg"], **kw)
-        my_logger.debug("Creating InfoPanel")
-        self._vars={}
-        self._labels=[]
-        self.prefs=prefs
+    def _build(self):
+        prefs = self.prefs
+        bg    = prefs["color_panel_bg"]
 
-        self._canvas=tk.Canvas(self, bg=prefs["color_bg"],
-                                 highlightthickness=0, height=64)
-        scrollbar=ttk.Scrollbar(self, orient=tk.VERTICAL,
-                                  command=self._canvas.yview)
-        self._canvas.configure(yscrollcommand=scrollbar.set)
+        for i, (label, key, unit, fmt) in enumerate(DASHBOARD_METRICS):
+            tile = tk.Frame(self, bg=bg, padx=8, pady=4,
+                            relief=tk.FLAT, bd=0)
+            tile.grid(row=0, column=i, sticky="nsew", padx=1)
+            self.columnconfigure(i, weight=1)
 
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self._canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            tk.Label(tile, text=label,
+                     bg=bg, fg=prefs["color_label"],
+                     font=prefs["font_ui"]).pack()
 
-        self._inner=tk.Frame(self._canvas, bg=prefs["color_bg"])
-        self._window_id=self._canvas.create_window((0,0), window=self._inner,
-                                                     anchor="nw")
+            var = tk.StringVar(value="—")
+            self._vars[key] = var
+            tk.Label(tile, textvariable=var,
+                     bg=bg, fg=prefs["color_value"],
+                     font=prefs["font_metric"]).pack()
 
-        # Resize the scroll region whenever the inner frame changes size
-        self._inner.bind("<Configure>", self._on_inner_configure)
-        # Stretch the inner frame to fill canvas width
-        self._canvas.bind("<Configure>", self._on_canvas_configure)
+        # Thin accent border at the bottom
+        tk.Frame(self, bg=prefs["color_border"], height=1).grid(
+            row=1, column=0, columnspan=len(DASHBOARD_METRICS), sticky="ew")
 
-        col=0
-        row=0
-        ufont=self.prefs["font_label"].copy()
-        ufont.append("underline")
+    def update_record(self, record: dict):
+        """Push a new telemetry record into the dashboard tiles."""
+        for label, key, unit, fmt in DASHBOARD_METRICS:
+            value = record.get(key)
+            self._vars[key].set(_fmt(value, fmt, unit))
 
-        for field in fields:
-            if field is None:
-                row += 1
-                col=0
-                continue
-
-            if field[0] is None:
-                if col > 0:
-                    row += 1
-                if field[1] is not None:
-                    lbl=tk.Label(self._inner, text=field[1],
-                                bg=self.prefs["color_bg"],
-                                fg=self.prefs["color_accent"],
-                                font=ufont,
-                                anchor="w")
-                    lbl.grid(row=row, column=0, columnspan=4,
-                            sticky="ew", padx=6, pady=(6, 1))
-                row += 1
-                col=0
-                continue
-
-            key_lbl=tk.Label(self._inner, text=field[0] + ":", bg=self.prefs["color_bg"],
-                    fg=self.prefs["color_label"],
-                    font=self.prefs["font_label"],
-                    anchor="w")
-            key_lbl.grid(row=row, column=col, sticky="w",
-                        padx=(6, 2), pady=1)
-            var=tk.StringVar(value="—")
-            val_lbl=tk.Label(self._inner, textvariable=var,
-                                bg=self.prefs["color_bg"],
-                                fg=self.prefs["color_value"],
-                                font=self.prefs["font_label"],
-                                anchor="w")
-            val_lbl.grid(row=row, column=col+1, sticky="w",
-                            padx=(2, 6), pady=1)
-            col += 2
-            if col > 2:
-                col=0
-                row += 1
-
-            self._vars[field[0]]=var
-            self._labels.append((key_lbl, val_lbl))
-
-        self._bind_mousewheel(self._inner)
-
-    def _bind_mousewheel(self, widget):
-        widget.bind("<MouseWheel>",  self._on_mousewheel)      # Windows/macOS
-        widget.bind("<Button-4>",    self._on_mousewheel)      # Linux scroll up
-        widget.bind("<Button-5>",    self._on_mousewheel)      # Linux scroll down
-        for child in widget.winfo_children():
-            self._bind_mousewheel(child)
-
-    def _on_inner_configure(self, event):
-        """Update scroll region when inner frame resizes."""
-        self._canvas.configure(scrollregion=self._canvas.bbox("all"))
-
-    def _on_canvas_configure(self, event):
-        """Keep inner frame width matched to canvas width."""
-        self._canvas.itemconfig(self._window_id, width=event.width)
-
-    def _on_mousewheel(self, event):
-        if event.num == 4:          # Linux scroll up
-            self._canvas.yview_scroll(-1, "units")
-        elif event.num == 5:        # Linux scroll down
-            self._canvas.yview_scroll(1, "units")
-        else:                       # Windows / macOS
-            self._canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-    def redraw(self):
-        """Reconfigure all labels to pick up changed prefs."""
-        self._canvas.configure(bg=self.prefs["color_bg"])
-        self._inner.configure(bg=self.prefs["color_bg"])
-        self.configure(bg=self.prefs["color_bg"])
-        for key_lbl, val_lbl in self._labels:
-            key_lbl.configure(bg=self.prefs["color_bg"],
-                              fg=self.prefs["color_label"],
-                              font=self.prefs["font_label"])
-            val_lbl.configure(bg=self.prefs["color_bg"],
-                              fg=self.prefs["color_value"],
-                              font=self.prefs["font_label"])
-
-    def update_field(self, name: str, value):
-        if name in self._vars:
-            new = str(value)
-            if new != self._vars[name].get():
-                self._vars[name].set(new)
+    def clear(self):
+        for var in self._vars.values():
+            var.set("—")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Main application window
+#  FileListPane  –  left panel with persistent fc2 file list
+#
+#  Scrollable list of fc2 files.  Fires on_select(path) when the user
+#  clicks a row.  The list is persisted across sessions.
 # ─────────────────────────────────────────────────────────────────────────────
 
-class DroneViewer(tk.Tk):
+class FileListPane(tk.Frame):
+    def __init__(self, parent, prefs: dict, on_select, **kw):
+        my_logger.debug("Creating File List Pane.")
+        bg = prefs["color_bg"]
+        super().__init__(parent, bg=bg, **kw)
+        self.prefs     = prefs
+        self.on_select = on_select
+        self._paths: list[str] = []   # parallel to Listbox entries
+        self._build()
+        self._load_persisted()
 
-    def __init__(self):
-        super().__init__()
+    # ── Construction ─────────────────────────────────────────────────────────
 
-        my_logger.debug("Creating DroneViewer window")
+    def _build(self):
+        prefs = self.prefs
+        bg    = prefs["color_bg"]
 
-        self.prefs=load_prefs()
+        # Title bar
+        hdr = tk.Frame(self, bg=prefs["color_panel_bg"], pady=4)
+        hdr.pack(fill=tk.X)
+        tk.Label(hdr, text="FC2 Files",
+                 bg=prefs["color_panel_bg"],
+                 fg=prefs["color_accent"],
+                 font=prefs["font_title"]).pack(side=tk.LEFT, padx=8)
 
-        self.title("Atom 2 Flight Log Viewer")
-        self.configure(bg=self.prefs["color_bg"])
-        self.minsize(1100, 720)
+        # Listbox + scrollbar
+        list_frame = tk.Frame(self, bg=bg)
+        list_frame.pack(fill=tk.BOTH, expand=True)
 
-        my_logger.setLevel(mwhlogging.LOG_LEVEL_MAP[self.prefs["log_level"]])
-        geometry=self.prefs.get("window_geometry", "1280x800")
+        sb = tk.Scrollbar(list_frame, orient=tk.VERTICAL)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self.geometry(geometry)
-
-        # ── State ─────────────────────────────────────────────────────────
-        self.records            =[]
-        self.current_idx        =0
-        self.playing            =False
-        self.pending_update     =False
-        self.speed_idx          =0
-        self.playback_thread    =None
-        self._stop_event        =threading.Event()
-
-        # Map markers / path
-        self._path_line         =None
-        self._drone_marker      =None
-        self._drone_heading     =-1
-        self._drone_cache       ={}
-        self._home_marker       =None
-        self._played_path       =[]         # coords shown so far
-        self._heading           =None
-
-        self._apply_styles()
-        self._build_ui()
-
-        # Make a loop-invariant list of info fields to update.
-        self.PANEL_UPDATE_ITEMS = [
-            (label, key) for (label, key) in
-            (f for f in PANEL_ITEMS if f is not None and f[0] is not None)
-            if label not in PANEL_SKIP
-        ]
-
-        # Attach the tkinter log window now that the Tk root exists.
-        my_logger.configure_logging(
-            tk_parent=self,
-            tk_menubar=self.menubar,
-            tk_title="Atom Data Viewer Log"
+        self._listbox = tk.Listbox(
+            list_frame,
+            bg=prefs["color_panel_bg"],
+            fg=prefs["color_value"],
+            selectbackground=prefs["color_select"],
+            selectforeground=prefs["color_value"],
+            font=prefs["font_ui"],
+            relief=tk.FLAT,
+            bd=0,
+            activestyle="none",
+            yscrollcommand=sb.set,
         )
+        sb.config(command=self._listbox.yview)
+        self._listbox.pack(fill=tk.BOTH, expand=True)
 
-        # Adding support for double-clicking on fc2 files.
-        if PLATFORM_SYSTEM == "Darwin":
-            self.createcommand('::tk::mac::OpenDocument', 
-                self.mac_handle_doubleclick)
-        self.createcommand('tkAboutDialog',
-            self._show_about)
+        self._listbox.bind("<<ListboxSelect>>", self._on_select)
+        self._listbox.bind("<Delete>",          self._remove_selected)
+        self._listbox.bind("<BackSpace>",       self._remove_selected)
+        self._listbox.bind("<Double-Button-1>", self._on_select)
 
-    def mac_handle_doubleclick(self, *filenames):
-        self.after(100, lambda: self.load_file(filenames[0]))
+        # Thin status bar showing count
+        self._count_var = tk.StringVar(value="0 files")
+        tk.Label(self, textvariable=self._count_var,
+                 bg=prefs["color_panel_bg"],
+                 fg=prefs["color_label"],
+                 font=prefs["font_small"]).pack(fill=tk.X, pady=2, padx=4, side=tk.BOTTOM)
 
-    # ── UI construction ───────────────────────────────────────────────────
-    def _show_prefs(self):
-        if self.playing:
-            self._pause()
-        PrefsDialog(self, self.prefs, self._on_prefs_saved, self.menubar)
+    # ── Public API ────────────────────────────────────────────────────────────
 
-    def _show_log(self):
-        my_logger._tk_window.show()
+    def add_files(self, paths: list[str]):
+        """Add one or more paths; duplicates and non-existent files are ignored."""
+        added = 0
+        for p in paths:
+            p = str(Path(p).resolve())
+            if p not in self._paths and Path(p).exists():
+                self._paths.append(p)
+                self._listbox.insert(tk.END, Path(p).name)
+                added += 1
+        if added:
+            self._paths.sort()
+            self._save()
+            self._update_count()
 
-    def _on_prefs_saved(self, new_prefs: dict):
-        self.prefs.update(new_prefs)
-        save_prefs(self.prefs)
-        my_logger.setLevel(mwhlogging.LOG_LEVEL_MAP[self.prefs["log_level"]])
-        # Redraw all canvas gauges so they pick up the new colors immediately
-        self._gauge_speed.max_val=self.prefs["max_speed"]
-        self._gauge_dist.max_val=self.prefs["max_dist"]
-        self._gauge_alt.max_val=self.prefs["max_alt"]
-        self._gauge_wind.max_val=self.prefs["max_wind"]
-        for widget in (self._gauge_speed, self._gauge_alt, self._gauge_dist,
-                       self._gauge_compass, self._bar_battery, self._bar_sats,
-                       self._bar_wind, self._stick_left,
-                       self._stick_right, self._gauge_wind):
-            widget._draw_static()
-            widget._draw()
-        self.info.redraw()
+    def remove_selected(self):
+        self._remove_selected()
 
-    def _show_about(self):
-        messagebox.showinfo(
-            "About",
-            "Atom 2 Data Viewer\n"
-            f"Version {_version}\n\n"
-            "View the contents of an Atom2 flight log (.fc2 file).\n\n"
-            "Written by Michael Heinz.\n"
-            "Based on work by Michael Heinz, Koen Aerts, and Rob Pritt."
-        )
+    def get_paths(self) -> list[str]:
+        return list(self._paths)
 
-    def _on_close(self):
-        my_logger.debug("Quitting.")
-        self.prefs["window_geometry"]=self.geometry()
-        save_prefs(self.prefs)
-        self.quit()
+    def select_path(self, path: str):
+        """Programmatically select a row by path."""
+        path = str(Path(path).resolve())
+        if path in self._paths:
+            idx = self._paths.index(path)
+            self._listbox.selection_clear(0, tk.END)
+            self._listbox.selection_set(idx)
+            self._listbox.see(idx)
 
-    def _build_ui(self):
+    # ── Internal ─────────────────────────────────────────────────────────────
 
-        my_logger.debug("Building the UI")
+    def _on_select(self, _event=None):
+        sel = self._listbox.curselection()
+        if sel:
+            path = self._paths[sel[0]]
+            self.on_select(path)
 
-        self.option_add('*tearOff', False)
+    def _remove_selected(self, _event=None):
+        sel = self._listbox.curselection()
+        if not sel:
+            return
+        idx = sel[0]
+        self._listbox.delete(idx)
+        del self._paths[idx]
+        self._save()
+        self._update_count()
 
-        self.menubar=tk.Menu(self)
-        self.configure(menu=self.menubar)
+    def _load_persisted(self):
+        paths = load_file_list()
+        for p in paths:
+            self._paths.append(p)
+            self._listbox.insert(tk.END, Path(p).name)
+        self._update_count()
 
-        file_menu=tk.Menu(self.menubar)
-        self.menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Open FC2", command=self._open_file)
-        file_menu.add_separator()
-        file_menu.add_command(label="Preferences…", command=self._show_prefs)  # ← add this
-        file_menu.add_separator()
-        if PLATFORM_SYSTEM != "Darwin":
-            file_menu.add_command(label="About", command=self._show_about)
-        file_menu.add_command(label="View Log…", command=self._show_log)
-        file_menu.add_command(label="Quit", command=self._on_close)
+    def _save(self):
+        save_file_list(self._paths)
 
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
-        self.createcommand("tk::mac::Quit", self._on_close)
+    def _update_count(self):
+        n = len(self._paths)
+        self._count_var.set(f"{n} file{'s' if n != 1 else ''}")
 
-        # ── Top bar ───────────────────────────────────────────────────────
-        top=tk.Frame(self, bg=self.prefs["color_bg"], pady=6)
-        top.pack(fill=tk.X, side=tk.TOP)
 
-        tk.Label(top, text="ATOM 2 FLIGHT VIEWER",
-                 bg=self.prefs["color_bg"], fg=self.prefs["color_accent"],
-                 font=self.prefs["font_title"]).pack(side=tk.LEFT, padx=16)
+# ─────────────────────────────────────────────────────────────────────────────
+#  PlaybackControls  –  transport bar at the bottom of the map pane
+#
+#  Slider + transport buttons + speed selector.
+#  Callbacks injected by the parent so this widget stays decoupled.
+# ─────────────────────────────────────────────────────────────────────────────
 
-        self._file_label=tk.Label(top, text="No file loaded",
-                                    bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
-                                    font=self.prefs["font_title"])
-        self._file_label.pack(side=tk.LEFT, padx=8)
+class PlaybackControls(tk.Frame):
+    PLAYBACK_SPEEDS = [1, 2, 4, 8, 16]
 
-        open_btn=tk.Button(top, text="Open FC2…",
-                             command=self._open_file,
-                             fg=self.prefs["color_bg"], relief=tk.FLAT,
-                             font=self.prefs["font_label"],
-                             padx=10, pady=2, cursor="hand2")
-        open_btn.pack(side=tk.RIGHT, padx=16)
+    def __init__(self, parent, prefs: dict,
+                 on_play_pause, on_step_back, on_step_fwd,
+                 on_slider, on_speed_change, **kw):
+        my_logger.debug("Creating Playback Controls.")
+        bg = prefs["color_bg"]
+        super().__init__(parent, bg=bg, **kw)
+        self.prefs           = prefs
+        self._on_play_pause  = on_play_pause
+        self._on_step_back   = on_step_back
+        self._on_step_fwd    = on_step_fwd
+        self._on_slider      = on_slider
+        self._on_speed_change= on_speed_change
+        self.speed_idx       = 0
+        self._playing        = False
+        self._build()
 
-        # ── Main paned area ───────────────────────────────────────────────
-        main_pane=tk.PanedWindow(self, orient=tk.HORIZONTAL,
-                              bg=self.prefs["color_bg"], sashwidth=4, sashrelief=tk.FLAT)
-        main_pane.pack(fill=tk.BOTH, expand=True)
+    # ── Construction ─────────────────────────────────────────────────────────
 
-        # Left: map
-        map_frame=tk.Frame(main_pane, bg=self.prefs["color_bg"])
-        main_pane.add(map_frame, stretch="always", minsize=500)
+    def _build(self):
+        prefs = self.prefs
+        bg    = prefs["color_bg"]
 
-        self.map_widget=tkintermapview.TkinterMapView(
-            map_frame, corner_radius=0)
-        self.map_widget.pack(fill=tk.BOTH, expand=True)
+        # Progress label row
+        lbl_row = tk.Frame(self, bg=bg)
+        lbl_row.pack(fill=tk.X, padx=8, pady=(4, 0))
 
-        # Override the scroll wheel, it doesn't seem to work correctly in
-        # Darwin.
-        if PLATFORM_SYSTEM == "Darwin":
-            def _map_mouse_zoom(event):
-                my_logger.debug("Mouse Zoom Event.")
-                relative_x=event.x / self.map_widget.width
-                relative_y=event.y / self.map_widget.height
-                delta=event.delta * 0.01
-                new_zoom=self.map_widget.zoom + delta
-                self.map_widget.set_zoom(new_zoom,
-                             relative_pointer_x=relative_x,
-                             relative_pointer_y=relative_y)
+        self._progress_var = tk.StringVar(value="0 / 0")
+        tk.Label(lbl_row, textvariable=self._progress_var,
+                 bg=bg, fg=prefs["color_label"],
+                 font=prefs["font_small"]).pack(side=tk.RIGHT)
 
-            self.map_widget.canvas.bind("<MouseWheel>", _map_mouse_zoom)
-
-        # Right: gauges + controls
-        right=tk.Frame(main_pane, bg=self.prefs["color_bg"], width=380)
-        right.pack_propagate(False)
-        main_pane.add(right, stretch="never", minsize=380)
-
-        self._build_gauges(right)
-        self._build_controls(right)
-
-        # ── Bottom status bar ─────────────────────────────────────────────
-        bot=tk.Frame(self, bg=self.prefs["color_bg"], pady=3)
-        bot.pack(fill=tk.X, side=tk.BOTTOM)
-
-        self._status_var=tk.StringVar(value="Ready. Open an FC2 file to begin.")
-        tk.Label(bot, textvariable=self._status_var,
-                 bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
-                 font=self.prefs["font_small"]).pack(side=tk.LEFT, padx=10)
-
-        self._progress_var=tk.StringVar(value="0 / 0")
-        tk.Label(bot, textvariable=self._progress_var,
-                 bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
-                 font=self.prefs["font_small"]).pack(side=tk.RIGHT, padx=10)
-
-    def _build_gauges(self, parent):
-        """Build the entire right-side gauge panel."""
-
-        my_logger.debug("Building the Gauges")
-
-        # ── Section: Arc gauges row ───────────────────────────────────────
-        arc_row=tk.LabelFrame(parent, bg=self.prefs["color_bg"])
-        arc_row.pack(fill=tk.X, padx=6, pady=(6, 0))
-
-        self._gauge_speed =ArcGauge(arc_row, self.prefs, "SPEED", min_val=0,
-                                      max_val=self.prefs["max_speed"],
-                                      unit=" kph",
-                                      warn_pct=0.5, danger_pct=0.8, size=110)
-        self._gauge_alt   =ArcGauge(arc_row, self.prefs, "ALT", min_val=0,
-                                      max_val=self.prefs["max_alt"],
-                                      unit=" m",
-                                      warn_pct=0.5, danger_pct=0.8, size=110)
-        self._gauge_dist  =ArcGauge(arc_row, self.prefs, "DIST", min_val=0,
-                                      max_val=self.prefs["max_dist"],
-                                      unit=" m",
-                                      warn_pct=0.5, danger_pct=0.8, size=110)
-
-        for g in (self._gauge_speed, self._gauge_alt, self._gauge_dist):
-            g.pack(side=tk.LEFT, expand=True)
-
-        # ── Section: Compass + bars ───────────────────────────────────────
-        mid_row=tk.Frame(parent, bg=self.prefs["color_bg"])
-        mid_row.pack(fill=tk.X, padx=6, pady=4)
-
-        self._gauge_compass=CompassGauge(mid_row, self.prefs, label="HEADING", size=110)
-        self._gauge_compass.pack(side=tk.LEFT, padx=(0, 8))
-
-        bars=tk.Frame(mid_row, bg=self.prefs["color_bg"])
-        bars.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        self._bar_battery=BarGauge(bars, self.prefs, label="BATT",
-                                     max_val=100, unit="%", size_w=36,
-                                     size_h=110, warn_low=0.5, danger_low=0.25)
-        self._bar_sats   =BarGauge(bars, self.prefs, label="SATS", max_val=30,
-                                     size_w=36, size_h=110, warn_low=0.5,
-                                     danger_low=0.3)
-        self._bar_wind   =BarGauge(bars, self.prefs, label="WIND",
-                                     max_val=self.prefs["max_wind"],
-                                     unit=" m/s", size_w=36, size_h=110,
-                                     warn_high=0.5, danger_high=0.9)
-
-        for b in (self._bar_battery, self._bar_sats, self._bar_wind):
-            b.pack(side=tk.LEFT, padx=2)
-
-        self._gauge_wind=CompassGauge(mid_row, self.prefs, label="WIND", size=110)
-        self._gauge_wind.pack(side=tk.LEFT, padx=(0, 8))
-
-        # ── Section: Text info ────────────────────────────────────────────
-        info_frame=tk.Frame(parent, bg=self.prefs["color_bg"], bd=0)
-        info_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
-
-        self.info=InfoPanel(info_frame, self.prefs, PANEL_ITEMS)
-        self.info.pack(fill=tk.BOTH, expand=True)
-
-        # ── Section: RC Sticks ────────────────────────────────────────────
-        sticks_frame=tk.Frame(parent, bg=self.prefs["color_bg"])
-        sticks_frame.pack(padx=6, pady=6)
-
-        tk.Label(sticks_frame, text="CONTROLLER",
-                 bg=self.prefs["color_bg"], fg=self.prefs["color_label"],
-                 font=self.prefs["font_small"]).pack(padx=8)
-
-        self._stick_left =StickDisplay(sticks_frame, self.prefs,
-                                         "Throttle & Yaw",  size=110)
-        self._stick_right=StickDisplay(sticks_frame, self.prefs,
-                                         "Pitch & Bank", size=110)
-        self._stick_left.pack(side=tk.LEFT, padx=(0, 4))
-        self._stick_right.pack(side=tk.LEFT)
-
-    def _build_controls(self, parent):
-        """Transport controls at the bottom of the right panel."""
-
-        my_logger.debug("Building the Controls")
-
-        ctrl=tk.LabelFrame(parent, bg=self.prefs["color_bg"], pady=8)
-        ctrl.pack(fill=tk.X, side=tk.BOTTOM, padx=0, pady=0)
+        self._time_var = tk.StringVar(value="00:00")
+        tk.Label(lbl_row, textvariable=self._time_var,
+                 bg=bg, fg=prefs["color_value"],
+                 font=prefs["font_small"]).pack(side=tk.LEFT)
 
         # Slider
-        self._slider_var=tk.IntVar(value=0)
-        self._slider=ttk.Scale(ctrl, from_=0, to=1,
-                                 variable=self._slider_var,
-                                 orient=tk.HORIZONTAL,
-                                 command=self._on_slider)
-        self._slider.pack(fill=tk.X, padx=10, pady=(4, 6))
+        self._slider_var = tk.IntVar(value=0)
+        style = ttk.Style()
+        try:
+            style.configure("Playback.Horizontal.TScale",
+                            background=bg,
+                            troughcolor=prefs["color_border"],
+                            slidercolor=prefs["color_accent"])
+        except Exception:
+            pass
 
-        btn_row=tk.Frame(ctrl, bg=self.prefs["color_bg"])
-        btn_row.pack()
+        self._slider = ttk.Scale(
+            self, from_=0, to=1,
+            variable=self._slider_var,
+            orient=tk.HORIZONTAL,
+            command=self._slider_moved,
+            style="Playback.Horizontal.TScale",
+        )
+        self._slider.pack(fill=tk.X, padx=10, pady=4)
+        self._slider.state(["disabled"])
 
-        def btn(text, cmd, color=self.prefs["color_gauge_bg"], fg=self.prefs["color_value"]):
-            return tk.Button(btn_row, text=text, command=cmd,
-                             bg=color, fg=fg, relief=tk.FLAT,
-                             font=self.prefs["font_label"],
-                             cursor="hand2", activebackground=self.prefs["color_border"],
-                             activeforeground=color, bd=1)
+        # Button row
+        btn_row = tk.Frame(self, bg=bg)
+        btn_row.pack(pady=(0, 4))
 
-        self.bind("<space>",      lambda e: self._toggle_play())
-        self.bind("<Left>",       lambda e: self._step_back())
-        self.bind("<Right>",      lambda e: self._step_fwd())
+        use_emoji = (PLATFORM_SYSTEM == "Darwin")
 
-        if PLATFORM_SYSTEM == "Darwin":
-            self._btn_rw   =btn("⏮️", self._slow_down)
-            self._btn_back =btn("⏪", self._step_back)
-            self._btn_play =btn("▶️", self._toggle_play)
-            self._btn_fwd  =btn("⏩", self._step_fwd)
-            self._btn_ff   =btn("⏭️", self._speed_up)
-            self.bind("<Command-o>",  lambda e: self._open_file())  # macOS
-        else:
-            self._btn_rw   =btn("<<<", self._slow_down)
-            self._btn_back =btn("<<", self._step_back)
-            self._btn_play =btn(">", self._toggle_play)
-            self._btn_fwd  =btn(">>", self._step_fwd)
-            self._btn_ff   =btn(">>>", self._speed_up)
-            self.bind("<Control-o>",  lambda e: self._open_file())  # Windows/Linux
+        def mkbtn(text, cmd):
 
-        for b in (self._btn_rw, self._btn_back, self._btn_play,
-                  self._btn_fwd, self._btn_ff):
+            return tk.Button(
+                btn_row, text=text, command=cmd,
+                bg=prefs["color_button_bg"], fg=prefs["color_button_fg"],
+                relief=tk.FLAT, font=prefs["font_ui"],
+                cursor="hand2", padx=2,
+                activebackground=prefs["color_border"],
+                activeforeground=prefs["color_value"]
+            )
+
+        self._btn_slower = mkbtn("🐢" if use_emoji else "Slower", self._slower)
+        self._btn_back   = mkbtn("⏪" if use_emoji else "<<",  self._step_back)
+        self._btn_play   = mkbtn("▶️" if use_emoji else ">",   self._play_pause)
+        self._btn_fwd    = mkbtn("⏩" if use_emoji else ">>",  self._step_fwd)
+        self._btn_faster = mkbtn("🐰" if use_emoji else "Faster", self._faster)
+
+        for b in (self._btn_slower, self._btn_back, self._btn_play,
+                  self._btn_fwd,  self._btn_faster):
             b.pack(side=tk.LEFT, padx=2)
 
         # Speed selector
-        speed_row=tk.Frame(ctrl, bg=self.prefs["color_bg"])
-        speed_row.pack(pady=(4, 2))
+        speed_row = tk.Frame(self, bg=bg)
+        speed_row.pack(pady=(0, 6))
 
-        self._speed_var=tk.StringVar(value="1×")
-        speeds=["1×", "2×", "4×", "8×", "16×"]
-        for i, label in enumerate(speeds):
-            rb=tk.Radiobutton(speed_row, text=label,
-                                variable=self._speed_var, value=label,
-                                command=lambda i=i: self._set_speed(i),
-                                bg=self.prefs["color_bg"],
-                                fg=self.prefs["color_label"],
-                                selectcolor=self.prefs["color_bg"],
-                                activebackground=self.prefs["color_bg"],
-                                activeforeground=self.prefs["color_accent"],
-                                indicatoron=True,
-                                relief=tk.FLAT,
-                                font=self.prefs["font_label"],
-                                padx=4, pady=2)
+        self._speed_var = tk.StringVar(value="1×")
+        for i, spd in enumerate(self.PLAYBACK_SPEEDS):
+            rb = tk.Radiobutton(
+                speed_row, text=f"{spd}×",
+                variable=self._speed_var, value=f"{spd}×",
+                command=lambda i=i: self._set_speed(i),
+                bg=bg, fg=prefs["color_label"],
+                selectcolor=bg,
+                activebackground=bg,
+                activeforeground=prefs["color_accent"],
+                font=prefs["font_ui"],
+                relief=tk.FLAT, padx=4,
+            )
             rb.pack(side=tk.LEFT)
 
-    def _apply_styles(self):
-        style=ttk.Style(self)
-        # Use a native-looking theme on each platform
-        available=style.theme_names()
-        # For some reason, "clam" sometimes messes up the radio buttons in
-        # Ubuntu, so prefer "alt" over "clam".
-        for preferred in ("aqua", "vista", "alt", "clam", "default"):
-            if preferred in available:
-                style.theme_use(preferred)
-                break
+    # ── Public API ────────────────────────────────────────────────────────────
 
-        style.configure("TScale", background=self.prefs["color_gauge_bg"],
-                        troughcolor=self.prefs["color_border"],
-                        slidercolor=self.prefs["color_accent"])
-
-    # ── File loading ──────────────────────────────────────────────────────
-
-    def _open_file(self):
-        file=filedialog.askopenfilename(
-            title="Open Atom 2 FC2 Log",
-            initialdir=self.prefs.get("input_dir",""),
-            filetypes=[("FC2 flight logs", "*.fc2"), ("All files", "*.*")]
-        )
-        if not file or not Path(file).exists():
-            return
-
-        self.prefs["input_dir"] = str(Path(file).parent)
-
-        self.load_file(file)
-
-    def load_file(self, path: str):
-        my_logger.info("Loading %s", path)
-        self._set_status("Loading…")
-        self.update_idletasks()
-
-        try:
-            records=atom2_parser(file_name=path, logger=my_logger)
-        except Exception as e:
-            messagebox.showerror("Parse error", str(e))
-            self._set_status("Error loading file.")
-            return
-
-        self.records=[r for r in records if r.get("GPS Lock") == "Yes"]
-        if not self.records:
-            messagebox.showwarning("No data",
-                "No valid records found in this file.")
-            return
-        self.records_len=len(self.records) - 1
-
-        self.coords=[(r["lat (deg)"], r["lon (deg)"]) for r in self.records]
-
-        self.current_idx=0
-
-        # Slider range
-        self._slider.configure(to=len(self.records) - 1)
+    def set_range(self, total: int):
+        """Call after loading a file to configure the slider range."""
+        self._slider.configure(to=max(1, total - 1))
+        self._slider.state(["!disabled"])
+        self._progress_var.set(f"1 / {total}")
         self._slider_var.set(0)
 
-        # Draw full path on map
-        self._draw_map_path()
+    def set_position(self, idx: int, total: int, elapsed_us: float):
+        self._slider_var.set(idx)
+        self._progress_var.set(f"{idx + 1} / {total}")
+        elapsed_s  = elapsed_us / 1_000_000
+        m, s       = divmod(int(elapsed_s), 60)
+        self._time_var.set(f"{m:02d}:{s:02d}")
 
-        self._bar_wind.max_val=self.prefs["max_wind"]
-        self._gauge_alt.max_val=self.prefs["max_alt"]
-        self._gauge_speed.max_val=self.prefs["max_speed"]
-        self._gauge_dist.max_val=self.prefs["max_dist"]
+    def set_playing(self, playing: bool):
+        self._playing = playing
+        use_emoji = (PLATFORM_SYSTEM == "Darwin")
+        if playing:
+            self._btn_play.configure(
+                text="⏸" if use_emoji else "||",
+                bg=self.prefs["color_warn"],
+            )
+        else:
+            self._btn_play.configure(
+                text="▶" if use_emoji else ">",
+                bg=self.prefs["color_panel_bg"],
+            )
 
-        # Get the initial bounding box for the map.
-        field_range=[r[0] for r in self.coords]
-        self.min_lat, self.max_lat=min(field_range),max(field_range)
-        field_range=[r[1] for r in self.coords]
-        self.min_lon, self.max_lon=min(field_range),max(field_range)
+    def current_speed(self) -> int:
+        return self.PLAYBACK_SPEEDS[self.speed_idx]
 
-        # Centre map on first point, scale the map to fit the entire path.
-        my_logger.debug("Map bounding box: %s, %s",
-                        (self.max_lat,self.min_lon), (self.min_lat,self.max_lon))
-        self.map_widget.fit_bounding_box((self.max_lat, self.min_lon),
-                                         (self.min_lat, self.max_lon))
+    # ── Internal ─────────────────────────────────────────────────────────────
 
-        if my_logger.level <= mwhlogging.INFO:
-            log_stats(my_logger, records)
+    def _play_pause(self):
+        self._on_play_pause()
 
-        self._file_label.configure(text=os.path.basename(path))
-        self._set_status(f"Loaded {len(records)} GPS records.")
-        self._update_display(0)
+    def _step_back(self):
+        self._on_step_back()
 
-    # ── Map drawing ───────────────────────────────────────────────────────
+    def _step_fwd(self):
+        self._on_step_fwd()
 
-    def _draw_map_path(self):
+    def _slower(self):
+        self._set_speed(self.speed_idx - 1)
+
+    def _faster(self):
+        self._set_speed(self.speed_idx + 1)
+
+    def _set_speed(self, idx: int):
+        self.speed_idx = max(0, min(len(self.PLAYBACK_SPEEDS) - 1, idx))
+        self._speed_var.set(f"{self.PLAYBACK_SPEEDS[self.speed_idx]}×")
+        self._on_speed_change(self.speed_idx)
+
+    def _slider_moved(self, val):
+        idx = int(float(val))
+        self._on_slider(idx)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  MapPane  –  the right pane containing dashboard + map + controls
+#
+#  Right-side pane.  Top: DashboardStrip.  Middle: map (tkintermapview).
+#  Bottom: PlaybackControls.
+#
+#  If tkintermapview is unavailable, a placeholder canvas is shown instead.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class MapPane(tk.Frame):
+
+    def __init__(self, parent, prefs: dict, playback_callbacks: dict, **kw):
+        my_logger.debug("Creating Map Pane.")
+        bg = prefs["color_bg"]
+        super().__init__(parent, bg=bg, **kw)
+        self.prefs = prefs
+
+        # ── Dashboard ────────────────────────────────────────────────────────
+        self.dashboard = DashboardStrip(self, prefs)
+        self.dashboard.pack(fill=tk.X)
+
+        # ── Map ──────────────────────────────────────────────────────────────
+        map_container = tk.Frame(self, bg=bg)
+        map_container.pack(fill=tk.BOTH, expand=True)
+
+        if HAS_MAP:
+            self.map_widget = tkintermapview.TkinterMapView(
+                map_container, corner_radius=0)
+            self.map_widget.pack(fill=tk.BOTH, expand=True)
+
+            # Darwin scroll-wheel fix
+            if PLATFORM_SYSTEM == "Darwin":
+                def _map_zoom(event):
+                    rx = event.x / self.map_widget.width
+                    ry = event.y / self.map_widget.height
+                    self.map_widget.set_zoom(
+                        self.map_widget.zoom + event.delta * 0.01,
+                        relative_pointer_x=rx,
+                        relative_pointer_y=ry,
+                    )
+                self.map_widget.canvas.bind("<MouseWheel>", _map_zoom)
+        else:
+            # Fallback placeholder
+            self.map_widget = None
+            tk.Label(map_container,
+                     text="Map unavailable.\nInstall tkintermapview to enable.",
+                     bg=bg, fg=prefs["color_label"],
+                     font=prefs["font_ui"]).pack(expand=True)
+
+        # ── Playback controls ─────────────────────────────────────────────
+        self.controls = PlaybackControls(
+            self, prefs,
+            on_play_pause  = playback_callbacks["play_pause"],
+            on_step_back   = playback_callbacks["step_back"],
+            on_step_fwd    = playback_callbacks["step_fwd"],
+            on_slider      = playback_callbacks["slider"],
+            on_speed_change= playback_callbacks["speed_change"],
+        )
+        self.controls.pack(fill=tk.X, side=tk.BOTTOM)
+
+        # ── Internal map state ────────────────────────────────────────────
+        self._path_line    = None
+        self._drone_marker = None
+        self._home_marker  = None
+        self._drone_cache  = {}      # heading → ImageTk.PhotoImage
+        self._drone_heading= -1
+
+    # ── Map drawing helpers ───────────────────────────────────────────────────
+
+    def draw_path(self, coords: list[tuple]):
+        """Draw (or redraw) the full flight path on the map."""
+        if not self.map_widget:
+            return
         if self._path_line:
             self._path_line.delete()
-            self._path_line=None
+            self._path_line = None
+        if self._drone_marker:
+            self._drone_marker.delete()
+            self._drone_marker = None
+        if self._home_marker:
+            self._home_marker.delete()
+            self._home_marker = None
+        self._drone_cache.clear()
+        self._drone_heading = -1
 
-        if len(self.coords) >= 2:
-            self._path_line=self.map_widget.set_path(
-                self.coords, color=self.prefs["color_path"], width=4)
+        if len(coords) >= 2:
+            self._path_line = self.map_widget.set_path(
+                coords, color=self.prefs["color_path"], width=4)
 
-    #
-    # Icons for the map
-    #
-    def _make_drone_icon(self, heading) -> ImageTk.PhotoImage:
-        """Draw a simple arrow head rotated to the current heading."""
-        size=21 # Make this an odd number so we actually have a center pixel.
-        # Note we add 4 pixels of padding on all sides to make sure there's
-        # room for the rotation.
-        pad=4
-        tsize=size + pad * 2
-        img=Image.new("RGBA", (tsize, tsize), (0, 0, 0, 0))
-        draw=ImageDraw.Draw(img)
+    def fit_to_path(self, coords: list[tuple]):
+        """Zoom/pan the map to show the entire flight path."""
+        if not self.map_widget or not coords:
+            return
+        lats = [c[0] for c in coords]
+        lons = [c[1] for c in coords]
+        self.map_widget.fit_bounding_box(
+            (max(lats), min(lons)), (min(lats), max(lons)))
 
-        cx=cy = tsize // 2
+    def update_markers(self, lat, lon, home_lat, home_lon, heading: float):
+        """Move drone and home markers to the current position."""
+        if not self.map_widget:
+            return
+        if not is_valid_latlon(lat, lon):
+            return
 
-        # Draw a simple arrow/chevron pointing "up" (north=0°)
-        # Note the 4-pixel pad on the top and left.
-        draw.polygon([(cx, pad),
-                      (cx + size//2, pad + size),
-                      (cx, cy+ pad),
-                      (cx - size//2, pad + size)],
-                    fill=self.prefs["color_danger"], outline=self.prefs["color_border"])
+        # Home marker
+        if is_valid_latlon(home_lat, home_lon):
+            if self._home_marker is None:
+                self._home_marker = self.map_widget.set_marker(
+                    home_lat, home_lon,
+                    icon=self._make_home_icon() if HAS_PIL else None,
+                )
+            else:
+                self._home_marker.set_position(home_lat, home_lon)
 
-        img=img.rotate(-heading, resample=Image.BICUBIC, expand=False)
+        # Drone marker (cached per 5° step)
+        h5 = round(heading / 5) * 5
+        if HAS_PIL and h5 not in self._drone_cache:
+            self._drone_cache[h5] = self._make_drone_icon(h5)
+        icon = self._drone_cache.get(h5)
 
+        if self._drone_marker is None:
+            self._drone_marker = self.map_widget.set_marker(
+                lat, lon, icon=icon)
+            self._drone_heading = h5
+        else:
+            self._drone_marker.set_position(lat, lon)
+            if h5 != self._drone_heading:
+                self._drone_heading = h5
+                if icon:
+                    self._drone_marker.change_icon(icon)
+
+    # ── Icon factories (require Pillow) ───────────────────────────────────────
+
+    def _make_drone_icon(self, heading) -> "ImageTk.PhotoImage | None":
+        if not HAS_PIL:
+            return None
+        size, pad = 21, 4
+        tsize = size + pad * 2
+        img   = Image.new("RGBA", (tsize, tsize), (0, 0, 0, 0))
+        draw  = ImageDraw.Draw(img)
+        cx = cy = tsize // 2
+        draw.polygon(
+            [(cx, pad),
+             (cx + size // 2, pad + size),
+             (cx,             cy + pad),
+             (cx - size // 2, pad + size)],
+            fill=self.prefs["color_danger"],
+            outline=self.prefs["color_border"],
+        )
+        img = img.rotate(-heading, resample=Image.BICUBIC, expand=False)
         return ImageTk.PhotoImage(img)
 
-    def _make_home_icon(self) -> ImageTk.PhotoImage:
-        size=20
-        img=Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        draw=ImageDraw.Draw(img)
-
-        cc=size // 2
+    def _make_home_icon(self) -> "ImageTk.PhotoImage | None":
+        if not HAS_PIL:
+            return None
+        size = 22
+        img  = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        cc   = size // 2
 
         if self.prefs["font_marker"] == "":
             # Draw a simple house icon.
-            # Roof triangle
+            draw.rectangle([(4, 0), (7, cc)],
+                           fill=self.prefs["color_border"],
+                           outline=self.prefs["color_border"])
             draw.polygon([(cc, 0), (size, cc), (0, cc)],
                          fill=self.prefs["color_accent"],
                          outline=self.prefs["color_border"])
-            # House body
             draw.rectangle([(0, cc), (size, size)],
                            fill=self.prefs["color_accent"],
-                           outline=self.prefs["color_border"])
-            # Door
-            draw.rectangle([(cc-4, cc), (cc+4, size)],
+                           outline=self.prefs["color_border"],
+                           width=2)
+            draw.rectangle([(cc - 3, cc), (cc + 3, size)],
                            fill=self.prefs["color_border"])
+            draw.rectangle([(cc - 2, cc - size // 3), (cc + 2, cc - size // 3 + 4)],
+                           fill=self.prefs["color_border"],
+                           outline=self.prefs["color_border"])
         else:
+            # Use a letter "H" in a circle.
             font=ImageFont.truetype(self.prefs["font_marker"], size)
             draw.ellipse([(0,0),(size,size)], fill=self.prefs["color_bg"],
                          outline=self.prefs["color_path"])
@@ -1401,120 +1122,716 @@ class DroneViewer(tk.Tk):
 
         return ImageTk.PhotoImage(img)
 
-    def _update_markers(self, heading, lat, lon, home_lat, home_lon):
-        '''
-        Updates the position (and orientation) of the home and drone markers.
-        '''
-        # Home marker
-        if is_valid_latlon(home_lat, home_lon):
-            if self._home_marker is None:
-                self._home_marker=self.map_widget.set_marker(
-                    home_lat, home_lon,
-                    icon=self._make_home_icon(),
-                )
-                # Make sure the drone is drone on top of the home marker.
-                if self._drone_marker is not None:
-                    self._drone_marker.delete()
-                    self._drone_marker=None
-            else:
-                self._home_marker.set_position(home_lat,home_lon)
 
-        h2 = round(heading/5,0)*5
-        if h2 not in self._drone_cache:
-            self._drone_cache[h2]=self._make_drone_icon(h2)
+# ─────────────────────────────────────────────────────────────────────────────
+#  FlightSummaryWindow  –  pop-up showing stats for the loaded file
+#
+#  Displays min/max statistics for all basic fields of the currently
+#  loaded fc2 file.  Populated by calling refresh(records).
+# ─────────────────────────────────────────────────────────────────────────────
 
-        if self._drone_marker is None:
-            self._drone_marker=self.map_widget.set_marker(
-                lat, lon,
-                icon=self._drone_cache[h2],
-            )
-            self._drone_heading=h2
+class FlightSummaryWindow(tk.Toplevel):
+    """
+    Flight summary pop-up built around a ttk.Treeview table.
+
+    Columns
+    -------
+    Field   – human-readable field name
+    Min     – minimum value across all records
+    Max     – maximum value across all records
+    Unit    – unit string
+
+    The table covers every numeric field found in BASIC_DATA plus the
+    derived speed and distance fields.  A header strip above the table
+    shows file name, total record count, and flight duration.
+
+    Clicking a column header sorts the table by that column (toggle
+    ascending / descending).  The window is resizable; columns resize
+    with it.
+    """
+
+    # Fields to summarise.  Tuple: (data_key, display_name, unit)
+    # Add or remove rows here without touching anything else.
+    SUMMARY_FIELDS = [
+        ("alt (m)",                    "Altitude",        "m"),
+        ("heading (deg)",              "Heading",         "°"),
+        ("pitch angle (deg)",          "Pitch",           "°"),
+        ("bank (deg)",                 "Roll",            "°"),
+        ("3d Derived Speed (m/s)",     "3-D Speed",       "m/s"),
+        ("3d Travelled Distance (m)",  "Distance Travelled",  "m"),
+        ("3d Distance Distance (m)",   "Distance to Home",   "m"),
+        ("Wind Speed (m/s)",           "Wind Speed",      "m/s"),
+        ("Wind Direction (deg)",       "Wind Direction",  "°"),
+        ("Battery Level (%)",          "Battery Level",   "%"),
+        ("Battery (mv)",               "Battery Voltage", "mV"),
+        ("Battery Current (ma)",       "Battery Current", "mA"),
+        ("Battery Temp (c)",           "Battery Temp", "C"),
+        ("Satellites",                 "Satellites",      ""),
+        ("Signal Strength (%)",        "Signal Strength", "%"),
+    ]
+
+    # Column definitions: (treeview id, header label, anchor, min width, stretch)
+    _COLUMNS = [
+        ("field", "Field",  tk.W,  80, True),
+        ("unit",  "Unit",   tk.E,  40, True),
+        ("min",   "Min",    tk.E,   80, True),
+        ("max",   "Max",    tk.E,   80, True),
+    ]
+
+    def __init__(self, parent, prefs: dict):
+        my_logger.debug("Creating Flight Summary Window.")
+
+        super().__init__(parent)
+        self.prefs = prefs
+        self.title("Flight Summary")
+        self.resizable(True, True)
+        self.transient(parent)
+
+        x=parent.winfo_x() + (parent.winfo_width()  - 760)  // 2
+        y=parent.winfo_y() + (parent.winfo_height() - 420) // 2
+        self.geometry(f"760x420+{x}+{y}")
+
+        self.configure(bg=prefs["color_bg"])
+
+        self._sort_col = "field"
+        self._sort_asc = True
+
+        self._build()
+        self.protocol("WM_DELETE_WINDOW", self.withdraw)
+
+    # ── Construction ──────────────────────────────────────────────────────────
+
+    def _build(self):
+        p = self.prefs
+        bg       = p["color_bg"]
+        panel_bg = p["color_panel_bg"]
+        fg       = p["color_value"]
+        label_fg = p["color_label"]
+        accent   = p["color_accent"]
+        border   = p["color_border"]
+        font_ui  = p["font_ui"]
+        font_sm  = p["font_small"]
+        font_ttl = p["font_title"]
+
+        # ── Header strip ──────────────────────────────────────────────────
+        hdr = tk.Frame(self, bg=panel_bg, pady=6)
+        hdr.pack(fill=tk.X)
+
+        self._title_var = tk.StringVar(value="No file loaded.")
+        tk.Label(hdr, textvariable=self._title_var,
+                 bg=panel_bg, fg=accent,
+                 font=font_ttl, anchor="w").pack(side=tk.LEFT, padx=10)
+
+        self._meta_var = tk.StringVar(value="")
+        tk.Label(hdr, textvariable=self._meta_var,
+                 bg=panel_bg, fg=label_fg,
+                 font=font_sm, anchor="e").pack(side=tk.RIGHT, padx=10)
+
+        tk.Frame(self, bg=border, height=1).pack(fill=tk.X)
+
+        # ── Treeview + scrollbars ─────────────────────────────────────────
+        tree_frame = tk.Frame(self, bg=bg)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+
+        vsb = tk.Scrollbar(tree_frame, orient=tk.VERTICAL)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+        hsb = tk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
+        hsb.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Style the Treeview to match the app colour palette.
+        style = ttk.Style(self)
+        style_name = "Summary.Treeview"
+        style.configure(style_name,
+                        background=panel_bg,
+                        foreground=fg,
+                        fieldbackground=panel_bg,
+                        rowheight=22,
+                        font=font_ui)
+        style.configure(f"{style_name}.Heading",
+                        background=panel_bg,
+                        foreground=label_fg,
+                        relief=tk.FLAT,
+                        font=font_ui)
+        style.map(style_name,
+                  background=[("selected", p["color_select"])],
+                  foreground=[("selected", fg)])
+        style.map(f"{style_name}.Heading",
+                  background=[("active", border)])
+
+        col_ids = [c[0] for c in self._COLUMNS]
+        self._tree = ttk.Treeview(
+            tree_frame,
+            columns=col_ids,
+            show="headings",
+            selectmode="browse",
+            yscrollcommand=vsb.set,
+            xscrollcommand=hsb.set,
+            style=style_name,
+        )
+        vsb.config(command=self._tree.yview)
+        hsb.config(command=self._tree.xview)
+        self._tree.pack(fill=tk.BOTH, expand=True)
+
+        # Configure each column and bind header click for sorting.
+        for col_id, label, anchor, minwidth, stretch in self._COLUMNS:
+            self._tree.heading(col_id, text=label,
+                               command=lambda c=col_id: self._sort_by(c))
+            self._tree.column(col_id, anchor=anchor,
+                              minwidth=minwidth, stretch=stretch)
+
+        # Alternating row colours
+        self._tree.tag_configure("odd",  background=panel_bg)
+        self._tree.tag_configure("even", background=bg)
+
+        # ── Bottom bar ────────────────────────────────────────────────────
+        tk.Frame(self, bg=border, height=1).pack(fill=tk.X)
+        bot = tk.Frame(self, bg=panel_bg, pady=4)
+        bot.pack(fill=tk.X)
+
+        self._footer_var = tk.StringVar(value="")
+        tk.Label(bot, textvariable=self._footer_var,
+                 bg=panel_bg, fg=label_fg,
+                 font=font_sm, anchor="w").pack(side=tk.LEFT, padx=10)
+
+        tk.Button(bot, text="Close",
+                  command=self.withdraw,
+                  font=font_ui,
+                  bg=p.get("color_button_bg", panel_bg),
+                  fg=p.get("color_button_fg", fg),
+                  relief=tk.FLAT, padx=8
+                  ).pack(side=tk.RIGHT, padx=8)
+
+    # ── Public API ────────────────────────────────────────────────────────────
+
+    def refresh(self, records: list[dict], file_name: str = ""):
+        """Recompute statistics from records and repopulate the table."""
+
+        # Clear existing rows.
+        self._tree.delete(*self._tree.get_children())
+
+        if not records:
+            self._title_var.set("No file loaded.")
+            self._meta_var.set("")
+            self._footer_var.set("")
+            return
+
+        fname = Path(file_name).name if file_name else "unknown"
+        self.title(f"Flight Summary — {fname}")
+        self._title_var.set(fname)
+
+        # ── Flight duration ───────────────────────────────────────────────
+        elapsed_vals = [r.get("elapsed (us)", 0) for r in records
+                        if isinstance(r.get("elapsed (us)"), (int, float))]
+        if elapsed_vals:
+            duration_s = (max(elapsed_vals) - min(elapsed_vals)) / 1_000_000
+            m, s = divmod(int(duration_s), 60)
+            h, m = divmod(m, 60)
+            dur_str = (f"{h}h {m:02d}m {s:02d}s" if h
+                       else f"{m}m {s:02d}s")
         else:
-            self._drone_marker.set_position(lat,lon)
-            if h2 != self._drone_heading:
-                self._drone_heading=h2
-                self._drone_marker.change_icon(self._drone_cache[h2])
+            dur_str = "unknown"
 
+        self._meta_var.set(f"Duration: {dur_str}   Records: {len(records):,}")
+
+        # ── Build rows ────────────────────────────────────────────────────
+        rows = []  # list of (field_label, unit, min, max, mean, range, sort_key)
+        for data_key, display_name, unit in self.SUMMARY_FIELDS:
+            vals = [r[data_key] for r in records
+                    if isinstance(r.get(data_key), (int, float))]
+                   
+            if not vals:
+                continue
+            vmin  = min(vals)
+            vmax  = max(vals)
+            vmean = sum(vals) / len(vals)
+            vrange = vmax - vmin
+            rows.append({
+                "field": display_name,
+                "unit":  unit,
+                "min":   vmin,
+                "max":   vmax,
+                "mean":  vmean,
+                "range": vrange,
+            })
+
+        # Store for re-sort without re-computing.
+        self._rows = rows
+        self._populate_tree(rows)
+
+        # ── Footer ───────────────────────────────────────────────────────
+        gps_count = sum(1 for r in records if r.get("GPS Lock") == "Yes")
+        gps_pct   = 100 * gps_count / len(records) if records else 0
+        self._footer_var.set(
+            f"GPS lock: {gps_count:,} of {len(records):,} records  ({gps_pct:.0f}%)"
+        )
+
+    def show(self):
+        self.deiconify()
+        self.lift()
+
+    # ── Internal ─────────────────────────────────────────────────────────────
+
+    def _populate_tree(self, rows: list[dict]):
+        """Insert rows into the Treeview, applying sort and alternating colours."""
+        self._tree.delete(*self._tree.get_children())
+
+        # Determine sort key and direction.
+        col  = self._sort_col
+        asc  = self._sort_asc
+        numeric_cols = {"min", "max", "mean", "range"}
+
+        def sort_key(r):
+            v = r.get(col, "")
+            if col in numeric_cols:
+                return v if isinstance(v, (int, float)) else float("-inf")
+            return str(v).lower()
+
+        sorted_rows = sorted(rows, key=sort_key, reverse=not asc)
+
+        # Update heading arrows.
+        for col_id, label, *_ in self._COLUMNS:
+            arrow = (" ▲" if asc else " ▼") if col_id == col else ""
+            self._tree.heading(col_id, text=label + arrow)
+
+        for i, row in enumerate(sorted_rows):
+            tag = "even" if i % 2 == 0 else "odd"
+            self._tree.insert("", tk.END, tags=(tag,), values=(
+                row["field"],
+                row["unit"],
+                self._fmtn(row["min"]),
+                self._fmtn(row["max"]),
+                self._fmtn(row["mean"]),
+                self._fmtn(row["range"]),
+            ))
+
+    def _sort_by(self, col_id: str):
+        """Toggle sort direction when the same column is clicked again."""
+        if self._sort_col == col_id:
+            self._sort_asc = not self._sort_asc
+        else:
+            self._sort_col = col_id
+            self._sort_asc = True
+        if hasattr(self, "_rows"):
+            self._populate_tree(self._rows)
 
     @staticmethod
-    def _deg_to_dms(deg:float) ->str:
-        m=(deg - math.floor(deg))*60
-        s=(m - math.floor(m))*60
-        deg=math.floor(deg)
-        m=math.floor(m)
-        s=round(s,1)
-        return f"{deg}:{m:02d}:{s:04.1f}"
+    def _fmtn(v) -> str:
+        """Format a numeric value for display: integers without decimals."""
+        if not isinstance(v, (int, float)):
+            return "—"
+        if v == int(v) and abs(v) < 10_000:
+            return f"{int(v)}"
+        return f"{v:.2f}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  CSV export helper
+#
+#   Write records to a CSV file alongside the source file (or in destination).
+#   Returns the path of the written CSV.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def export_csv(file_name: str, records: list[dict],
+               extended: bool = False, derived: bool = True,
+               destination: str | None = None) -> str:
+    my_logger.debug(f"Exporting {file_name} to {destination}.")
+    base_name  = Path(file_name).stem
+    directory  = destination if destination else str(Path(file_name).parent)
+    csv_path   = os.path.join(directory, f"{base_name}.csv")
+
+    header = (
+        BASIC_DATA
+        + (EXTENDED_DATA if extended else [])
+        + (DERIVED_DATA  if derived  else [])
+    )
+
+    with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        for rec in records:
+            writer.writerow([rec.get(field, "") for field in header])
+
+    my_logger.info("CSV written: %s", csv_path)
+    return csv_path
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Main application window
+# ─────────────────────────────────────────────────────────────────────────────
+
+class Atom2Viewer(tk.Tk):
+    """
+    Top-level window.  Owns the menu bar, the horizontal PanedWindow that
+    splits the file-list pane from the map pane, and all playback state.
+    """
+
+    PLAYBACK_INCREMENT = [1, 1, 2, 4, 8]   # record steps per tick at each speed index
+
+    def __init__(self):
+        my_logger.debug("Creating top level window.")
+        super().__init__()
+
+        self.prefs = load_prefs()
+
+        my_logger.setLevel(mwhlogging.LOG_LEVEL_MAP[self.prefs["log_level"]])
+
+        self.title("Atom 2 Flight Log Viewer")
+        self.configure(bg=self.prefs["color_bg"])
+        self.minsize(900, 600)
+        self.geometry(self.prefs.get("window_geometry", "1400x860"))
+
+        # ── Playback state ────────────────────────────────────────────────
+        self.records:     list[dict] = []
+        self.records_len: int        = 0
+        self.coords:      list[tuple]= []
+        self.current_file: str       = ""
+        self.current_idx:  int       = 0
+        self.playing:      bool      = False
+        self.pending_update: bool    = False
+        self.speed_idx:    int       = 0
+        self._stop_event             = threading.Event()
+        self._playback_thread        = None
+
+        # ── All-records cache (for CSV export) ────────────────────────────
+        # atom2_parser is called once; we keep all records (not just GPS-locked)
+        self._all_records: list[dict] = []
+
+        self._apply_styles()
+        self._build_ui()
+
+        my_logger.debug("After _build_ui")
+
+        # Attach logger window now that Tk root exists
+        my_logger.configure_logging(
+            tk_parent=self,
+            tk_menubar=self._menubar,
+            tk_title="Atom 2 Viewer Log",
+        )
+
+        my_logger.debug("After configure logging.")
+
+        # macOS: double-click on .fc2 in Finder
+        if PLATFORM_SYSTEM == "Darwin":
+            self.createcommand("::tk::mac::OpenDocument", self._mac_open)
+            self.createcommand("tkAboutDialog",           self._show_about)
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        try:
+            self.createcommand("tk::mac::Quit", self._on_close)
+        except Exception:
+            pass
+        my_logger.debug("complete.")
+
+    def _mac_open(self, *filenames):
+        my_logger.debug("_mac_open")
+        self.after(100, lambda: self._load_file(filenames[0]))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # UI construction
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _apply_styles(self):
+        style = ttk.Style(self)
+        for preferred in ("aqua", "vista", "alt", "clam", "default"):
+            if preferred in style.theme_names():
+                style.theme_use(preferred)
+                break
+
+    def _save_prefs(self,prefs):
+        self.prefs=prefs
+        save_prefs(prefs)
+
+    def _build_ui(self):
+        self.option_add("*tearOff", False)
+
+        # ── Menu bar ─────────────────────────────────────────────────────
+        self._menubar = tk.Menu(self)
+        self.configure(menu=self._menubar)
+
+        self._build_file_menu()
+        self._build_view_menu()
+        self._build_playback_menu()
+        self._build_help_menu()
+
+        # ── Horizontal paned window ───────────────────────────────────────
+        paned = tk.PanedWindow(
+            self, orient=tk.HORIZONTAL,
+            bg=self.prefs["color_border"],
+            sashwidth=5, sashrelief=tk.FLAT,
+        )
+        paned.pack(fill=tk.BOTH, expand=True)
+        self._paned = paned
+
+        # Left: file list
+        self._file_list_pane = FileListPane(
+            paned, self.prefs, on_select=self._load_file)
+        paned.add(self._file_list_pane,
+                  stretch="never",
+                  minsize=160,
+                  width=self.prefs.get("sash_position", 280))
+
+        # Right: dashboard + map + controls
+        self._map_pane = MapPane(
+            paned, self.prefs,
+            playback_callbacks={
+                "play_pause"  : self._toggle_play,
+                "step_back"   : self._step_back,
+                "step_fwd"    : self._step_fwd,
+                "slider"      : self._on_slider,
+                "speed_change": self._on_speed_change,
+            },
+        )
+        paned.add(self._map_pane, stretch="always", minsize=500)
+
+        # ── Status bar ────────────────────────────────────────────────────
+        status_bar = tk.Frame(self, bg=self.prefs["color_panel_bg"], pady=3)
+        status_bar.pack(fill=tk.X, side=tk.BOTTOM)
+
+        self._status_var = tk.StringVar(value="Ready.")
+        tk.Label(status_bar, textvariable=self._status_var,
+                 bg=self.prefs["color_panel_bg"],
+                 fg=self.prefs["color_label"],
+                 font=self.prefs["font_small"]).pack(side=tk.LEFT, padx=10)
+
+        # ── Pop-up windows (hidden until needed) ──────────────────────────
+        self._summary_window = None
+        self._preferences_window = None
+
+        # ── Keyboard shortcuts ────────────────────────────────────────────
+        self._bind_keys()
+
+    # ── Menu builders ─────────────────────────────────────────────────────────
+
+    def _build_file_menu(self):
+        m = tk.Menu(self._menubar)
+        self._menubar.add_cascade(label="File", menu=m, underline=0)
+
+        acc = "Command" if PLATFORM_SYSTEM == "Darwin" else "Ctrl"
+
+        m.add_command(label="Import FC2 File(s)…",
+                      command=self._import_files,
+                      accelerator=f"{acc}+O",
+                      underline=0)
+        m.add_command(label="Import Directory…",
+                      command=self._import_directory,
+                      underline=7)
+        m.add_separator()
+        m.add_command(label="Export Current File to CSV…",
+                      command=self._export_csv_current,
+                      accelerator=f"{acc}+E",
+                      underline=0)
+        m.add_command(label="Export All Files to CSV…",
+                      command=self._export_csv_all,
+                      underline=7)
+        m.add_separator()
+        m.add_command(label="Preferences…",
+                      command=self._show_prefs,
+                      underline=0)
+        m.add_separator()
+        if PLATFORM_SYSTEM != "Darwin":
+            m.add_command(label="About",
+                          command=self._show_about,
+                          underline=0)
+        m.add_command(label="View Log…",
+                      command=self._show_log,
+                      underline=5)
+        m.add_separator()
+        m.add_command(label="Quit",
+                      command=self._on_close,
+                      accelerator=f"{acc}+Q",
+                      underline=0)
+
+    def _build_view_menu(self):
+        m = tk.Menu(self._menubar)
+        self._menubar.add_cascade(label="View", menu=m, underline=0)
+
+        m.add_command(label="Flight Summary…",
+                      command=self._show_summary,
+                      underline=0)
+        m.add_command(label="Log Window…",
+                      command=self._show_log,
+                      underline=0)
+        m.add_separator()
+        m.add_command(label="Fit Map to Path",
+                      command=self._fit_map,
+                      underline=0)
+
+    def _build_playback_menu(self):
+        m = tk.Menu(self._menubar)
+        self._menubar.add_cascade(label="Playback", menu=m, underline=0)
+
+        m.add_command(label="Play / Pause",
+                      command=self._toggle_play,
+                      accelerator="Space",
+                      underline=0)
+        m.add_command(label="Step Back",
+                      command=self._step_back,
+                      accelerator="←",
+                      underline=5)
+        m.add_command(label="Step Forward",
+                      command=self._step_fwd,
+                      accelerator="→",
+                      underline=5)
+        m.add_separator()
+        m.add_command(label="Decrease Speed",
+                      command=self._slower,
+                      underline=0)
+        m.add_command(label="Increase Speed",
+                      command=self._faster,
+                      underline=0)
+        m.add_separator()
+        m.add_command(label="Go to Start",
+                      command=lambda: self._update_display(0),
+                      underline=6)
+        m.add_command(label="Go to End",
+                      command=lambda: self._update_display(len(self.records) - 1),
+                      underline=6)
+
+    def _build_help_menu(self):
+        m = tk.Menu(self._menubar)
+        self._menubar.add_cascade(label="Help", menu=m, underline=0)
+
+        m.add_command(label="About…",
+                      command=self._show_about,
+                      underline=0)
+
+    def _bind_keys(self):
+        if PLATFORM_SYSTEM == "Darwin":
+            self.bind("<Command-o>", lambda e: self._import_files())
+            self.bind("<Command-e>", lambda e: self._export_csv_current())
+            self.bind("<Command-q>", lambda e: self._on_close())
+        else:
+            self.bind("<Control-o>", lambda e: self._import_files())
+            self.bind("<Control-e>", lambda e: self._export_csv_current())
+            self.bind("<Control-q>", lambda e: self._on_close())
+
+        self.bind("<space>", lambda e: self._toggle_play())
+        self.bind("<Left>",  lambda e: self._step_back())
+        self.bind("<Right>", lambda e: self._step_fwd())
+        self.bind("<Delete>",    lambda e: self._file_list_pane.remove_selected())
+        self.bind("<BackSpace>", lambda e: self._file_list_pane.remove_selected())
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # File import
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _import_files(self):
+        files = filedialog.askopenfilenames(
+            title="Import FC2 Flight Log(s)",
+            initialdir=self.prefs.get("last_import_dir", str(Path.home())),
+            filetypes=[("FC2 flight logs", "*.fc2"), ("All files", "*.*")],
+        )
+        if not files:
+            return
+        self.prefs["last_import_dir"] = str(Path(files[0]).parent)
+        self._file_list_pane.add_files(list(files))
+        self._set_status(f"Added {len(files)} file(s) to the list.")
+
+    def _import_directory(self):
+        directory = filedialog.askdirectory(
+            title="Import all FC2 files from directory",
+            initialdir=self.prefs.get("last_import_dir", str(Path.home())),
+        )
+        if not directory:
+            return
+        self.prefs["last_import_dir"] = directory
+        fc2_files = list(Path(directory).glob("*.fc2"))
+        if not fc2_files:
+            messagebox.showinfo("No FC2 Files",
+                                f"No .fc2 files found in:\n{directory}")
+            return
+        self._file_list_pane.add_files([str(p) for p in fc2_files])
+        self._set_status(f"Added {len(fc2_files)} file(s) from directory.")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # File loading  (parses the binary and updates the map / dashboard)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _load_file(self, path: str):
+        """Parse an fc2 file and populate the UI.  Called from file-list click."""
+        if self.playing:
+            self._pause()
+
+        self._set_status(f"Loading {Path(path).name}…")
+        self.update_idletasks()
+
+        try:
+            all_records = atom2_parser(file_name=path, logger=my_logger)
+        except Exception as exc:
+            messagebox.showerror("Parse Error", str(exc))
+            self._set_status("Error loading file.")
+            return
+
+        if not all_records:
+            messagebox.showwarning("Empty File", "No records found in this file.")
+            return
+
+        self._all_records = all_records
+        self.current_file = path
+
+        # For map/playback, only use GPS-locked records
+        gps_records = [r for r in all_records if r.get("GPS Lock") == "Yes"]
+        if not gps_records:
+            messagebox.showwarning("No GPS Data",
+                                   "No GPS-locked records found in this file.")
+            return
+
+        self.records     = gps_records
+        self.records_len = len(gps_records)
+        self.coords      = [(r["lat (deg)"], r["lon (deg)"]) for r in gps_records]
+        self.current_idx = 0
+
+        # Draw path and fit map
+        self._map_pane.draw_path(self.coords)
+        self._map_pane.fit_to_path(self.coords)
+
+        # Set slider range
+        self._map_pane.controls.set_range(self.records_len)
+
+        # Update window title
+        self.title(f"Atom 2 Viewer — {Path(path).name}")
+
+        self._set_status(
+            f"Loaded {self.records_len} GPS records from {Path(path).name}.")
+
+        # Go to first frame
+        self._update_display(0)
+
+        # Update summary window if it's open
+        if self._summary_window != None and self._summary_window.winfo_viewable():
+            self._summary_window.refresh(self._all_records, self.current_file)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Display update  (called every frame during playback)
+    # ─────────────────────────────────────────────────────────────────────────
 
     def _update_display(self, idx: int):
-        idx=max(0, min(idx, len(self.records) - 1))
-        self.current_idx=idx
-        r=self.records[idx]
+        if not self.records:
+            return
+        idx = max(0, min(idx, self.records_len - 1))
+        self.current_idx = idx
+        r = self.records[idx]
 
-        # Gauges - Note that we count on set_value to avoid unnneeded
-        # updates.
-        self._gauge_speed.set_value(r.get("3d Derived Speed (m/s)", 0)*3.6)
-        #self._gauge_speed.set_value(r.get("speed (m/s)", 0)*3.6)
-        self._gauge_alt.set_value(r.get("alt (m)", 0))
-        self._gauge_dist.set_value(r.get("distance (m)", 0))
-        heading = r.get("heading (deg)", 0)
-        self._gauge_compass.set_value(heading)
-        self._gauge_wind.set_value(r.get("Wind (deg)", 0))
+        # Dashboard
+        self._map_pane.dashboard.update_record(r)
 
-        self._bar_battery.set_value(r.get("Battery Level (%)", 0))
-        self._bar_sats.set_value(r.get("Satellites", 0))
-        self._bar_wind.set_value(r.get("Wind Speed (m/s)", 0))
+        # Map markers
+        lat      = r.get("lat (deg)")
+        lon      = r.get("lon (deg)")
+        home_lat = r.get("Home Lat (deg)")
+        home_lon = r.get("Home Lon (deg)")
+        heading  = r.get("heading (deg)", 0)
+        self._map_pane.update_markers(lat, lon, home_lat, home_lon, heading)
 
-        # RC Sticks
-        # Left stick: throttle (Y) + rudder/yaw (X)
-        # Right stick: elevator/pitch (Y) + aileron/roll (X)
-        self._stick_left.set_values(
-            r.get("rc rudder",   1024),
-            r.get("rc throttle", 1024)
-        )
-        self._stick_right.set_values(
-            r.get("rc aileron",  1024),
-            r.get("rc elevator", 1024)
-        )
+        # Controls
+        elapsed_us = r.get("elapsed (us)", 0)
+        self._map_pane.controls.set_position(idx, self.records_len, elapsed_us)
 
-        # Update panel items. This turned out to be surprisingly
-        # expensive, so we use an invariant list of items to update and we
-        # count on update_field to only change fields that have changed.
-        for field in self.PANEL_UPDATE_ITEMS:
-            if field is None:
-                continue
-            self.info.update_field(field[0], r.get(field[1], "—"))
+        self.pending_update = False
 
-        # Handle panel items that have special formatting.
-        elapsed_us=r.get("elapsed (us)", 0)
-        elapsed_s =elapsed_us / 1_000_000
-        m, s      =divmod(int(elapsed_s), 60)
-        self.info.update_field("Elapsed",     f"{m:02d}:{s:02d}")
-
-        lat=r.get("lat (deg)")
-        lon=r.get("lon (deg)")
-        if is_valid_latlon(lat, lon):
-            self.info.update_field("Lat",     self._deg_to_dms(lat))
-            self.info.update_field("Lon",     self._deg_to_dms(lon))
-
-        hlat=r.get("Home Lat (deg)")
-        hlon=r.get("Home Lon (deg)")
-        if is_valid_latlon(hlat, hlon):
-            self.info.update_field("H Lat",    self._deg_to_dms(hlat))
-            self.info.update_field("H Lon",    self._deg_to_dms(hlon))
-        else:
-            self.info.update_field("H Lat","—")
-            self.info.update_field("H Lon","—")
-
-        # Slider
-        self._slider_var.set(idx)
-        self._progress_var.set(f"{idx + 1} / {len(self.records)}")
-
-        # Map marker
-        self._update_markers(heading, lat, lon, hlat, hlon)
-
-        self.pending_update=False
-
-    # ── Transport controls ────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
+    # Playback engine
+    # ─────────────────────────────────────────────────────────────────────────
 
     def _toggle_play(self):
         if self.playing:
@@ -1525,61 +1842,46 @@ class DroneViewer(tk.Tk):
     def _play(self):
         if not self.records:
             return
-        if self.current_idx >= len(self.records) - 1:
-            self.current_idx=0
-        self.playing=True
-        if PLATFORM_SYSTEM == "Darwin":
-            self._btn_play.configure(text="⏸️", bg=self.prefs["color_warn"],
-                                     fg=self.prefs["color_bg"])
-        else:
-            self._btn_play.configure(text="||", bg=self.prefs["color_warn"],
-                                     fg=self.prefs["color_bg"])
+        if self.current_idx >= self.records_len - 1:
+            self.current_idx = 0
+        self.playing = True
+        self._map_pane.controls.set_playing(True)
         self._stop_event.clear()
-        self.playback_thread=threading.Thread(
+        self._playback_thread = threading.Thread(
             target=self._playback_loop, daemon=True)
-        self.playback_thread.start()
+        self._playback_thread.start()
 
     def _pause(self):
-        self.playing=False
+        self.playing = False
         self._stop_event.set()
-        if PLATFORM_SYSTEM == "Darwin":
-            self._btn_play.configure(text="▶️", bg=self.prefs["color_accent"],
-                                     fg=self.prefs["color_bg"])
-        else:
-            self._btn_play.configure(text=">", bg=self.prefs["color_accent"],
-                                     fg=self.prefs["color_bg"])
-
-    # Playback speed multipliers
-    PLAYBACK_SPEED=[1, 2, 4, 8, 16]
-    # To improve performance, we skip records when running at higher
-    # playback speeds.
-    PLAYBACK_INCREMENT=[1, 1, 2, 4, 8]
+        self._map_pane.controls.set_playing(False)
 
     def _playback_loop(self):
-        """Background thread that advances frames at the selected rate."""
-        while not self._stop_event.is_set():
+        """Background thread: advances frames at the correct wall-clock rate."""
+        incr = self.PLAYBACK_INCREMENT
+        speeds = PlaybackControls.PLAYBACK_SPEEDS
 
-            i_next=self.current_idx + self.PLAYBACK_INCREMENT[self.speed_idx]
+        while not self._stop_event.is_set():
+            step   = incr[self.speed_idx]
+            i_next = self.current_idx + step
+
             if i_next >= self.records_len:
                 self.after(0, self._pause)
                 break
 
-            # Calculate sleep based on elapsed time between records
-            # divided by the playback multiplier.
-            r_cur =self.records[self.current_idx]
-            r_next=self.records[i_next]
-            dt_us =r_next.get("elapsed (us)", 0) - r_cur.get("elapsed (us)", 0)
-            dt_us =dt_us / self.PLAYBACK_SPEED[self.speed_idx]
-            sleep =max(0.01, dt_us / 1_000_000)
+            r_cur  = self.records[self.current_idx]
+            r_next = self.records[i_next]
+            dt_us  = (r_next.get("elapsed (us)", 0)
+                      - r_cur.get("elapsed (us)", 0))
+            dt_us  = dt_us / speeds[self.speed_idx]
+            sleep  = max(0.01, dt_us / 1_000_000)
 
             if not self.pending_update:
-                self.pending_update=True
-                self.current_idx = i_next
+                self.pending_update = True
+                self.current_idx    = i_next
                 self.after(0, self._update_display, i_next)
 
             self._stop_event.wait(timeout=sleep)
-
-
 
     def _step_back(self):
         self._update_display(self.current_idx - 100)
@@ -1587,36 +1889,172 @@ class DroneViewer(tk.Tk):
     def _step_fwd(self):
         self._update_display(self.current_idx + 100)
 
-    def _slow_down(self):
-        self._set_speed(self.speed_idx-1)
-        self._speed_var.set(f"{self.PLAYBACK_SPEED[self.speed_idx]}×")
+    def _slower(self):
+        ctrl = self._map_pane.controls
+        ctrl._slower()
 
-    def _speed_up(self):
-        self._set_speed(self.speed_idx+1)
-        self._speed_var.set(f"{self.PLAYBACK_SPEED[self.speed_idx]}×")
+    def _faster(self):
+        ctrl = self._map_pane.controls
+        ctrl._faster()
 
-    def _on_slider(self, val):
-        idx=int(float(val))
+    def _on_slider(self, idx: int):
         if idx != self.current_idx:
             self._update_display(idx)
 
-    def _set_speed(self, idx: int):
-        self.speed_idx=max(0, min(len(self.PLAYBACK_SPEED)-1, idx))
+    def _on_speed_change(self, idx: int):
+        self.speed_idx = idx
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # CSV export
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _export_csv_current(self):
+        """Export the currently loaded file to CSV."""
+        if not self._all_records:
+            messagebox.showinfo("No Data", "No file is currently loaded.")
+            return
+
+        dest_dir = filedialog.askdirectory(
+            title="Choose export directory",
+            initialdir=self.prefs.get("last_export_dir", str(Path.home())),
+        )
+        if not dest_dir:
+            return
+        self.prefs["last_export_dir"] = dest_dir
+
+        try:
+            csv_path = export_csv(
+                self.current_file,
+                self._all_records,
+                extended=self.prefs.get("csv_extended", False),
+                derived=self.prefs.get("csv_derived", True),
+                destination=dest_dir,
+            )
+            self._set_status(f"Exported: {Path(csv_path).name}")
+            messagebox.showinfo("Export Complete", f"CSV written to:\n{csv_path}")
+        except Exception as exc:
+            messagebox.showerror("Export Error", str(exc))
+
+    def _export_csv_all(self):
+        """Export every file in the file list to CSV."""
+        paths = self._file_list_pane.get_paths()
+        if not paths:
+            messagebox.showinfo("No Files", "The file list is empty.")
+            return
+
+        dest_dir = filedialog.askdirectory(
+            title="Choose export directory for all files",
+            initialdir=self.prefs.get("last_export_dir", str(Path.home())),
+        )
+        if not dest_dir:
+            return
+        self.prefs["last_export_dir"] = dest_dir
+
+        errors  = []
+        written = 0
+        for path in paths:
+            try:
+                records = atom2_parser(file_name=path, logger=my_logger)
+                if records:
+                    export_csv(
+                        path, records,
+                        extended=self.prefs.get("csv_extended", False),
+                        derived=self.prefs.get("csv_derived", True),
+                        destination=dest_dir,
+                    )
+                    written += 1
+            except Exception as exc:
+                errors.append(f"{Path(path).name}: {exc}")
+
+        msg = f"Exported {written} of {len(paths)} files."
+        if errors:
+            msg += "\n\nErrors:\n" + "\n".join(errors)
+        messagebox.showinfo("Batch Export Complete", msg)
+        self._set_status(f"Batch export: {written}/{len(paths)} files written.")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Pop-ups and dialogs
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _show_summary(self):
+        if self._summary_window == None:
+            self._summary_window = FlightSummaryWindow(self, self.prefs)
+
+        self._summary_window.refresh(self._all_records, self.current_file)
+        self._summary_window.show()
+
+    def _show_log(self):
+        try:
+            my_logger._tk_window.show()
+        except Exception:
+            messagebox.showinfo("Log", "Log window is not available.")
+
+    def _fit_map(self):
+        if self.coords:
+            self._map_pane.fit_to_path(self.coords)
+        else:
+            messagebox.showinfo("No Data", "No flight path is loaded.")
+
+    def _show_prefs(self):
+        if self._preferences_window == None:
+            self._preferences_window = PrefsDialog(self, self.prefs,
+                                                   self._save_prefs,
+                                                   self._menubar)
+        self._preferences_window.show()
+
+    def _show_about(self):
+        messagebox.showinfo(
+            "About Atom 2 Viewer",
+            f"Atom 2 Flight Log Viewer & Exporter\n"
+            f"Version {_version}\n\n"
+            "Combines adv.py (visualizer) and atom_data_extractor.py (CSV export).\n\n"
+            "Written by Michael Heinz.\n"
+            "Based on work by Michael Heinz, Koen Aerts, and Rob Pritt.",
+        )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Status bar helper
+    # ─────────────────────────────────────────────────────────────────────────
 
     def _set_status(self, msg: str):
         self._status_var.set(msg)
 
-def main():
-    app=DroneViewer()
+    # ─────────────────────────────────────────────────────────────────────────
+    # Shutdown
+    # ─────────────────────────────────────────────────────────────────────────
 
+    def _on_close(self):
+        if self.playing:
+            self._pause()
+        self.prefs["window_geometry"] = self.geometry()
+        try:
+            self.prefs["sash_position"] = self._paned.sash_coord(0)[0]
+        except Exception as e:
+            my_logger.error(f"{str(e)}")
+            pass
+
+        save_prefs(self.prefs)
+        self.quit()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Entry point
+# ─────────────────────────────────────────────────────────────────────────────
+
+def main():
+    app = Atom2Viewer()
+
+    # Allow a single fc2 path as a command-line argument (convenience)
     if len(sys.argv) > 1:
-        path=sys.argv[1]
-        if os.path.exists(path):
-            app.after(200, lambda: app.load_file(path))
+        path = sys.argv[1]
+        if Path(path).exists():
+            app._file_list_pane.add_files([path])
+            app.after(200, lambda: app._load_file(path))
         else:
-            my_logger.error(f"{path} does not exist.")
+            my_logger.error("File not found: %s", path)
 
     app.mainloop()
+
 
 if __name__ == "__main__":
     main()
