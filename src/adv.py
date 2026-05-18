@@ -156,6 +156,9 @@ DEFAULT_PREFS = {
     # --- CSV export options ---
     "csv_extended": False,
     "csv_derived": True,
+
+    # --- System Theme
+    "theme": "default",
 }
 
 DARK_MODE_PREFS = {
@@ -197,6 +200,9 @@ DARK_MODE_PREFS = {
     # --- CSV export options ---
     "csv_extended": False,
     "csv_derived": True,
+
+    # --- System Theme
+    "theme": "default",
 }
 
 if PLATFORM_SYSTEM == "Linux":
@@ -445,7 +451,7 @@ class PrefsDialog(tk.Toplevel):
                   command=self._save,
                   default=tk.ACTIVE).pack(side=tk.RIGHT)
         tk.Button(btn_row, text="Cancel",
-                  command=self.destroy).pack(side=tk.RIGHT, padx=(4, 0))
+                  command=self.withdraw).pack(side=tk.RIGHT, padx=(4, 0))
 
         # Allow Enter to save and Escape to cancel
         self.bind("<Return>",  lambda e: self._save())
@@ -838,10 +844,10 @@ class PlaybackControls(tk.Frame):
             return tk.Button(
                 btn_row, text=text, command=cmd,
                 bg=prefs["color_button_bg"], fg=prefs["color_button_fg"],
-                relief=tk.FLAT, font=prefs["font_ui"],
+                relief=tk.FLAT, font=tuple(prefs["font_ui"]),
                 cursor="hand2", padx=2,
-                activebackground=prefs["color_border"],
-                activeforeground=prefs["color_value"]
+                activebackground=prefs["color_button_bg"],
+                activeforeground=prefs["color_button_fg"]
             )
 
         self._btn_slower = mkbtn("🐢" if use_emoji else "Slower", self._slower)
@@ -1532,10 +1538,13 @@ class Atom2Viewer(tk.Tk):
 
     def _apply_styles(self):
         style = ttk.Style(self)
-        for preferred in ("aqua", "vista", "alt", "clam", "default"):
-            if preferred in style.theme_names():
-                style.theme_use(preferred)
-                break
+        preferred = self.prefs["theme"]
+        style.theme_use(preferred)
+        #for preferred in ("aqua", "vista", "alt", "clam", "default"):
+        #    if preferred in style.theme_names():
+        #        my_logger.debug(f"Using {preferred} theme.")
+        #        style.theme_use(preferred)
+        #        break
 
     def _save_prefs(self,prefs):
         self.prefs=prefs
