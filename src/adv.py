@@ -706,7 +706,7 @@ class FileListPane(tk.Frame):
         super().__init__(parent, bg=bg, **kw)
         self.prefs     = prefs
         self.on_select = on_select
-        self._paths: list[tuple[str,str,bool]] = []   # parallel to Listbox entries
+        self._paths: list[list] = []   # parallel to Listbox entries
         self._build()
         self._load_persisted()
 
@@ -760,6 +760,13 @@ class FileListPane(tk.Frame):
                  fg=prefs["color_label"],
                  font=prefs["font_small"]).pack(fill=tk.X, pady=2, padx=4, side=tk.BOTTOM)
 
+    def _refresh_list(self):
+        self._listbox.delete(0, tk.END)
+        for p in self._paths:
+            self._listbox.insert(tk.END, p[1])
+            color = self.prefs["color_value"] if p[2] else self.prefs["color_warn"]
+            self._listbox.itemconfig(tk.END, fg=color)
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     def add_files(self, paths: list[str]):
@@ -768,16 +775,24 @@ class FileListPane(tk.Frame):
         for p in paths:
             p = str(Path(p).resolve())
             if p not in self._paths and Path(p).exists():
+                # Skip files that don't really contain fc2 data.
+                try:
+                    records = atom2_parser(file_name=p, logger=my_logger)
+                except Exception as exc:
+                    my_logger.error(f"{p} is not a valid atom2 fc2 file.")
+                    continue
+
                 my_logger.debug(f"Adding {p} to the file list.")
                 ts = self._ms_to_datetime_str(atom2_parse_filename(p))
-                ok = True
-                self._paths.append((p,ts,ok))
-                self._listbox.insert(tk.END, ts)
+                mappable = any(r.get("GPS Lock") == "Yes" for r in records)
+
+                self._paths.append([p, ts, mappable])
                 added += 1
         if added:
             self._paths.sort()
             self._save()
             self._update_count()
+            self._refresh_list()
 
     def remove_selected(self):
         self._remove_selected()
@@ -818,11 +833,16 @@ class FileListPane(tk.Frame):
         self._update_count()
 
     def _load_persisted(self):
+        # Note that because this is only called at start up we don't
+        # need to erase the old list or worry about sorting the new one.
         paths = load_file_list()
         for p in paths:
             my_logger.debug(f"Adding {p[0]} to the file list.")
             self._paths.append(p)
             self._listbox.insert(tk.END, p[1])
+            mappable = p[2]
+            color = self.prefs["color_value"] if mappable else self.prefs["color_warn"]
+            self._listbox.itemconfig(tk.END, fg=color)
         self._update_count()
 
     def _save(self):
@@ -1561,6 +1581,9 @@ The main window is divided into two panes separated by a draggable sash.
 
 Left pane – FC2 File List
   • Lists all FC2 flight-log files that have been imported.
+  • Files that can be displayed on the map are shown in the "values" color.
+    Files that have no valid GPS record are displayed with the "warning"
+    color.
   • The list is saved on disk and restored when the app restarts.
   • Double-click a file to load it.
   • Press Delete or Backspace to remove a file from the list
@@ -1570,8 +1593,8 @@ Left pane – FC2 File List
 Right pane – Dashboard, Map, and Playback Controls
   • Dashboard Strip (top): shows live telemetry for the current record —
     speed, altitude, distance, heading, battery level, satellite count,
-    wind speed, and flight mode. Values change color (green / amber / red)
-    as they approach their configured gauge limits.
+    wind speed, and flight mode. Some values change color (safe / warning /
+    danger) as they approach their configured limits.
   • Map (middle): displays the complete flight path as a colored line.
     A drone icon (arrow) shows the current position and heading.
     A house icon marks the home point. Requires the tkintermapview package.
@@ -1676,7 +1699,7 @@ Note: most changes take effect after restarting the application.""",
 
         x = parent.winfo_x() + (parent.winfo_width()  - 680) // 2
         y = parent.winfo_y() + (parent.winfo_height() - 560) // 2
-        self.geometry(f"680x560+{x}+{y}")
+        self.geometry(f"680x600+{x}+{y}")
         self.minsize(500, 400)
 
         self.configure(bg=prefs["color_bg"])
@@ -2188,7 +2211,7 @@ class Atom2Viewer(tk.Tk):
         if not directory:
             return
         self.prefs["last_import_dir"] = directory
-        fc2_files = list(Path(directory).glob("*.fc2"))
+        fc2_files = list(Path(directory).rglob("*.fc2"))
         if not fc2_files:
             messagebox.showinfo("No FC2 Files",
                                 f"No .fc2 files found in:\n{directory}")
