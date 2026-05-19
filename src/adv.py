@@ -321,7 +321,6 @@ class PrefsDialog(tk.Toplevel):
         self.resizable(False, False)
         self.transient(parent)      # keep on top of parent
         self.menubar=menubar
-        self._center_on(parent)
         self.validate=parent.register(self._validate_digit)
 
         self.configure(menu=self.menubar)
@@ -330,9 +329,14 @@ class PrefsDialog(tk.Toplevel):
         self._swatches: dict[str, tk.Label]={}
         self._font_vars: dict[str, tuple]  ={}
 
+        self._csv_extended_var = tk.BooleanVar(value=self._prefs.get("csv_extended", False))
+        self._csv_derived_var = tk.BooleanVar(value=self._prefs.get("csv_derived", True))
+
         self._build()
 
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
+
+        self._center_on(parent)
 
     # ── Layout ─────────────────────────────────────────────────────────
 
@@ -435,6 +439,20 @@ class PrefsDialog(tk.Toplevel):
 
             self._font_vars[key]=(family_var, size_var, bold_var)
 
+        # ── CSV Export Options ───────────────────────────────────────────
+        csv_frame=tk.LabelFrame(self, text=" CSV Export Options ", padx=6, pady=6)
+        csv_frame.pack(fill=tk.X, padx=4, pady=4)
+
+        tk.Label(csv_frame, text="Include Extended Data:",
+                 anchor="w").grid(row=0, column=0, sticky="w", padx=4, pady=4)
+        chk_ext = tk.Checkbutton(csv_frame, variable=self._csv_extended_var)
+        chk_ext.grid(row=0, column=1)
+
+        tk.Label(csv_frame, text="Include Derived Data:",
+                 anchor="w").grid(row=0, column=2, sticky="w", padx=4, pady=4)
+        chk_der = tk.Checkbutton(csv_frame, variable=self._csv_derived_var)
+        chk_der.grid(row=0, column=3)
+
         # ── Logging ──────────────────────────────────────────────
         log_frame=tk.LabelFrame(self, text=" Logging ", padx=6, pady=6)
         log_frame.pack(fill=tk.X, padx=12, pady=4)
@@ -514,7 +532,11 @@ class PrefsDialog(tk.Toplevel):
         self._marker_var.set(default_prefs.get("font_marker", ""))
         self._log_var.set(default_prefs.get("log_level", "Info"))
 
-        # 4. Update internal state to match the theme
+        # 4. Update CSV Checkbox States
+        self._csv_extended_var.set(default_prefs.get("csv_extended", False))
+        self._csv_derived_var.set(default_prefs.get("csv_derived", True))
+
+        # 5. Update internal state to match the theme
         self._prefs.update(default_prefs)
         self.update_idletasks()
 
@@ -543,7 +565,11 @@ class PrefsDialog(tk.Toplevel):
             bold_var.set(len(default) > 2 and default[2] == "bold")
         self._log_var.set(default_prefs.get("log_level", "Info"))
 
-        # 4. Update internal state to match the theme
+        # 4. Update CSV Checkbox States
+        self._csv_extended_var.set(default_prefs.get("csv_extended", False))
+        self._csv_derived_var.set(default_prefs.get("csv_derived", True))
+
+        # 5. Update internal state to match the theme
         self._prefs.update(default_prefs)
         self.update_idletasks()
 
@@ -561,6 +587,9 @@ class PrefsDialog(tk.Toplevel):
         self._prefs["max_dist"]=int(self._max_dist.get())
         self._prefs["max_alt"]=int(self._max_alt.get())
         self._prefs["max_wind"]=int(self._max_wind.get())
+
+        self._prefs["csv_extended"]=self._csv_extended_var.get()
+        self._prefs["csv_derived"]=self._csv_derived_var.get()
 
         self._on_save(self._prefs)
         self.withdraw()
@@ -1647,6 +1676,7 @@ class Atom2Viewer(tk.Tk):
         m.add_separator()
         m.add_command(label="Preferences…",
                       command=self._show_prefs,
+                      accelerator=f"{acc}+,",
                       underline=0)
         m.add_separator()
         if PLATFORM_SYSTEM != "Darwin":
@@ -1723,6 +1753,7 @@ class Atom2Viewer(tk.Tk):
             self.bind("<Command-o>", lambda e: self._import_files())
             self.bind("<Command-e>", lambda e: self._export_csv_current())
             self.bind("<Command-q>", lambda e: self._on_close())
+            self.bind("<Command-,>", lambda e: self._show_prefs())
             # View Menu
             self.bind("<Command-f>", lambda e: self._show_summary())
             self.bind("<Command-l>", lambda e: self._show_log())
