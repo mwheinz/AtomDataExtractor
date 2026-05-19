@@ -1509,6 +1509,376 @@ def export_csv(file_name: str, records: list[dict],
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  HelpWindow  –  tabbed help dialog
+#
+#  Four tabs: Overview, Keyboard Shortcuts, Windows, Preferences
+#  Opens via Help > Help… (F1 on non-Mac, Command+? on Mac).
+# ─────────────────────────────────────────────────────────────────────────────
+
+class HelpWindow(tk.Toplevel):
+    """
+    Tabbed help window with sections for:
+      • Overview / Quick Start
+      • Keyboard Shortcuts
+      • Window descriptions (Main, Flight Summary, Log, Preferences)
+    """
+
+    # ── Content ───────────────────────────────────────────────────────────────
+
+    _SHORTCUTS = [
+        # (key, description)
+        # File
+        ("Ctrl+O  /  ⌘O",     "Import FC2 file(s)"),
+        ("Ctrl+E  /  ⌘E",     "Export current file to CSV"),
+        ("Ctrl+,  /  ⌘,",     "Open Preferences"),
+        ("Ctrl+Q  /  ⌘Q",     "Quit"),
+        # View
+        ("Ctrl+F  /  ⌘F",     "Show / hide Flight Summary"),
+        ("Ctrl+L  /  ⌘L",     "Show / hide Log window"),
+        ("Ctrl+0  /  ⌘0",     "Fit map to flight path"),
+        # Playback
+        ("Space",              "Play / Pause"),
+        ("→  (Right arrow)",   "Step forward 100 records"),
+        ("←  (Left arrow)",    "Step back 100 records"),
+        # File list
+        ("Delete / Backspace", "Remove selected file from list"),
+        ("Double-click",       "Load selected file"),
+    ]
+
+    _WINDOWS = [
+        (
+            "Main Window",
+            """\
+The main window is divided into two panes separated by a draggable sash.
+
+Left pane – FC2 File List
+  • Lists all FC2 flight-log files that have been imported.
+  • The list is saved on disk and restored when the app restarts.
+  • Double-click a file to load it.
+  • Press Delete or Backspace to remove a file from the list
+    (the file itself is not deleted).
+  • Use File > Import FC2 File(s) or File > Import Directory to add files.
+
+Right pane – Dashboard, Map, and Playback Controls
+  • Dashboard Strip (top): shows live telemetry for the current record —
+    speed, altitude, distance, heading, battery level, satellite count,
+    wind speed, and flight mode. Values change color (green / amber / red)
+    as they approach their configured gauge limits.
+  • Map (middle): displays the complete flight path as a colored line.
+    A drone icon (arrow) shows the current position and heading.
+    A house icon marks the home point. Requires the tkintermapview package.
+  • Playback Controls (bottom): slider, transport buttons (step back, play/pause,
+    step forward), speed selector (1× – 16×), and an elapsed-time readout.
+
+Status bar (very bottom): shows the last operation or any error messages.""",
+        ),
+        (
+            "Flight Summary",
+            """\
+Opened via View > Flight Summary… or Ctrl+F / ⌘F.
+
+Displays a sortable table of statistics for the currently loaded file.
+
+Columns
+  • Field    – telemetry field name (e.g. Altitude, Speed, Battery Level)
+  • Unit     – measurement unit (m, m/s, %, etc.)
+  • Min      – minimum value recorded during the flight
+  • Max      – maximum value recorded during the flight
+
+Header strip
+  • Shows the file name, total record count, and flight duration.
+
+Footer bar
+  • Reports how many records had a valid GPS lock, and what percentage
+    of the flight that represents.
+
+Clicking any column header sorts the table by that column.
+Clicking the same header again reverses the sort order (▲ / ▼ arrow shown).
+
+The window updates automatically whenever a new file is loaded
+while the Flight Summary is visible.""",
+        ),
+        (
+            "Log Window",
+            """\
+Opened via View > Log… or Ctrl+L / ⌘L.
+
+Shows a running log of application events: file loads, parse results,
+CSV exports, errors, and internal debug messages.
+
+Log levels (set in Preferences > Logging):
+  • Error   – only serious failures
+  • Warning – failures and significant warnings
+  • Info    – normal operational messages (default)
+  • Debug   – verbose developer-level messages
+
+The log is useful for diagnosing parse errors or unexpected behavior.
+Log entries are displayed in the window and also sent to the standard output
+when the application is launched from a terminal window.
+
+Log entries are not saved to disk.""",
+        ),
+        (
+            "Preferences",
+            """\
+Opened via File > Preferences… or Ctrl+, / ⌘,.
+
+Gauge Limits
+  • Max Dist   – the distance (meters) from the home point considered dangerous.
+  • Max Speed  – the speed (m/s) of the drone that is considered hazardous.
+  • Max Alt    – the altitude (meters) that is considered hazardous.
+  • Max Wind   – the wind speed (m/s) that is considered hazardous.
+
+  Gauges transition through green → amber → red as values approach their limit.
+
+Colors
+  • Customize every color used in the application — background, text,
+    accent, borders, safe/warning/danger indicators, and the flight-path
+    color on the map.
+  • Click "Choose…" next to any swatch to pick a new color.
+
+Fonts
+  • Set the font family, size, and bold style for four text roles:
+    Label Font, Title Font, Small Font, and Gauge Font.
+
+CSV Export Options
+  • Include Extended Data – adds extra raw fields from the FC2 file to CSV output.
+  • Include Derived Data  – adds computed fields (speed, distance, etc.) to CSV output.
+
+Logging
+  • Sets the verbosity of the Log window (Error / Warning / Info / Debug).
+
+Quick-theme buttons
+  • Light Mode – resets all colors and fonts to the built-in light theme.
+  • Dark Mode  – resets all colors and fonts to the built-in dark theme.
+
+Note: most changes take effect after restarting the application.""",
+        ),
+    ]
+
+    # ── Construction ──────────────────────────────────────────────────────────
+
+    def __init__(self, parent, prefs: dict):
+        my_logger.debug("Creating Help Window.")
+        super().__init__(parent)
+        self.title("Help – Atom 2 Flight Log Viewer")
+        self.resizable(True, True)
+        self.transient(parent)
+        self.prefs = prefs
+
+        x = parent.winfo_x() + (parent.winfo_width()  - 680) // 2
+        y = parent.winfo_y() + (parent.winfo_height() - 560) // 2
+        self.geometry(f"680x560+{x}+{y}")
+        self.minsize(500, 400)
+
+        self.configure(bg=prefs["color_bg"])
+        self._build()
+        self.protocol("WM_DELETE_WINDOW", self.withdraw)
+
+    def _build(self):
+        p = prefs = self.prefs
+        bg       = p["color_bg"]
+        panel_bg = p["color_panel_bg"]
+        fg       = p["color_value"]
+        label_fg = p["color_label"]
+        accent   = p["color_accent"]
+        border   = p["color_border"]
+        font_ui  = p["font_ui"]
+        font_sm  = p["font_small"]
+        font_ttl = p["font_title"]
+
+        # ── Header ────────────────────────────────────────────────────────
+        hdr = tk.Frame(self, bg=panel_bg, pady=8)
+        hdr.pack(fill=tk.X)
+        tk.Label(hdr, text="Atom 2 Flight Log Viewer — Help",
+                 bg=panel_bg, fg=accent,
+                 font=font_ttl).pack(side=tk.LEFT, padx=12)
+        tk.Frame(self, bg=border, height=1).pack(fill=tk.X)
+
+        # ── Notebook ──────────────────────────────────────────────────────
+        style = ttk.Style(self)
+        style.configure("Help.TNotebook",        background=bg)
+        style.configure("Help.TNotebook.Tab",    background=panel_bg,
+                        foreground=label_fg, padding=[8, 4])
+        style.map("Help.TNotebook.Tab",
+                  background=[("selected", bg)],
+                  foreground=[("selected", fg)])
+
+        nb = ttk.Notebook(self, style="Help.TNotebook")
+        nb.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+
+        # Tab 1: Overview
+        nb.add(self._make_text_tab(nb, self._overview_text()),
+               text="Quick Start")
+
+        # Tab 2: Keyboard Shortcuts
+        nb.add(self._make_shortcuts_tab(nb), text="Keyboard Shortcuts")
+
+        # Tab 3: Windows (sub-tabs per window)
+        nb.add(self._make_windows_tab(nb), text="Windows")
+
+        # ── Close button ──────────────────────────────────────────────────
+        tk.Frame(self, bg=border, height=1).pack(fill=tk.X)
+        bot = tk.Frame(self, bg=panel_bg, pady=6)
+        bot.pack(fill=tk.X)
+        tk.Button(bot, text="Close",
+                  command=self.withdraw,
+                  font=font_ui,
+                  bg=p.get("color_button_bg", panel_bg),
+                  fg=p.get("color_button_fg", fg),
+                  relief=tk.FLAT, padx=12
+                  ).pack(side=tk.RIGHT, padx=10)
+
+    # ── Tab builders ──────────────────────────────────────────────────────────
+
+    def _make_text_tab(self, parent, text: str) -> tk.Frame:
+        """Return a frame containing a read-only scrolled Text widget."""
+        p      = self.prefs
+        bg     = p["color_panel_bg"]
+        fg     = p["color_value"]
+        border = p["color_border"]
+
+        frame = tk.Frame(parent, bg=bg)
+        sb    = tk.Scrollbar(frame, orient=tk.VERTICAL)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        txt = tk.Text(frame,
+                      bg=bg, fg=fg,
+                      font=p["font_ui"],
+                      relief=tk.FLAT, bd=0,
+                      wrap=tk.WORD,
+                      padx=14, pady=10,
+                      yscrollcommand=sb.set,
+                      state=tk.NORMAL,
+                      cursor="arrow")
+        sb.config(command=txt.yview)
+        txt.pack(fill=tk.BOTH, expand=True)
+        txt.insert(tk.END, text)
+        txt.configure(state=tk.DISABLED)
+        return frame
+
+    def _make_shortcuts_tab(self, parent) -> tk.Frame:
+        """Return a frame with a two-column shortcut table."""
+        p        = self.prefs
+        bg       = p["color_panel_bg"]
+        fg       = p["color_value"]
+        label_fg = p["color_label"]
+        accent   = p["color_accent"]
+        border   = p["color_border"]
+        font_ui  = p["font_ui"]
+
+        outer = tk.Frame(parent, bg=bg)
+
+        # Scrollable canvas for the table
+        canvas = tk.Canvas(outer, bg=bg, bd=0, highlightthickness=0)
+        sb     = tk.Scrollbar(outer, orient=tk.VERTICAL, command=canvas.yview)
+        canvas.configure(yscrollcommand=sb.set)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(fill=tk.BOTH, expand=True)
+
+        inner = tk.Frame(canvas, bg=bg)
+        win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        def _on_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfig(win_id, width=event.width)
+
+        canvas.bind("<Configure>", _on_configure)
+
+        # Header row
+        tk.Label(inner, text="Shortcut", font=p["font_title"],
+                 bg=bg, fg=accent, anchor="w",
+                 width=22).grid(row=0, column=0, sticky="w", padx=(14, 4), pady=(10, 4))
+        tk.Label(inner, text="Action", font=p["font_title"],
+                 bg=bg, fg=accent, anchor="w").grid(
+                 row=0, column=1, sticky="w", padx=4, pady=(10, 4))
+
+        tk.Frame(inner, bg=border, height=1).grid(
+            row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=2)
+
+        for i, (key, desc) in enumerate(self._SHORTCUTS):
+            row_bg = bg if i % 2 == 0 else p["color_bg"]
+            tk.Label(inner, text=key, font=font_ui,
+                     bg=row_bg, fg=fg, anchor="w",
+                     width=22).grid(row=i + 2, column=0,
+                                    sticky="w", padx=(14, 4), pady=2)
+            tk.Label(inner, text=desc, font=font_ui,
+                     bg=row_bg, fg=fg, anchor="w").grid(
+                     row=i + 2, column=1, sticky="w", padx=4, pady=2)
+
+        return outer
+
+    def _make_windows_tab(self, parent) -> tk.Frame:
+        """Return a frame with a sub-notebook, one tab per window."""
+        p  = self.prefs
+        bg = p["color_bg"]
+
+        outer = tk.Frame(parent, bg=bg)
+
+        style = ttk.Style(outer)
+        style.configure("Sub.TNotebook",      background=bg)
+        style.configure("Sub.TNotebook.Tab",  background=p["color_panel_bg"],
+                        foreground=p["color_label"], padding=[6, 3])
+        style.map("Sub.TNotebook.Tab",
+                  background=[("selected", p["color_panel_bg"])],
+                  foreground=[("selected", p["color_value"])])
+
+        sub_nb = ttk.Notebook(outer, style="Sub.TNotebook")
+        sub_nb.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+
+        for title, content in self._WINDOWS:
+            tab = self._make_text_tab(sub_nb, content)
+            sub_nb.add(tab, text=title)
+
+        return outer
+
+    # ── Content helpers ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def _overview_text() -> str:
+        acc = "⌘" if PLATFORM_SYSTEM == "Darwin" else "Ctrl+"
+        return f"""\
+Welcome to the Atom 2 Flight Log Viewer & Exporter.
+
+QUICK START
+
+1. Import files
+   • Use File > Import FC2 File(s) ({acc}O) to add one or more .fc2 log files,
+     or File > Import Directory to add every .fc2 file in a folder.
+   • Files are remembered and restored the next time you open the app.
+
+2. Load a file
+   • Double-click any file in the left-hand list to parse and display it.
+   • The map will draw the full flight path and zoom to fit it.
+
+3. Explore the flight
+   • Use the playback controls at the bottom to step through the flight
+     record by record, or press Space to play / pause.
+   • Use the speed selector (1× – 16×) to accelerate playback.
+   • The dashboard tiles at the top update in real time.
+
+4. View statistics
+   • Open View > Flight Summary ({acc}F) for a sortable table of min/max
+     values for every telemetry channel.
+
+5. Export to CSV
+   • Use File > Export Current File to CSV ({acc}E) to save the loaded
+     flight as a spreadsheet.
+   • File > Export All Files to CSV processes your entire file list at once.
+
+6. Customize
+   • File > Preferences ({acc},) lets you change colors, fonts, gauge
+     limits, and CSV export options.
+
+For more detail on each window or keyboard shortcut, see the other tabs.
+"""
+
+    def show(self):
+        self.deiconify()
+        self.lift()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Main application window
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1646,6 +2016,7 @@ class Atom2Viewer(tk.Tk):
         # ── Pop-up windows (hidden until needed) ──────────────────────────
         self._summary_window = None
         self._preferences_window = None
+        self._help_window = None
 
         # ── Keyboard shortcuts ────────────────────────────────────────────
         self._bind_keys()
@@ -1743,6 +2114,12 @@ class Atom2Viewer(tk.Tk):
         m = tk.Menu(self._menubar)
         self._menubar.add_cascade(label="Help", menu=m, underline=0)
 
+        acc = "Command+?" if PLATFORM_SYSTEM == "Darwin" else "F1"
+        m.add_command(label="Help…",
+                      command=self._show_help,
+                      accelerator=acc,
+                      underline=0)
+        m.add_separator()
         m.add_command(label="About…",
                       command=self._show_about,
                       underline=0)
@@ -1767,6 +2144,11 @@ class Atom2Viewer(tk.Tk):
             self.bind("<Control-f>", lambda e: self._show_summary())
             self.bind("<Control-l>", lambda e: self._show_log())
             self.bind("<Control-0>", lambda e: self._fit_map())
+
+        if PLATFORM_SYSTEM == "Darwin":
+            self.bind("<Command-?>",   lambda e: self._show_help())
+        else:
+            self.bind("<F1>",          lambda e: self._show_help())
 
         self.bind("<space>", lambda e: self._toggle_play())
         self.bind("<Left>",  lambda e: self._step_back())
@@ -2065,6 +2447,11 @@ class Atom2Viewer(tk.Tk):
                                                    self._save_prefs,
                                                    self._menubar)
         self._preferences_window.show()
+
+    def _show_help(self):
+        if self._help_window is None:
+            self._help_window = HelpWindow(self, self.prefs)
+        self._help_window.show()
 
     def _show_about(self):
         messagebox.showinfo(
