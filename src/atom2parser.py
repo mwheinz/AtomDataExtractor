@@ -419,6 +419,20 @@ def _add_derived_fields(record, prev):
 
     record["Date/Time"] = datetime.datetime.utcfromtimestamp(record["utc (ms)"]/1000)
 
+# Extract timestamp from filename
+def parse_filename(file_name:str):
+    base_name, _ = os.path.splitext(os.path.basename(file_name))
+    timestamp_ms = None
+    try:
+        timestamp_ms = datetime.datetime.strptime(
+            re.sub("-.*", "", base_name),
+            "%Y%m%d%H%M%S"
+        ).timestamp() * 1000
+    except ValueError:
+        raise BadData(f"Could not parse timestamp from filename: \"{base_name}\"")
+
+    return timestamp_ms
+
 def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Logger = None) -> list[dict]:
     """
     Parse Atom2 flight log and return a list of flight log records.
@@ -442,16 +456,7 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
     if logger is None:
         raise BadData("You must specify the logger.")
 
-    # Extract timestamp from filename
-    base_name, _ = os.path.splitext(os.path.basename(file_name))
-
-    try:
-        timestamp_ms = datetime.datetime.strptime(
-            re.sub("-.*", "", base_name),
-            "%Y%m%d%H%M%S"
-        ).timestamp() * 1000
-    except ValueError:
-        raise BadData(f"Could not parse timestamp from filename: \"{base_name}\"")
+    timestamp_ms = parse_filename(file_name)
 
     with open(file_name, mode="rb") as flight_file:
         record_count = 0
