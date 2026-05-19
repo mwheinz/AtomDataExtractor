@@ -2520,10 +2520,9 @@ class Atom2Viewer(tk.Tk):
 
     def _show_about(self):
         messagebox.showinfo(
-            "About Atom 2 Viewer",
-            f"Atom 2 Flight Log Viewer & Exporter\n"
-            f"Version {_version}\n\n"
-            "Combines adv.py (visualizer) and atom_data_extractor.py (CSV export).\n\n"
+            "About Atom 2 Data Viewer",
+            f"Atom 2 Log Visualizer\n\n"
+            f"Version:\n{_version}\n\n"
             "Written by Michael Heinz.\n"
             "Based on work by Michael Heinz, Koen Aerts, and Rob Pritt.",
         )
