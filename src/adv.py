@@ -130,7 +130,7 @@ DASHBOARD_METRICS = [
 DEFAULT_PREFS = {
     # ─── Basic Settings ───
     "window_geometry": "1400x860",
-    "sash_position": 200,           # Width of the left pane.
+    "sash_position": 165,           # Width of the left pane.
     "log_level": "Info",
     "last_import_dir": str(Path.home()),
     "last_export_dir": str(Path.home()),
@@ -145,16 +145,16 @@ DEFAULT_PREFS = {
     "color_bg":         "#ffffff",  # Main background (White)
     "color_panel_bg":   "#f8f9fa",  # Lighter background for containers (Off-white)
     "color_button_bg":  "#e9ecef",  # Button background (Very light gray)
-    "color_button_fg":  "#333333",  # Button text color (Dark gray)
-    "color_accent":     "#007bff",  # Primary interactive highlight (Classic Blue)
-    "color_border":     "#dee2e6",  # Separator lines (Light gray)
+    "color_button_fg":  "#222222",  # Button text color (Dark gray)
+    "color_accent":     "#0432ff",  # Primary interactive highlight (Blue)
+    "color_border":     "#011892",  # Separator lines (Duller blue)
     "color_value":      "#212529",  # Text value color (Near black)
     "color_label":      "#6c757d",  # Label color (Medium gray)
-    "color_path":       "#28a745",  # Success/Path (Standard Green)
+    "color_path":       "#148023",  # Map Path (Forest Green)
     "color_safe":       "#28a745",  # Safe (Standard Green)
-    "color_warn":       "#ffc107",  # Warning (Standard Amber)
-    "color_danger":     "#dc3545",  # Danger (Standard Red)
-    "color_select":     "#dfdfff",  # Selected List Item
+    "color_warn":       "#ff9300",  # Warning (Amber/Orange)
+    "color_danger":     "#ff2600",  # Danger (Red)
+    "color_select":     "#0096ff",  # Selected List Item
 
     # ─── Font palette ───
     "font_ui": ["TkDefaultFont", 10],
@@ -174,7 +174,7 @@ DEFAULT_PREFS = {
 DARK_MODE_PREFS = {
     # ─── Basic Settings ───
     "window_geometry": "1400x860",
-    "sash_position": 200,
+    "sash_position": 165,
     "log_level": "Info",
     "last_import_dir": str(Path.home()),
     "last_export_dir": str(Path.home()),
@@ -189,7 +189,7 @@ DARK_MODE_PREFS = {
     "color_bg":         "#121212",  # Main background (Near black)
     "color_panel_bg":   "#1e1e2d",  # Panel background (Deep midnight blue/gray)
     "color_button_bg":  "#252526",  # Button background (Slightly different from panel)
-    "color_button_fg":  "#121212",  # Button text color (Deep black)
+    "color_button_fg":  "#e0e0e0",  # Button text color (Off-white/Light gray)
     "color_accent":     "#64b5ff",  # Primary interactive highlight (Bright Cyan/Sky Blue)
     "color_border":     "#333333",  # Separator lines (Medium dark gray)
     "color_value":      "#e0e0e0",  # Text value color (Off-white/Light gray)
@@ -225,12 +225,12 @@ elif PLATFORM_SYSTEM == "Darwin":
     DEFAULT_PREFS["font_title"] = ["Helvetica Neue", 12, "bold"]
     DEFAULT_PREFS["font_small"] = ["Helvetica Neue", 8]
     DEFAULT_PREFS["font_metric"]= ["Helvetica Neue", 12]
-    DEFAULT_PREFS["font_marker"]="/System/Library/Fonts/HelveticaNeue.ttc"
+    #DEFAULT_PREFS["font_marker"]="/System/Library/Fonts/HelveticaNeue.ttc"
     DARK_MODE_PREFS["font_ui"]    = ["Helvetica Neue", 10]
     DARK_MODE_PREFS["font_title"] = ["Helvetica Neue", 12, "bold"]
     DARK_MODE_PREFS["font_small"] = ["Helvetica Neue", 8]
     DARK_MODE_PREFS["font_metric"]= ["Helvetica Neue", 12]
-    DARK_MODE_PREFS["font_marker"]="/System/Library/Fonts/HelveticaNeue.ttc"
+    #DARK_MODE_PREFS["font_marker"]="/System/Library/Fonts/HelveticaNeue.ttc"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Preference persistence
@@ -292,6 +292,9 @@ class PrefsDialog(tk.Toplevel):
 
     COLOR_FIELDS=[
         ("color_bg",       "Background"),
+        ("color_panel_bg", "Panel Background"),
+        ("color_button_bg","Button Backg."),
+        ("color_button_fg","Button Text"),
         ("color_accent",   "Accent"),
         ("color_border",   "Border"),
         ("color_value",    "Values"),
@@ -539,7 +542,6 @@ class PrefsDialog(tk.Toplevel):
             family_var.set(default[0])
             size_var.set(default[1])
             bold_var.set(len(default) > 2 and default[2] == "bold")
-        self._marker_var.set(default_prefs.get("font_marker", ""))
         self._log_var.set(default_prefs.get("log_level", "Info"))
 
         # 4. Update CSV Checkbox States
@@ -573,7 +575,6 @@ class PrefsDialog(tk.Toplevel):
             family_var.set(default[0])
             size_var.set(default[1])
             bold_var.set(len(default) > 2 and default[2] == "bold")
-        self._marker_var.set(default_prefs.get("font_marker", ""))
         self._log_var.set(default_prefs.get("log_level", "Info"))
 
         # 4. Update CSV Checkbox States
@@ -942,14 +943,20 @@ class PlaybackControls(tk.Frame):
 
         def mkbtn(text, cmd):
 
-            return tk.Button(
-                btn_row, text=text, command=cmd,
-                bg=prefs["color_button_bg"], fg=prefs["color_button_fg"],
-                relief=tk.FLAT, font=tuple(prefs["font_ui"]),
-                cursor="hand2", padx=2,
-                activebackground=prefs["color_button_bg"],
-                activeforeground=prefs["color_button_fg"]
-            )
+            if use_emoji:
+                # The color prefs don't work with TKinter on Darwin right now.
+                return tk.Button(
+                    btn_row, text=text, command=cmd,
+                )
+            else:
+                return tk.Button(
+                    btn_row, text=text, command=cmd,
+                    bg=prefs["color_button_bg"], fg=prefs["color_button_fg"],
+                    relief=tk.FLAT, font=tuple(prefs["font_ui"]),
+                    cursor="hand2", padx=2,
+                    activebackground=prefs["color_button_bg"],
+                    activeforeground=prefs["color_button_fg"]
+                )
 
         self._btn_slower = mkbtn("🐢" if use_emoji else "Slower", self._slower)
         self._btn_back   = mkbtn("⏪" if use_emoji else "<<",  self._step_back)
@@ -1195,10 +1202,10 @@ class MapPane(tk.Frame):
                            fill=self.prefs["color_border"],
                            outline=self.prefs["color_border"])
             draw.polygon([(cc, 0), (size, cc), (0, cc)],
-                         fill=self.prefs["color_accent"],
+                         fill=self.prefs["color_warn"],
                          outline=self.prefs["color_border"])
             draw.rectangle([(0, cc), (size, size)],
-                           fill=self.prefs["color_accent"],
+                           fill=self.prefs["color_warn"],
                            outline=self.prefs["color_border"],
                            width=2)
             draw.rectangle([(cc - 3, cc), (cc + 3, size)],
@@ -1324,7 +1331,7 @@ class FlightSummaryWindow(tk.Toplevel):
 
         self._meta_var = tk.StringVar(value="")
         tk.Label(hdr, textvariable=self._meta_var,
-                 bg=panel_bg, fg=label_fg,
+                 bg=panel_bg, fg=accent,
                  font=font_sm, anchor="e").pack(side=tk.RIGHT, padx=10)
 
         tk.Frame(self, bg=border, height=1).pack(fill=tk.X)
@@ -1390,16 +1397,21 @@ class FlightSummaryWindow(tk.Toplevel):
 
         self._footer_var = tk.StringVar(value="")
         tk.Label(bot, textvariable=self._footer_var,
-                 bg=panel_bg, fg=label_fg,
+                 bg=panel_bg, fg=accent,
                  font=font_sm, anchor="w").pack(side=tk.LEFT, padx=10)
 
-        tk.Button(bot, text="Close",
-                  command=self.withdraw,
-                  font=font_ui,
-                  bg=p.get("color_button_bg", panel_bg),
-                  fg=p.get("color_button_fg", fg),
-                  relief=tk.FLAT, padx=8
-                  ).pack(side=tk.RIGHT, padx=8)
+        if PLATFORM_SYSTEM == "Darwin":
+            tk.Button(bot, text="Close",
+                      command=self.withdraw,
+                      ).pack(side=tk.RIGHT, padx=8)
+        else:
+            tk.Button(bot, text="Close",
+                      command=self.withdraw,
+                      font=font_ui,
+                      bg=p.get("color_button_bg", panel_bg),
+                      fg=p.get("color_button_fg", fg),
+                      relief=tk.FLAT, padx=8
+                      ).pack(side=tk.RIGHT, padx=8)
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -2063,7 +2075,7 @@ class Atom2Viewer(tk.Tk):
         self._status_var = tk.StringVar(value="Ready.")
         tk.Label(status_bar, textvariable=self._status_var,
                  bg=self.prefs["color_panel_bg"],
-                 fg=self.prefs["color_label"],
+                 fg=self.prefs["color_accent"],
                  font=self.prefs["font_small"]).pack(side=tk.LEFT, padx=10)
 
         # ── Pop-up windows (hidden until needed) ──────────────────────────
