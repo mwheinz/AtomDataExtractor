@@ -1747,6 +1747,18 @@ Note: most changes take effect after restarting the application.""",
                  font=font_ttl).pack(side=tk.LEFT, padx=12)
         tk.Frame(self, bg=border, height=1).pack(fill=tk.X)
 
+        # ── Close button ──────────────────────────────────────────────────
+        tk.Frame(self, bg=border, height=1).pack(fill=tk.X, side=tk.BOTTOM)
+        bot = tk.Frame(self, bg=panel_bg, pady=6)
+        bot.pack(fill=tk.X, side=tk.BOTTOM)
+        tk.Button(bot, text="Close",
+                  command=self.withdraw,
+                  font=font_ui,
+                  bg=p.get("color_button_bg", panel_bg),
+                  fg=p.get("color_button_fg", fg),
+                  relief=tk.FLAT, padx=12
+                  ).pack(side=tk.RIGHT, padx=10)
+
         # ── Notebook ──────────────────────────────────────────────────────
         style = ttk.Style(self)
         style.configure("Help.TNotebook",        background=bg)
@@ -1768,18 +1780,6 @@ Note: most changes take effect after restarting the application.""",
 
         # Tab 3: Windows (sub-tabs per window)
         nb.add(self._make_windows_tab(nb), text="Windows")
-
-        # ── Close button ──────────────────────────────────────────────────
-        tk.Frame(self, bg=border, height=1).pack(fill=tk.X)
-        bot = tk.Frame(self, bg=panel_bg, pady=6)
-        bot.pack(fill=tk.X)
-        tk.Button(bot, text="Close",
-                  command=self.withdraw,
-                  font=font_ui,
-                  bg=p.get("color_button_bg", panel_bg),
-                  fg=p.get("color_button_fg", fg),
-                  relief=tk.FLAT, padx=12
-                  ).pack(side=tk.RIGHT, padx=10)
 
     # ── Tab builders ──────────────────────────────────────────────────────────
 
