@@ -420,7 +420,7 @@ def _add_derived_fields(record, prev):
     record["Date/Time"] = datetime.datetime.utcfromtimestamp(record["utc (ms)"]/1000)
 
 # Extract timestamp from filename
-def parse_filename(file_name:str):
+def atom2_parse_filename(file_name:str):
     base_name, _ = os.path.splitext(os.path.basename(file_name))
     timestamp_ms = None
     try:
@@ -456,7 +456,7 @@ def atom2_parser(file_name: str = None, fields: dict = ATOM2_FIELDS, logger: Log
     if logger is None:
         raise BadData("You must specify the logger.")
 
-    timestamp_ms = parse_filename(file_name)
+    timestamp_ms = atom2_parse_filename(file_name)
 
     with open(file_name, mode="rb") as flight_file:
         record_count = 0

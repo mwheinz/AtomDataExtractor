@@ -48,6 +48,7 @@ import os
 import platform
 import sys
 import threading
+from datetime import datetime
 from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -84,6 +85,7 @@ from atom2parser import (
     atom2_parser,
     is_valid_latlon,
     log_stats,
+    atom2_parse_filename,
 )
 import mwhlogging
 from mwhlogging import MWHLogger
@@ -128,7 +130,7 @@ DASHBOARD_METRICS = [
 DEFAULT_PREFS = {
     # ─── Basic Settings ───
     "window_geometry": "1400x860",
-    "sash_position": 280,           # Width of the left pane.
+    "sash_position": 200,           # Width of the left pane.
     "log_level": "Info",
     "last_import_dir": str(Path.home()),
     "last_export_dir": str(Path.home()),
@@ -172,7 +174,7 @@ DEFAULT_PREFS = {
 DARK_MODE_PREFS = {
     # ─── Basic Settings ───
     "window_geometry": "1400x860",
-    "sash_position": 280,
+    "sash_position": 200,
     "log_level": "Info",
     "last_import_dir": str(Path.home()),
     "last_export_dir": str(Path.home()),
@@ -266,7 +268,7 @@ def load_file_list() -> list[str]:
             with open(FILELIST_FILE, encoding="utf-8") as f:
                 paths = json.load(f)
                 paths.sort()
-            return [p for p in paths if Path(p).exists()]
+            return [p for p in paths if Path(p[0]).exists()]
     except Exception as exc:
         my_logger.error("Could not load file list: %s", exc)
     return []
@@ -704,7 +706,7 @@ class FileListPane(tk.Frame):
         super().__init__(parent, bg=bg, **kw)
         self.prefs     = prefs
         self.on_select = on_select
-        self._paths: list[str] = []   # parallel to Listbox entries
+        self._paths: list[tuple[str,str,bool]] = []   # parallel to Listbox entries
         self._build()
         self._load_persisted()
 
@@ -767,8 +769,10 @@ class FileListPane(tk.Frame):
             p = str(Path(p).resolve())
             if p not in self._paths and Path(p).exists():
                 my_logger.debug(f"Adding {p} to the file list.")
-                self._paths.append(p)
-                self._listbox.insert(tk.END, Path(p).name)
+                ts = self._ms_to_datetime_str(atom2_parse_filename(p))
+                ok = True
+                self._paths.append((p,ts,ok))
+                self._listbox.insert(tk.END, ts)
                 added += 1
         if added:
             self._paths.sort()
@@ -792,10 +796,14 @@ class FileListPane(tk.Frame):
 
     # ── Internal ─────────────────────────────────────────────────────────────
 
+    def _ms_to_datetime_str(self, ms: int) -> str:
+        dt = datetime.fromtimestamp(ms / 1000)
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+
     def _on_select(self, _event=None):
         sel = self._listbox.curselection()
         if sel:
-            path = self._paths[sel[0]]
+            path = self._paths[sel[0]][0]
             self.on_select(path)
 
     def _remove_selected(self, _event=None):
@@ -812,9 +820,9 @@ class FileListPane(tk.Frame):
     def _load_persisted(self):
         paths = load_file_list()
         for p in paths:
-            my_logger.debug(f"Adding {p} to the file list.")
+            my_logger.debug(f"Adding {p[0]} to the file list.")
             self._paths.append(p)
-            self._listbox.insert(tk.END, Path(p).name)
+            self._listbox.insert(tk.END, p[1])
         self._update_count()
 
     def _save(self):
