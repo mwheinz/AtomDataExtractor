@@ -336,7 +336,11 @@ class PrefsDialog(tk.Toplevel):
 
         self._build()
 
-        self.protocol("WM_DELETE_WINDOW", self.withdraw)
+        self.protocol("WM_DELETE_WINDOW", lambda: self.withdraw())
+        if PLATFORM_SYSTEM == "Darwin":
+            self.bind("<Command-w>", lambda e: self.withdraw())
+        else:
+            self.bind("<Control-w>", lambda e: self.withdraw())
 
         self._center_on(parent)
 
@@ -483,6 +487,10 @@ class PrefsDialog(tk.Toplevel):
         # Allow Enter to save and Escape to cancel
         self.bind("<Return>",  lambda e: self._save())
         self.bind("<Escape>",  lambda e: self.withdraw())
+        if PLATFORM_SYSTEM == "Darwin":
+            self.bind("<Command-w>", lambda e: self.withdraw())
+        else:
+            self.bind("<Control-w>", lambda e: self.withdraw())
 
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -1284,7 +1292,12 @@ class FlightSummaryWindow(tk.Toplevel):
         self._sort_asc = True
 
         self._build()
-        self.protocol("WM_DELETE_WINDOW", self.withdraw)
+
+        self.protocol("WM_DELETE_WINDOW", lambda: self.withdraw())
+        if PLATFORM_SYSTEM == "Darwin":
+            self.bind("<Command-w>", lambda e: self.withdraw())
+        else:
+            self.bind("<Control-w>", lambda e: self.withdraw())
 
     # ── Construction ──────────────────────────────────────────────────────────
 
@@ -1708,7 +1721,11 @@ Note: most changes take effect after restarting the application.""",
 
         self.configure(bg=prefs["color_bg"])
         self._build()
-        self.protocol("WM_DELETE_WINDOW", self.withdraw)
+        self.protocol("WM_DELETE_WINDOW", lambda: self.withdraw())
+        if PLATFORM_SYSTEM == "Darwin":
+            self.bind("<Command-w>", lambda e: self.withdraw())
+        else:
+            self.bind("<Control-w>", lambda e: self.withdraw())
 
     def _build(self):
         p = prefs = self.prefs

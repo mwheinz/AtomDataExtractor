@@ -23,7 +23,10 @@ module has no tkinter dependency at all.
 import logging
 import re
 import sys
+import platform
 from logging.handlers import RotatingFileHandler
+
+PLATFORM_SYSTEM = platform.system()
 
 # ── Public level constants (convenience re-exports) ──────────────────────────
 ERROR    = logging.ERROR
@@ -190,7 +193,8 @@ class _TkLogWindow:
         win = tk.Toplevel(self._root)
         win.title(self._title)
         win.geometry("900x400")
-        win.configure(bg=self.BG, menu=self._menubar)
+        if PLATFORM_SYSTEM == "Darwin":
+            win.configure(bg=self.BG, menu=self._menubar)
         win.withdraw()
 
         # ── toolbar ──────────────────────────────────────────────────────────
@@ -226,7 +230,11 @@ class _TkLogWindow:
         self._win  = win
 
         # Hide instead of destroy when the user clicks the close button.
-        win.protocol("WM_DELETE_WINDOW", win.withdraw)
+        win.protocol("WM_DELETE_WINDOW", lambda: win.withdraw())
+        if PLATFORM_SYSTEM == "Darwin":
+            win.bind("<Command-w>", lambda e: win.withdraw())
+        else:
+            win.bind("<Control-w>", lambda e: win.withdraw())
 
         # Register Tk Text tags for every level.
         for level, (fg, bg) in _TK_LEVEL_COLORS.items():
