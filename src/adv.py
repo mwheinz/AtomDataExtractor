@@ -325,7 +325,7 @@ class PrefsDialog(tk.Toplevel):
         self.menubar=menubar
         self.validate=parent.register(self._validate_digit)
 
-        self.configure(menu=self.menubar)
+        self.configure(menu=menubar)
         self._prefs  =prefs.copy()
         self._on_save=on_save
         self._swatches: dict[str, tk.Label]={}
@@ -565,6 +565,7 @@ class PrefsDialog(tk.Toplevel):
             family_var.set(default[0])
             size_var.set(default[1])
             bold_var.set(len(default) > 2 and default[2] == "bold")
+        self._marker_var.set(default_prefs.get("font_marker", ""))
         self._log_var.set(default_prefs.get("log_level", "Info"))
 
         # 4. Update CSV Checkbox States
@@ -671,7 +672,7 @@ class DashboardStrip(tk.Frame):
         for label, key, unit, fmt, limit in DASHBOARD_METRICS:
             value = record.get(key)
             self._vars[key].set(_fmt(value, fmt, unit))
-            if limit is not None:
+            if limit is not None and isinstance(value, (int, float)):
                 max_val = int(self.prefs[limit])
                 if value > max_val * 0.9:
                     self._labels[key].config(fg=self.prefs["color_danger"])
@@ -679,7 +680,7 @@ class DashboardStrip(tk.Frame):
                     self._labels[key].config(fg=self.prefs["color_warn"])
                 else:
                     self._labels[key].config(fg=self.prefs["color_safe"])
-            elif label == "Battery":
+            elif label == "Battery" and isinstance(value, (int, float)):
                 if value < 25:
                     self._labels[key].config(fg=self.prefs["color_danger"])
                 elif value < 50:
@@ -774,7 +775,10 @@ class FileListPane(tk.Frame):
         added = 0
         for p in paths:
             p = str(Path(p).resolve())
-            if p not in self._paths and Path(p).exists():
+            existing = [entry[0] for entry in self._paths]
+            if p in existing:
+                my_logger.warning(f"{p} is already in the file list. Skipping.")
+            elif Path(p).exists():
                 # Skip files that don't really contain fc2 data.
                 try:
                     records = atom2_parser(file_name=p, logger=my_logger)
@@ -788,6 +792,8 @@ class FileListPane(tk.Frame):
 
                 self._paths.append([p, ts, mappable])
                 added += 1
+            else:
+                my_logger.warning(f"{p} does not exist.")
         if added:
             self._paths.sort()
             self._save()
@@ -798,7 +804,7 @@ class FileListPane(tk.Frame):
         self._remove_selected()
 
     def get_paths(self) -> list[str]:
-        return list(self._paths)
+        return [entry[0] for entry in self._paths]
 
     def select_path(self, path: str):
         """Programmatically select a row by path."""
@@ -1481,8 +1487,6 @@ class FlightSummaryWindow(tk.Toplevel):
                 row["unit"],
                 self._fmtn(row["min"]),
                 self._fmtn(row["max"]),
-                self._fmtn(row["mean"]),
-                self._fmtn(row["range"]),
             ))
 
     def _sort_by(self, col_id: str):
@@ -1985,8 +1989,9 @@ class Atom2Viewer(tk.Tk):
 
     def _apply_styles(self):
         style = ttk.Style(self)
-        preferred = self.prefs["theme"]
-        style.theme_use(preferred)
+        preferred = self.prefs.get("theme", "default")
+        if preferred in style.theme_names():
+            style.theme_use(preferred)
 
     def _save_prefs(self,prefs):
         self.prefs=prefs
