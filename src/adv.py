@@ -1616,20 +1616,23 @@ class HelpWindow(tk.Toplevel):
         # (key, description)
         # File
         ("Ctrl+O  /  ⌘O",     "Import FC2 file(s)"),
-        ("Ctrl+E  /  ⌘E",     "Export current file to CSV"),
+        ("Ctrl+E  /  ⌘E",     "Export selected files to CSV"),
         ("Ctrl+,  /  ⌘,",     "Open Preferences"),
         ("Ctrl+Q  /  ⌘Q",     "Quit"),
         # View
         ("Ctrl+F  /  ⌘F",     "Show / hide Flight Summary"),
         ("Ctrl+L  /  ⌘L",     "Show / hide Log window"),
         ("Ctrl+0  /  ⌘0",     "Fit map to flight path"),
+        ("Ctrl+minus  /  ⌘-", "Zoom out"),
+        ("Ctrl+plus  /  ⌘+", "Zoom in"),
         # Playback
         ("Space",              "Play / Pause"),
         ("→  (Right arrow)",   "Step forward 100 records"),
         ("←  (Left arrow)",    "Step back 100 records"),
         # File list
-        ("Delete / Backspace", "Remove selected file from list"),
+        ("Delete / Backspace", "Remove selected files from list"),
         ("Double-click",       "Load selected file"),
+        ("Shift-click",        "Select multiple files"),
     ]
 
     _WINDOWS = [
@@ -1644,9 +1647,11 @@ Left pane – FC2 File List
     Files that have no valid GPS record are displayed with the "warning"
     color.
   • The list is saved on disk and restored when the app restarts.
-  • Double-click a file to load it.
-  • Press Delete or Backspace to remove a file from the list
-    (the file itself is not deleted).
+  • Single-click a file to select it, or use shift-click to select multiple
+    files.
+  • Double-click a file to load it into the map view.
+  • Press Delete or Backspace to remove the selected files from the list
+    (the files themselves are not deleted).
   • Use File > Import FC2 File(s) or File > Import Directory to add files.
 
 Right pane – Dashboard, Map, and Playback Controls
@@ -1659,6 +1664,8 @@ Right pane – Dashboard, Map, and Playback Controls
     A house icon marks the home point. Requires the tkintermapview package.
   • Playback Controls (bottom): slider, transport buttons (step back, play/pause,
     step forward), speed selector (1× – 16×), and an elapsed-time readout.
+  • Zoom Controls: The "+" and "-" buttons in the map will zoom in and out.
+    Use short cut keys to zoom in and out and zoom to fit.
 
 Status bar (very bottom): shows the last operation or any error messages.""",
         ),
@@ -1952,8 +1959,8 @@ QUICK START
      values for every telemetry channel.
 
 5. Export to CSV
-   • Use File > Export Current File to CSV ({acc}E) to save the loaded
-     flight as a spreadsheet.
+   • Use File > Export Selected Files to CSV ({acc}E) to save the selected
+     flights as spreadsheets.
    • File > Export All Files to CSV processes your entire file list at once.
 
 6. Customize
