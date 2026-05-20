@@ -220,6 +220,10 @@ if PLATFORM_SYSTEM == "Linux":
     DEFAULT_PREFS["font_title"] = ["Times", 12, "bold"]
     DEFAULT_PREFS["font_small"] = ["Liberation", 8]
     DEFAULT_PREFS["font_metric"]= ["Liberation", 12]
+    DARK_MODE_PREFS["font_ui"]    = ["Liberation", 10]
+    DARK_MODE_PREFS["font_title"] = ["Times", 12, "bold"]
+    DARK_MODE_PREFS["font_small"] = ["Liberation", 8]
+    DARK_MODE_PREFS["font_metric"]= ["Liberation", 12]
 elif PLATFORM_SYSTEM == "Darwin":
     DEFAULT_PREFS["font_ui"]    = ["Helvetica Neue", 10]
     DEFAULT_PREFS["font_title"] = ["Helvetica Neue", 12, "bold"]
@@ -1997,6 +2001,8 @@ class Atom2Viewer(tk.Tk):
         )
 
         my_logger.debug("After configure logging.")
+
+        my_logger.info(f"Platform: {PLATFORM_SYSTEM}")
 
         # macOS: double-click on .fc2 in Finder
         if PLATFORM_SYSTEM == "Darwin":
