@@ -91,7 +91,10 @@ adv.py /path/to/your/logfile.fc2
 ```
 
 #### Exporting CSV
-Use **File → Export CSV…** to export the currently selected file to a CSV, or **File → Export All CSV…** to batch-export every file in the file list. You will be prompted to choose an output folder. CSV export options (extended fields, derived fields) are set in **File → Preferences…**.
+Use **File → Export Selected Files to CSV…** to export the currently selected files as CSV files. You will be prompted to choose an output folder. CSV export options (extended fields, derived fields) are set in **File → Preferences…**.
+
+#### Deleting Files from the list
+Use **File → Delete Selected Files…** will prompt you for confirmation, then remove the currently selected files from the file list. Files are not deleted from disk, just from the file list.
 
 #### Playback Controls
 The playback controls appear at the bottom of the right pane. Use the slider to jump to any point in the flight. The play/pause button and speed controls let you replay the flight at different rates. Keyboard shortcuts are listed below.
@@ -114,7 +117,7 @@ To view a summary of some of the log data, use **View → Flight Summary…**, w
 | Key | Action |
 |-----|--------|
 | Ctrl+O | Import FC2 file(s) |
-| Ctrl+E | Export current file to CSV |
+| Ctrl+E | Export selected files to CSV |
 | Ctrl+Q | Quit |
 | Ctrl+F | Show Flight Summary |
 | Ctrl+L | Show Log Window |
@@ -122,7 +125,7 @@ To view a summary of some of the log data, use **View → Flight Summary…**, w
 | Space | Play / Pause |
 | ← | Step back 100 records |
 | → | Step forward 100 records |
-| Delete / Backspace | Remove selected file from list |
+| Delete / Backspace | Remove selected files from list |
 
 *(On macOS, use Cmd in place of Ctrl.)*
 

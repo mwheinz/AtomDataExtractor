@@ -1984,6 +1984,7 @@ class Atom2Viewer(tk.Tk):
         self._summary_window = None
         self._preferences_window = None
         self._help_window = None
+        self._file_list_pane = None
 
         # ── Playback state ────────────────────────────────────────────────
         self.records:     list[dict] = []
@@ -2051,15 +2052,6 @@ class Atom2Viewer(tk.Tk):
     def _build_ui(self):
         self.option_add("*tearOff", False)
 
-        # ── Menu bar ─────────────────────────────────────────────────────
-        self._menubar = tk.Menu(self)
-        self.configure(menu=self._menubar)
-
-        self._build_file_menu()
-        self._build_view_menu()
-        self._build_playback_menu()
-        self._build_help_menu()
-
         # ── Horizontal paned window ───────────────────────────────────────
         paned = tk.PanedWindow(
             self, orient=tk.HORIZONTAL,
@@ -2100,6 +2092,15 @@ class Atom2Viewer(tk.Tk):
                  fg=self.prefs["color_accent"],
                  font=self.prefs["font_small"]).pack(side=tk.LEFT, padx=10)
 
+        # ── Menu bar ─────────────────────────────────────────────────────
+        self._menubar = tk.Menu(self)
+        self.configure(menu=self._menubar)
+
+        self._build_file_menu()
+        self._build_view_menu()
+        self._build_playback_menu()
+        self._build_help_menu()
+
         # ── Keyboard shortcuts ────────────────────────────────────────────
         self._bind_keys()
 
@@ -2119,13 +2120,13 @@ class Atom2Viewer(tk.Tk):
                       command=self._import_directory,
                       underline=7)
         m.add_separator()
-        m.add_command(label="Export Current File to CSV…",
-                      command=self._export_csv_current,
+        m.add_command(label="Export Selected Files to CSV…",
+                      command=self._export_csv_selected,
                       accelerator=f"{acc}+E",
                       underline=0)
-        m.add_command(label="Export All Files to CSV…",
-                      command=self._export_csv_all,
-                      underline=7)
+        m.add_command(label="Delete Selected Files…",
+                      command=self._file_list_pane.remove_selected,
+                      underline=0)
         m.add_separator()
         m.add_command(label="Preferences…",
                       command=self._show_prefs,
@@ -2210,7 +2211,7 @@ class Atom2Viewer(tk.Tk):
         if PLATFORM_SYSTEM == "Darwin":
             # File Menu
             self.bind("<Command-o>", lambda e: self._import_files())
-            self.bind("<Command-e>", lambda e: self._export_csv_current())
+            self.bind("<Command-e>", lambda e: self._export_csv_selected())
             self.bind("<Command-q>", lambda e: self._on_close())
             self.bind("<Command-,>", lambda e: self._show_prefs())
             # View Menu
@@ -2220,7 +2221,7 @@ class Atom2Viewer(tk.Tk):
         else:
             # File Menu
             self.bind("<Control-o>", lambda e: self._import_files())
-            self.bind("<Control-e>", lambda e: self._export_csv_current())
+            self.bind("<Control-e>", lambda e: self._export_csv_selected())
             self.bind("<Control-q>", lambda e: self._on_close())
             # View Menu
             self.bind("<Control-f>", lambda e: self._show_summary())
@@ -2436,37 +2437,9 @@ class Atom2Viewer(tk.Tk):
     # CSV export
     # ─────────────────────────────────────────────────────────────────────────
 
-    def _export_csv_current(self):
-        """Export the currently loaded file to CSV."""
-        if not self._all_records:
-            messagebox.showinfo("No Data", "No file is currently loaded.")
-            return
-
-        dest_dir = filedialog.askdirectory(
-            title="Choose export directory",
-            initialdir=self.prefs.get("last_export_dir", str(Path.home())),
-        )
-        if not dest_dir:
-            return
-        self.prefs["last_export_dir"] = dest_dir
-
-        try:
-            csv_path = export_csv(
-                self.current_file,
-                self._all_records,
-                extended=self.prefs.get("csv_extended", False),
-                derived=self.prefs.get("csv_derived", True),
-                destination=dest_dir,
-            )
-            self._set_status(f"Exported: {Path(csv_path).name}")
-            messagebox.showinfo("Export Complete", f"CSV written to:\n{csv_path}")
-        except Exception as exc:
-            my_logger.error(str(exc))
-            messagebox.showerror("Export Error", str(exc))
-
-    def _export_csv_all(self):
-        """Export every file in the file list to CSV."""
-        paths = self._file_list_pane.get_paths()
+    def _export_csv_selected(self):
+        """Export the selected files in the file list to CSV."""
+        paths = self._file_list_pane.get_selected_paths()
         if not paths:
             messagebox.showinfo("No Files", "The file list is empty.")
             return
