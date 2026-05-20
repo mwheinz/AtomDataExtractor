@@ -796,8 +796,8 @@ class FileListPane(tk.Frame):
                 # Skip files that don't really contain fc2 data.
                 try:
                     records = atom2_parser(file_name=p, logger=my_logger)
-                except Exception:
-                    my_logger.error("%s is not a valid atom2 fc2 file.", p)
+                except Exception as e:
+                    my_logger.error("%s failed to load: %s", p, str(e))
                     continue
 
                 my_logger.debug("Adding %s to the file list.", p)
