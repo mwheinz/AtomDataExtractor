@@ -1290,7 +1290,7 @@ class FlightSummaryWindow(tk.Toplevel):
         ("bank (deg)",                 "Roll",            "°"),
         ("3d Derived Speed (m/s)",     "3-D Speed",       "m/s"),
         ("3d Travelled Distance (m)",  "Distance Travelled",  "m"),
-        ("3d Distance Distance (m)",   "Distance to Home",   "m"),
+        ("3d Derived Distance (m)",    "Distance to Home",   "m"),
         ("Wind Speed (m/s)",           "Wind Speed",      "m/s"),
         ("Wind Direction (deg)",       "Wind Direction",  "°"),
         ("Battery Level (%)",          "Battery Level",   "%"),
@@ -1299,12 +1299,17 @@ class FlightSummaryWindow(tk.Toplevel):
         ("Battery Temp (c)",           "Battery Temp", "C"),
         ("Satellites",                 "Satellites",      ""),
         ("Signal Strength (%)",        "Signal Strength", "%"),
+        ("Date/Time",                  "Date/Time", ""),
+        ("Motor 1 RPM",                "Motor 1 RPM", ""),
+        ("Motor 2 RPM",                "Motor 2 RPM", ""),
+        ("Motor 3 RPM",                "Motor 3 RPM", ""),
+        ("Motor 4 RPM",                "Motor 4 RPM", ""),
     ]
 
     # Column definitions: (treeview id, header label, anchor, min width, stretch)
     _COLUMNS = [
         ("field", "Field",  tk.W,  80, True),
-        ("unit",  "Unit",   tk.E,  40, True),
+        ("unit",  "Unit",   tk.E,  20, True),
         ("min",   "Min",    tk.E,   80, True),
         ("max",   "Max",    tk.E,   80, True),
     ]
@@ -1339,7 +1344,7 @@ class FlightSummaryWindow(tk.Toplevel):
     # ── Construction ──────────────────────────────────────────────────────────
 
     def _build(self):
-        p = self.prefs
+        p        = self.prefs
         bg       = p["color_bg"]
         panel_bg = p["color_panel_bg"]
         fg       = p["color_value"]
