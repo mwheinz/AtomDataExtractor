@@ -244,7 +244,7 @@ def load_prefs() -> dict:
             with open(PREFS_FILE, encoding="utf-8") as f:
                 prefs.update(json.load(f))
     except Exception as exc:
-        my_logger.error("Could not load prefs: %s", exc)
+        my_logger.warning("Could not load prefs: %s", exc)
     return prefs
 
 
@@ -270,7 +270,7 @@ def load_file_list() -> list[str]:
                 paths.sort()
             return [p for p in paths if Path(p[0]).exists()]
     except Exception as exc:
-        my_logger.error("Could not load file list: %s", exc)
+        my_logger.warning("Could not load file list: %s", exc)
     return []
 
 
@@ -786,7 +786,7 @@ class FileListPane(tk.Frame):
             p = str(Path(p).resolve())
             existing = [entry[0] for entry in self._paths]
             if p in existing:
-                my_logger.warning(f"{p} is already in the file list. Skipping.")
+                my_logger.info(f"{p} is already in the file list. Skipping.")
             elif Path(p).exists():
                 # Skip files that don't really contain fc2 data.
                 try:
@@ -1121,6 +1121,7 @@ class MapPane(tk.Frame):
         self._drone_heading = -1
 
         if len(coords) >= 2:
+            self.map_widget.delete_all_path()
             self._path_line = self.map_widget.set_path(
                 coords, color=self.prefs["color_path"], width=4)
 
@@ -2269,6 +2270,7 @@ class Atom2Viewer(tk.Tk):
             all_records = atom2_parser(file_name=path, logger=my_logger)
         except Exception as exc:
             messagebox.showerror("Parse Error", str(exc))
+            my_logger.error(str(exc))
             self._set_status("Error loading file.")
             return
 
@@ -2443,6 +2445,7 @@ class Atom2Viewer(tk.Tk):
             self._set_status(f"Exported: {Path(csv_path).name}")
             messagebox.showinfo("Export Complete", f"CSV written to:\n{csv_path}")
         except Exception as exc:
+            my_logger.error(str(exc))
             messagebox.showerror("Export Error", str(exc))
 
     def _export_csv_all(self):
@@ -2473,7 +2476,11 @@ class Atom2Viewer(tk.Tk):
                         destination=dest_dir,
                     )
                     written += 1
+                else:
+                    my_logger.info(f"{Path(path).name}: 0 records.")
+                    errors.append(f"{Path(path).name}: 0 records.")
             except Exception as exc:
+                my_logger.warning(f"{Path(path).name}: {exc}")
                 errors.append(f"{Path(path).name}: {exc}")
 
         msg = f"Exported {written} of {len(paths)} files."
@@ -2545,7 +2552,7 @@ class Atom2Viewer(tk.Tk):
         try:
             self.prefs["sash_position"] = self._paned.sash_coord(0)[0]
         except Exception as e:
-            my_logger.error(f"{str(e)}")
+            my_logger.error(str(e))
             pass
 
         save_prefs(self.prefs)
