@@ -270,7 +270,7 @@ def load_file_list() -> list[str]:
         if FILELIST_FILE.exists():
             with open(FILELIST_FILE, encoding="utf-8") as f:
                 paths = json.load(f)
-                paths.sort()
+                paths = sorted(paths, key=lambda x: x[1])
             return [p for p in paths if Path(p[0]).exists()]
     except Exception as exc:
         my_logger.warning("Could not load file list: %s", exc)
@@ -756,6 +756,7 @@ class FileListPane(tk.Frame):
             bd=0,
             activestyle="none",
             yscrollcommand=sb.set,
+            selectmode=tk.EXTENDED,
         )
         sb.config(command=self._listbox.yview)
         self._listbox.pack(fill=tk.BOTH, expand=True)
@@ -763,8 +764,8 @@ class FileListPane(tk.Frame):
         # Disabled to avoid conflict with play/pause and to limit accidental
         # re-loads. Use double-click to load a file.
         #self._listbox.bind("<<ListboxSelect>>", self._on_select)
-        self._listbox.bind("<Delete>",          self._remove_selected)
-        self._listbox.bind("<BackSpace>",       self._remove_selected)
+        self._listbox.bind("<KeyRelease-Delete>",          self._remove_selected)
+        self._listbox.bind("<KeyRelease-BackSpace>",       self._remove_selected)
         self._listbox.bind("<Double-Button-1>", self._on_select)
 
         # Thin status bar showing count
@@ -808,7 +809,7 @@ class FileListPane(tk.Frame):
             else:
                 my_logger.error("%s does not exist.", p)
         if added:
-            self._paths.sort()
+            self._paths = sorted(self._paths, key=lambda x: x[1])
             self._save()
             self._update_count()
             self._refresh_list()
@@ -819,8 +820,10 @@ class FileListPane(tk.Frame):
     def get_paths(self) -> list[str]:
         return [entry[0] for entry in self._paths]
 
+    def get_selected_paths(self) -> list[str]:
+        return [self._paths[i][0] for i in self._listbox.curselection()]
+
     def select_path(self, path: str):
-        """Programmatically select a row by path."""
         path = str(Path(path).resolve())
         if path in self._paths:
             idx = self._paths.index(path)
@@ -844,10 +847,21 @@ class FileListPane(tk.Frame):
         sel = self._listbox.curselection()
         if not sel:
             return
-        idx = sel[0]
-        my_logger.info("Deleting item %s: %s", sel[0], self._paths[idx][0])
-        self._listbox.delete(idx)
-        del self._paths[idx]
+
+        count = len(sel)
+        cfiles = f"{count} file{'s' if count != 1 else ''}"
+
+        if not messagebox.askyesno("Remove Files",
+            f"Remove {cfiles} from list?\n(Files will not be deleted from disk.)",
+            parent=self,
+        ):
+            return
+        
+        for idx in reversed(sel):
+            my_logger.info("Deleting item %s: %s", idx, self._paths[idx][0])
+            self._listbox.delete(idx)
+            del self._paths[idx]
+
         self._save()
         self._update_count()
 
@@ -862,6 +876,7 @@ class FileListPane(tk.Frame):
             mappable = p[2]
             color = self.prefs["color_value"] if mappable else self.prefs["color_warn"]
             self._listbox.itemconfig(tk.END, fg=color)
+
         self._update_count()
 
     def _save(self):
@@ -2220,8 +2235,6 @@ class Atom2Viewer(tk.Tk):
         self.bind("<space>", lambda e: self._toggle_play())
         self.bind("<Left>",  lambda e: self._step_back())
         self.bind("<Right>", lambda e: self._step_fwd())
-        self.bind("<Delete>",    lambda e: self._file_list_pane.remove_selected())
-        self.bind("<BackSpace>", lambda e: self._file_list_pane.remove_selected())
 
     # ─────────────────────────────────────────────────────────────────────────
     # File import
