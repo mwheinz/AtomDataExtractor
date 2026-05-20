@@ -122,6 +122,8 @@ To view a summary of some of the log data, use **View → Flight Summary…**, w
 | Ctrl+F | Show Flight Summary |
 | Ctrl+L | Show Log Window |
 | Ctrl+0 | Fit map to path |
+| Ctrl+minus | Zoom out |
+| Ctrl+equal | Zoom in |
 | Space | Play / Pause |
 | ← | Step back 100 records |
 | → | Step forward 100 records |

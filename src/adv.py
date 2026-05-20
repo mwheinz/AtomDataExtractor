@@ -856,7 +856,7 @@ class FileListPane(tk.Frame):
             parent=self,
         ):
             return
-        
+
         for idx in reversed(sel):
             my_logger.info("Deleting item %s: %s", idx, self._paths[idx][0])
             self._listbox.delete(idx)
@@ -1118,6 +1118,19 @@ class MapPane(tk.Frame):
         self._drone_heading= -1
 
     # ── Map drawing helpers ───────────────────────────────────────────────────
+
+    def get_zoom(self):
+        return self.map_widget.zoom
+
+    def increase_zoom(self):
+        z = self.map_widget.zoom
+        if z < 19:
+            self.map_widget.set_zoom(z+1)
+
+    def decrease_zoom(self):
+        z = self.map_widget.zoom
+        if z > 0:
+            self.map_widget.set_zoom(z-1)
 
     def draw_path(self, coords: list[tuple]):
         """Draw (or redraw) the full flight path on the map."""
@@ -2218,6 +2231,8 @@ class Atom2Viewer(tk.Tk):
             self.bind("<Command-f>", lambda e: self._show_summary())
             self.bind("<Command-l>", lambda e: self._show_log())
             self.bind("<Command-0>", lambda e: self._fit_map())
+            self.bind("<Command-equal>", lambda e: self._zoom_in())
+            self.bind("<Command-minus>", lambda e: self._zoom_out())
         else:
             # File Menu
             self.bind("<Control-o>", lambda e: self._import_files())
@@ -2227,6 +2242,8 @@ class Atom2Viewer(tk.Tk):
             self.bind("<Control-f>", lambda e: self._show_summary())
             self.bind("<Control-l>", lambda e: self._show_log())
             self.bind("<Control-0>", lambda e: self._fit_map())
+            self.bind("<Control-equal>", lambda e: self._zoom_in())
+            self.bind("<Control-minus>", lambda e: self._zoom_out())
 
         if PLATFORM_SYSTEM == "Darwin":
             self.bind("<Command-?>",   lambda e: self._show_help())
@@ -2499,6 +2516,18 @@ class Atom2Viewer(tk.Tk):
     def _fit_map(self):
         if self.coords:
             self._map_pane.fit_to_path(self.coords)
+        else:
+            messagebox.showinfo("No Data", "No flight path is loaded.")
+
+    def _zoom_in(self):
+        if self.coords:
+            self._map_pane.increase_zoom()
+        else:
+            messagebox.showinfo("No Data", "No flight path is loaded.")
+
+    def _zoom_out(self):
+        if self.coords:
+            self._map_pane.decrease_zoom()
         else:
             messagebox.showinfo("No Data", "No flight path is loaded.")
 
