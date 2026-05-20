@@ -1998,6 +1998,8 @@ class Atom2Viewer(tk.Tk):
             tk_parent=self,
             tk_menubar=self._menubar,
             tk_title="Atom 2 Viewer Log",
+            tk_settings=(self.prefs["color_bg"], self.prefs["color_value"],
+                         "Courier New", 12)
         )
 
         my_logger.debug("After configure logging.")

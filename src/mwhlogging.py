@@ -24,16 +24,16 @@ import logging
 import re
 import sys
 import platform
-from logging.handlers import RotatingFileHandler
 
 PLATFORM_SYSTEM = platform.system()
 
-# ── Public level constants (convenience re-exports) ──────────────────────────
+# ── Re-export the log levels to make things easier.  ──────────────────────────
 ERROR    = logging.ERROR
 WARNING  = logging.WARNING
 INFO     = logging.INFO
 DEBUG    = logging.DEBUG
 
+# ── Convinence map for saving preferences ─────────────────────────────────────
 LOG_LEVEL_MAP={
     "Error": logging.ERROR,
     "Warning": logging.WARNING,
@@ -41,7 +41,7 @@ LOG_LEVEL_MAP={
     "Debug": logging.DEBUG,
 }
 
-# ── ANSI color definitions ────────────────────────────────────────────────────
+# ── Color definitions ─────────────────────────────────────────────────────────
 # Map each log level to the same ANSI code used in the terminal formatter so
 # both outputs stay visually consistent.
 _ANSI_COLORS: dict[int, str] = {
@@ -80,6 +80,15 @@ _SGR_BG = {
     44: "#0000cc", 45: "#880088", 46: "#006666", 47: "#aaaaaa",
 }
 
+# ── Default Window Settings ───────────────────────────────────────────────────
+_BG            = "#1e1e1e"
+_FG            = "#d4d4d4"
+_FONT_FACE     = "Courier New"  # monospaced; falls back gracefully
+_FONT_SIZE     = 11
+_MAX_LINES     = 2_000          # trim oldest lines when exceeded
+_DEFAULT_LINES = 24             # initial height of the log window
+_DEFAULT_CHARS = 82             # initial width of the log window
+
 
 def _parse_ansi(text: str) -> list[tuple[str, dict]]:
     """
@@ -116,27 +125,19 @@ def _parse_ansi(text: str) -> list[tuple[str, dict]]:
 
 
 # ── Tkinter log window ────────────────────────────────────────────────────────
+# A floating Toplevel (or embedded Frame) that displays log records.
+
+# The widget is created lazily on the first log message so that it is always
+# constructed on the main thread even when configure_logging() is called
+# early during startup.
+
+# All methods that touch Tk widgets must be called from the main thread.
+# Use _append_threadsafe() from background threads.
 
 class _TkLogWindow:
-    """
-    A floating Toplevel (or embedded Frame) that displays log records.
 
-    The widget is created lazily on the first log message so that it is always
-    constructed on the main thread even when configure_logging() is called
-    early during startup.
-
-    All methods that touch Tk widgets must be called from the main thread.
-    Use _append_threadsafe() from background threads.
-    """
-
-    # Dark terminal-style defaults
-    BG        = "#1e1e1e"
-    FG        = "#d4d4d4"
-    FONT_FACE = "Courier New"   # monospaced; falls back gracefully
-    FONT_SIZE = 11
-    MAX_LINES = 2_000           # trim oldest lines when exceeded
-
-    def __init__(self, parent, menubar, title: str = "Log"):
+    def __init__(self, parent, menubar, title: str = "Log", settings: list =
+                 None):
         import tkinter as tk  # imported here to keep the module lightweight
         self._tk   = tk
         self._root = parent
@@ -145,6 +146,17 @@ class _TkLogWindow:
         self._title = title
         self._menubar = menubar
         self._pending: list[str] = []   # messages queued before window exists
+
+        if settings is not None:
+            self.bg = settings[0]
+            self.fg = settings[1]
+            self.font_face = settings[2]
+            self.font_size = settings[3]
+        else:
+            self.bg = _BG
+            self.fg = _FG
+            self.font_face = _FONT_FACE
+            self.font_size = _FONT_SIZE
 
     # ── public ───────────────────────────────────────────────────────────────
 
@@ -157,8 +169,8 @@ class _TkLogWindow:
                 self._write(formatted_message + "\n")
             else:
                 self._append_threadsafe(formatted_message)
-        except Exception:
-            pass   # never let logging crash the app
+        except Exception as e:
+            print(str(e), file=sys.stderr)
 
     def show(self) -> None:
         """Open the window for the first time, un-hide it, or raise it."""
@@ -187,22 +199,31 @@ class _TkLogWindow:
 
     def _ensure_window(self) -> None:
         """Build the window the first time it is needed."""
+
+        import tkinter.font as tkf
+
         if self._win is not None:
             return
         tk = self._tk
         win = tk.Toplevel(self._root)
         win.title(self._title)
-        win.geometry("900x400")
+
+        # Calculate a useful default size for the window.
+        f = tkf.Font(family=self.font_face, size=self.font_size)
+        line_height = f.metrics("linespace")   # pixels per line, incl. leading
+
+        win_h = line_height * _DEFAULT_LINES
+        win_w = f.measure("M") * _DEFAULT_CHARS   # "M" width ≈ a good fixed-width char width
+
+        win.geometry(f"{win_w}x{win_h}")
         if PLATFORM_SYSTEM == "Darwin":
-            win.configure(bg=self.BG, menu=self._menubar)
+            win.configure(bg=self.bg, menu=self._menubar)
         win.withdraw()
 
-        # ── toolbar ──────────────────────────────────────────────────────────
-        toolbar = tk.Frame(win, bg=self.BG)
+        toolbar = tk.Frame(win, bg=self.bg)
         toolbar.pack(side="top", fill="x", padx=4, pady=(4, 0))
 
-        # ── text widget + scrollbar ───────────────────────────────────────────
-        frame = tk.Frame(win, bg=self.BG)
+        frame = tk.Frame(win, bg=self.bg)
         frame.pack(fill="both", expand=True, padx=4, pady=4)
 
         sb = tk.Scrollbar(frame)
@@ -210,8 +231,8 @@ class _TkLogWindow:
 
         text = tk.Text(
             frame,
-            bg=self.BG, fg=self.FG,
-            font=(self.FONT_FACE, self.FONT_SIZE),
+            bg=self.bg, fg=self.fg,
+            font=(self.font_face, self.font_size),
             yscrollcommand=sb.set,
             state="disabled",
             wrap="none",
@@ -221,7 +242,6 @@ class _TkLogWindow:
         text.pack(side="left", fill="both", expand=True)
         sb.config(command=text.yview)
 
-        # Horizontal scrollbar (long lines are common in logs)
         hb = tk.Scrollbar(win, orient="horizontal", command=text.xview)
         hb.pack(side="bottom", fill="x")
         text.configure(xscrollcommand=hb.set)
@@ -246,7 +266,7 @@ class _TkLogWindow:
         # Bold tag (used by the ANSI parser).
         text.tag_configure(
             "bold",
-            font=(self.FONT_FACE, self.FONT_SIZE, "bold")
+            font=(self.font_face, self.font_size, "bold")
         )
 
     def _write(self, text: str) -> None:
@@ -283,10 +303,10 @@ class _TkLogWindow:
         widget.configure(state="disabled")
 
         # Trim old lines to cap memory use.
-        line_count = int(widget.index("end-1c").split(".")[0])
-        if line_count > self.MAX_LINES:
+        line_count = int(widget.index("end-1c").split(".", maxsplit=1)[0])
+        if line_count > _MAX_LINES:
             widget.configure(state="normal")
-            widget.delete("1.0", f"{line_count - self.MAX_LINES}.0")
+            widget.delete("1.0", f"{line_count - _MAX_LINES}.0")
             widget.configure(state="disabled")
 
         widget.see("end")
@@ -304,14 +324,17 @@ class _TkHandler(logging.Handler):
         try:
             msg = self.format(record)
             self._window.append(msg)
-        except Exception:
-            self.handleError(record)
+        except Exception as e:
+            self.handleError(str(e))
 
 
 # ── Formatters ────────────────────────────────────────────────────────────────
 
 class MWHFormatter(logging.Formatter):
-    """Compact, optionally ANSI-colored log formatter."""
+    """
+    Main logging class. Supports colorized output to stderr and,
+    optionally, to a Tkinter window.
+    """
 
     def __init__(self, use_color: bool = True):
         super().__init__(
@@ -352,6 +375,7 @@ class MWHLogger(logging.Logger):
 
         self._tk_handler:   _TkHandler | None       = None
         self._tk_window:    _TkLogWindow | None      = None
+        self._tk_settings:  tuple | None = None
 
         self.setLevel(INFO)
         self.propagate = False
@@ -364,6 +388,7 @@ class MWHLogger(logging.Logger):
         tk_parent        = None,
         tk_menubar       = None,
         tk_title:   str  = None,
+        tk_settings: tuple = None,
     ) -> None:
         """
         Adjust log level and output destinations.
@@ -381,12 +406,13 @@ class MWHLogger(logging.Logger):
             tk_title = self.name
 
         if tk_parent is not None:
-            self.open_tk_window(tk_parent, tk_menubar, tk_title)
+            self.open_tk_window(tk_parent, tk_menubar, tk_title, tk_settings)
 
         if level is not None:
             self.setLevel(level)
 
-    def open_tk_window(self, parent, menubar, title: str) -> None:
+    def open_tk_window(self, parent, menubar, title: str, settings: list =
+                       None) -> None:
         """Create the tkinter log window and attach its handler."""
         if self._tk_handler is not None:
             # Already open; just raise the window.
@@ -394,7 +420,8 @@ class MWHLogger(logging.Logger):
                 self._tk_window._win.lift()
             return
 
-        self._tk_window = _TkLogWindow(parent, menubar, title=title)
+        self._tk_window = _TkLogWindow(parent, menubar, title=title,
+                                       settings=settings)
         h = _TkHandler(self._tk_window)
         # Use ANSI formatter — the Tk handler's _parse_ansi() strips the codes
         # and converts them to Tk tags, so the Text widget gets real colors.
