@@ -2259,7 +2259,7 @@ class Atom2Viewer(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
 
     def _load_file(self, path: str):
-        """Parse an fc2 file and populate the UI.  Called from file-list click."""
+        """Parse an fc2 file and populate the UI.  Called from double click."""
         if self.playing:
             self._pause()
 
@@ -2280,6 +2280,8 @@ class Atom2Viewer(tk.Tk):
 
         self._all_records = all_records
         self.current_file = path
+
+        log_stats(my_logger, self._all_records)
 
         # For map/playback, only use GPS-locked records
         gps_records = [r for r in all_records if r.get("GPS Lock") == "Yes"]
