@@ -414,10 +414,9 @@ class MWHLogger(logging.Logger):
     def open_tk_window(self, parent, menubar, title: str, settings: list =
                        None) -> None:
         """Create the tkinter log window and attach its handler."""
-        if self._tk_handler is not None:
+        if self._tk_handler is not None and self._tk_window and self._tk_window._win:
             # Already open; just raise the window.
-            if self._tk_window and self._tk_window._win:
-                self._tk_window._win.lift()
+            self._tk_window._win.lift()
             return
 
         self._tk_window = _TkLogWindow(parent, menubar, title=title,
@@ -429,6 +428,9 @@ class MWHLogger(logging.Logger):
         h.setLevel(self.level)
         self.addHandler(h)
         self._tk_handler = h
+
+    def show_tk_window(self):
+        self._tk_window.show()
 
     # ── level propagation ────────────────────────────────────────────────────
 

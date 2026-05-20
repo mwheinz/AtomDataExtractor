@@ -27,7 +27,7 @@ Keyboard shortcuts (non-Mac)
   Ctrl+L   Show Log
 
   Ctrl+0   Zoom map to fit window.
-  
+
   Space    Play / Pause
   Left     Step back  (100 records)
   Right    Step forward (100 records)
@@ -43,7 +43,6 @@ Author: Michael Heinz
 # ─────────────────────────────────────────────────────────────────────────────
 import csv
 import json
-import math
 import os
 import platform
 import sys
@@ -287,12 +286,11 @@ def save_file_list(paths: list[str]) -> None:
         my_logger.error("Could not save file list: %s", exc)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Displays the current preferences and allows updating them.
-# Supports two sets of defaults - normal and dark mode.
-# ─────────────────────────────────────────────────────────────────────────────
-
 class PrefsDialog(tk.Toplevel):
+    """
+    Displays the current preferences and allows updating them.
+    Supports two sets of defaults - normal and dark mode.
+    """
 
     COLOR_FIELDS=[
         ("color_bg",       "Background"),
@@ -319,8 +317,8 @@ class PrefsDialog(tk.Toplevel):
 
     # Use this to restrict input on the numeric fields.
     @staticmethod
-    def _validate_digit(P) -> bool:
-        return (P.isdigit() or P =="")
+    def _validate_digit(p) -> bool:
+        return (p.isdigit() or p =="")
 
     def __init__(self, parent, prefs: dict, on_save, menubar):
         my_logger.debug("Creating Prefs Dialog.")
@@ -354,7 +352,7 @@ class PrefsDialog(tk.Toplevel):
     # ── Layout ─────────────────────────────────────────────────────────
 
     def _build(self):
-        PAD={"padx" : 10, "pady" : 4}
+        pad={"padx" : 10, "pady" : 4}
 
         tk.Label(self, text="Most changes will not take effect until restart.",
                  font=self._prefs["font_ui"]).pack(padx=12, pady=(8, 0),
@@ -366,7 +364,8 @@ class PrefsDialog(tk.Toplevel):
         limits_frame.pack(fill=tk.X, padx=4, pady=4)
 
         # (Limit widgets setup remains identical)
-        tk.Label(limits_frame, text="Max Dist:", anchor="w", width=12).grid(row=0, column=0, sticky="w", padx=4, pady=4)
+        tk.Label(limits_frame, text="Max Dist:", anchor="w",
+                 width=12).grid(row=0, column=0, sticky="w", padx=4, pady=4)
         self._max_dist=tk.IntVar(value=self._prefs.get("max_dist", 0))
         tk.Entry(limits_frame, textvariable=self._max_dist,
                 validatecommand=(self.validate,"%P"), validate="key",
@@ -374,7 +373,8 @@ class PrefsDialog(tk.Toplevel):
         tk.Label(limits_frame, text="meters", anchor="w",
                 width=12).grid(row=0, column=2, sticky="w", padx=4, pady=4)
 
-        tk.Label(limits_frame, text="Max Speed:", anchor="w", width=12).grid(row=0, column=3, sticky="w", padx=4, pady=4)
+        tk.Label(limits_frame, text="Max Speed:", anchor="w",
+                 width=12).grid(row=0, column=3, sticky="w", padx=4, pady=4)
         self._max_speed=tk.IntVar(value=self._prefs.get("max_speed", 0))
         tk.Entry(limits_frame, textvariable=self._max_speed,
                 validatecommand=(self.validate,"%P"), validate="key",
@@ -382,7 +382,8 @@ class PrefsDialog(tk.Toplevel):
         tk.Label(limits_frame, text="kph", anchor="w",
                 width=12).grid(row=0, column=5, sticky="w", padx=4, pady=4)
 
-        tk.Label(limits_frame, text="Max Alt:", anchor="w", width=12).grid(row=1, column=0, sticky="w", padx=4, pady=4)
+        tk.Label(limits_frame, text="Max Alt:", anchor="w",
+                 width=12).grid(row=1, column=0, sticky="w", padx=4, pady=4)
         self._max_alt=tk.IntVar(value=self._prefs.get("max_alt", 0))
         tk.Entry(limits_frame, textvariable=self._max_alt,
                 validatecommand=(self.validate,"%P"), validate="key",
@@ -390,7 +391,8 @@ class PrefsDialog(tk.Toplevel):
         tk.Label(limits_frame, text="meters", anchor="w",
                 width=12).grid(row=1, column=2, sticky="w", padx=4, pady=4)
 
-        tk.Label(limits_frame, text="Max Wind:", anchor="w", width=12).grid(row=1, column=3, sticky="w", padx=4, pady=4)
+        tk.Label(limits_frame, text="Max Wind:", anchor="w",
+                 width=12).grid(row=1, column=3, sticky="w", padx=4, pady=4)
         self._max_wind=tk.IntVar(value=self._prefs.get("max_wind", 0))
         tk.Entry(limits_frame, textvariable=self._max_wind,
                 validatecommand=(self.validate,"%P"), validate="key",
@@ -406,7 +408,8 @@ class PrefsDialog(tk.Toplevel):
             row=i // 2
             col=(i % 2) * 3
 
-            tk.Label(color_frame, text=label + ":", anchor="w", width=12).grid(row=row, column=col, sticky="w", **PAD)
+            tk.Label(color_frame, text=label + ":", anchor="w",
+                     width=12).grid(row=row, column=col, sticky="w", **pad)
 
             swatch=tk.Label(color_frame, width=3,
                               bg=self._prefs.get(key, "#000000"),
@@ -416,7 +419,7 @@ class PrefsDialog(tk.Toplevel):
 
             tk.Button(color_frame, text="Choose…",
                       command=lambda k=key: self._pick_color(k),
-                      padx=4).grid(row=row, column=col + 2, **PAD)
+                      padx=4).grid(row=row, column=col + 2, **pad)
 
         # ── Fonts ─────────────────────────────────────────────────────
 
@@ -626,10 +629,9 @@ def _fmt(value, fmt_spec: str, unit: str) -> str:
     try:
         if fmt_spec == "s":
             return str(value)
-        elif fmt_spec == "d":
+        if fmt_spec == "d":
             return f"{int(value)}{unit}"
-        else:
-            return f"{float(value):{fmt_spec}}{unit}"
+        return f"{float(value):{fmt_spec}}{unit}"
     except (TypeError, ValueError):
         return str(value)
 
@@ -640,8 +642,6 @@ def _fmt(value, fmt_spec: str, unit: str) -> str:
 #  A horizontal row of labeled metric tiles.
 #  Each tile shows a label and a value that updates during playback.
 #
-#  TODO: tiles are plain tk.Label pairs; future work can replace them
-#  with canvas-drawn arc gauges copied from adv.py.
 # ─────────────────────────────────────────────────────────────────────────────
 
 class DashboardStrip(tk.Frame):
@@ -658,7 +658,7 @@ class DashboardStrip(tk.Frame):
         prefs = self.prefs
         bg    = prefs["color_panel_bg"]
 
-        for i, (label, key, unit, fmt, limit) in enumerate(DASHBOARD_METRICS):
+        for i, (label, key, _, _, _) in enumerate(DASHBOARD_METRICS):
             tile = tk.Frame(self, bg=bg, padx=8, pady=4,
                             relief=tk.FLAT, bd=0)
             tile.grid(row=0, column=i, sticky="nsew", padx=1)
@@ -706,14 +706,14 @@ class DashboardStrip(tk.Frame):
             var.set("—")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  FileListPane  –  left panel with persistent fc2 file list
-#
-#  Scrollable list of fc2 files.  Fires on_select(path) when the user
-#  double-clicks a row.  The list is persisted across sessions.
-# ─────────────────────────────────────────────────────────────────────────────
-
 class FileListPane(tk.Frame):
+    """
+    FileListPane  –  left panel with persistent fc2 file list
+
+    Scrollable list of fc2 files.  Fires on_select(path) when the user
+    double-clicks a row.  The list is persisted across sessions.
+    """
+
     def __init__(self, parent, prefs: dict, on_select, **kw):
         my_logger.debug("Creating File List Pane.")
         bg = prefs["color_bg"]
@@ -790,23 +790,23 @@ class FileListPane(tk.Frame):
             p = str(Path(p).resolve())
             existing = [entry[0] for entry in self._paths]
             if p in existing:
-                my_logger.info(f"{p} is already in the file list. Skipping.")
+                my_logger.info("%s is already in the file list. Skipping.", p)
             elif Path(p).exists():
                 # Skip files that don't really contain fc2 data.
                 try:
                     records = atom2_parser(file_name=p, logger=my_logger)
-                except Exception as exc:
-                    my_logger.error(f"{p} is not a valid atom2 fc2 file.")
+                except Exception:
+                    my_logger.error("%s is not a valid atom2 fc2 file.", p)
                     continue
 
-                my_logger.debug(f"Adding {p} to the file list.")
+                my_logger.debug("Adding %s to the file list.", p)
                 ts = self._ms_to_datetime_str(atom2_parse_filename(p))
                 mappable = any(r.get("GPS Lock") == "Yes" for r in records)
 
                 self._paths.append([p, ts, mappable])
                 added += 1
             else:
-                my_logger.warning(f"{p} does not exist.")
+                my_logger.error("%s does not exist.", p)
         if added:
             self._paths.sort()
             self._save()
@@ -845,7 +845,7 @@ class FileListPane(tk.Frame):
         if not sel:
             return
         idx = sel[0]
-        my_logger.debug(f"Deleting item {sel[0]}: {self._paths[idx]}")
+        my_logger.info("Deleting item %s: %s", sel[0], self._paths[idx][0])
         self._listbox.delete(idx)
         del self._paths[idx]
         self._save()
@@ -856,7 +856,7 @@ class FileListPane(tk.Frame):
         # need to erase the old list or worry about sorting the new one.
         paths = load_file_list()
         for p in paths:
-            my_logger.debug(f"Adding {p[0]} to the file list.")
+            my_logger.debug("Adding %s.", p[0])
             self._paths.append(p)
             self._listbox.insert(tk.END, p[1])
             mappable = p[2]
@@ -872,14 +872,14 @@ class FileListPane(tk.Frame):
         self._count_var.set(f"{n} file{'s' if n != 1 else ''}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  PlaybackControls  –  transport bar at the bottom of the map pane
-#
-#  Slider + transport buttons + speed selector.
-#  Callbacks injected by the parent so this widget stays decoupled.
-# ─────────────────────────────────────────────────────────────────────────────
-
 class PlaybackControls(tk.Frame):
+    """
+    PlaybackControls  –  transport bar at the bottom of the map pane
+
+    Slider + transport buttons + speed selector.
+    Callbacks injected by the parent so this widget stays decoupled.
+    """
+
     PLAYBACK_SPEEDS = [1, 2, 4, 8, 16]
 
     def __init__(self, parent, prefs: dict,
@@ -926,8 +926,8 @@ class PlaybackControls(tk.Frame):
                             background=bg,
                             troughcolor=prefs["color_border"],
                             slidercolor=prefs["color_accent"])
-        except Exception:
-            pass
+        except Exception as e:
+            my_logger.error(str(e))
 
         self._slider = ttk.Scale(
             self, from_=0, to=1,
@@ -952,21 +952,21 @@ class PlaybackControls(tk.Frame):
                 return tk.Button(
                     btn_row, text=text, command=cmd,
                 )
-            else:
-                return tk.Button(
-                    btn_row, text=text, command=cmd,
-                    bg=prefs["color_button_bg"], fg=prefs["color_button_fg"],
-                    relief=tk.FLAT, font=tuple(prefs["font_ui"]),
-                    cursor="hand2", padx=2,
-                    activebackground=prefs["color_button_bg"],
-                    activeforeground=prefs["color_button_fg"]
-                )
 
-        self._btn_slower = mkbtn("🐢" if use_emoji else "Slower", self._slower)
+            return tk.Button(
+                btn_row, text=text, command=cmd,
+                bg=prefs["color_button_bg"], fg=prefs["color_button_fg"],
+                relief=tk.FLAT, font=tuple(prefs["font_ui"]),
+                cursor="hand2", padx=2,
+                activebackground=prefs["color_button_bg"],
+                activeforeground=prefs["color_button_fg"]
+            )
+
+        self._btn_slower = mkbtn("⏮️" if use_emoji else "Slower", self._slower)
         self._btn_back   = mkbtn("⏪" if use_emoji else "<<",  self._step_back)
         self._btn_play   = mkbtn("▶️" if use_emoji else ">",   self._play_pause)
         self._btn_fwd    = mkbtn("⏩" if use_emoji else ">>",  self._step_fwd)
-        self._btn_faster = mkbtn("🐰" if use_emoji else "Faster", self._faster)
+        self._btn_faster = mkbtn("⏭️" if use_emoji else "Faster", self._faster)
 
         for b in (self._btn_slower, self._btn_back, self._btn_play,
                   self._btn_fwd,  self._btn_faster):
@@ -1009,16 +1009,13 @@ class PlaybackControls(tk.Frame):
 
     def set_playing(self, playing: bool):
         self._playing = playing
-        use_emoji = (PLATFORM_SYSTEM == "Darwin")
         if playing:
             self._btn_play.configure(
-                text="⏸" if use_emoji else "||",
-                bg=self.prefs["color_warn"],
+                text="⏸️" if PLATFORM_SYSTEM == "Darwin" else "||",
             )
         else:
             self._btn_play.configure(
-                text="▶" if use_emoji else ">",
-                bg=self.prefs["color_panel_bg"],
+                text="▶️" if PLATFORM_SYSTEM == "Darwin" else ">",
             )
 
     def current_speed(self) -> int:
@@ -1051,16 +1048,15 @@ class PlaybackControls(tk.Frame):
         self._on_slider(idx)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  MapPane  –  the right pane containing dashboard + map + controls
-#
-#  Right-side pane.  Top: DashboardStrip.  Middle: map (tkintermapview).
-#  Bottom: PlaybackControls.
-#
-#  If tkintermapview is unavailable, a placeholder canvas is shown instead.
-# ─────────────────────────────────────────────────────────────────────────────
-
 class MapPane(tk.Frame):
+    """
+    MapPane  –  the right pane containing dashboard + map + controls
+
+    Right-side pane.  Top: DashboardStrip.  Middle: map (tkintermapview).
+    Bottom: PlaybackControls.
+
+    If tkintermapview is unavailable, a placeholder canvas is shown instead.
+    """
 
     def __init__(self, parent, prefs: dict, playback_callbacks: dict, **kw):
         my_logger.debug("Creating Map Pane.")
@@ -1302,6 +1298,7 @@ class FlightSummaryWindow(tk.Toplevel):
 
         self._sort_col = "field"
         self._sort_asc = True
+        self._rows = None
 
         self._build()
 
@@ -1455,7 +1452,7 @@ class FlightSummaryWindow(tk.Toplevel):
         for data_key, display_name, unit in self.SUMMARY_FIELDS:
             vals = [r[data_key] for r in records
                     if isinstance(r.get(data_key), (int, float))]
-                   
+
             if not vals:
                 continue
             vmin  = min(vals)
@@ -1549,7 +1546,7 @@ class FlightSummaryWindow(tk.Toplevel):
 def export_csv(file_name: str, records: list[dict],
                extended: bool = False, derived: bool = True,
                destination: str | None = None) -> str:
-    my_logger.debug(f"Exporting {file_name} to {destination}.")
+    my_logger.debug("Exporting %s to %s.", file_name, destination)
     base_name  = Path(file_name).stem
     directory  = destination if destination else str(Path(file_name).parent)
     csv_path   = os.path.join(directory, f"{base_name}.csv")
@@ -1745,16 +1742,14 @@ Note: most changes take effect after restarting the application.""",
             self.bind("<Control-w>", lambda e: self.withdraw())
 
     def _build(self):
-        p = prefs = self.prefs
-        bg       = p["color_bg"]
-        panel_bg = p["color_panel_bg"]
-        fg       = p["color_value"]
-        label_fg = p["color_label"]
-        accent   = p["color_accent"]
-        border   = p["color_border"]
-        font_ui  = p["font_ui"]
-        font_sm  = p["font_small"]
-        font_ttl = p["font_title"]
+        bg       = self.prefs["color_bg"]
+        panel_bg = self.prefs["color_panel_bg"]
+        fg       = self.prefs["color_value"]
+        label_fg = self.prefs["color_label"]
+        accent   = self.prefs["color_accent"]
+        border   = self.prefs["color_border"]
+        font_ui  = self.prefs["font_ui"]
+        font_ttl = self.prefs["font_title"]
 
         # ── Header ────────────────────────────────────────────────────────
         hdr = tk.Frame(self, bg=panel_bg, pady=8)
@@ -1771,8 +1766,8 @@ Note: most changes take effect after restarting the application.""",
         tk.Button(bot, text="Close",
                   command=self.withdraw,
                   font=font_ui,
-                  bg=p.get("color_button_bg", panel_bg),
-                  fg=p.get("color_button_fg", fg),
+                  bg=self.prefs.get("color_button_bg", panel_bg),
+                  fg=self.prefs.get("color_button_fg", fg),
                   relief=tk.FLAT, padx=12
                   ).pack(side=tk.RIGHT, padx=10)
 
@@ -1805,7 +1800,6 @@ Note: most changes take effect after restarting the application.""",
         p      = self.prefs
         bg     = p["color_panel_bg"]
         fg     = p["color_value"]
-        border = p["color_border"]
 
         frame = tk.Frame(parent, bg=bg)
         sb    = tk.Scrollbar(frame, orient=tk.VERTICAL)
@@ -1831,7 +1825,6 @@ Note: most changes take effect after restarting the application.""",
         p        = self.prefs
         bg       = p["color_panel_bg"]
         fg       = p["color_value"]
-        label_fg = p["color_label"]
         accent   = p["color_accent"]
         border   = p["color_border"]
         font_ui  = p["font_ui"]
@@ -1972,6 +1965,11 @@ class Atom2Viewer(tk.Tk):
         self.minsize(900, 600)
         self.geometry(self.prefs.get("window_geometry", "1400x860"))
 
+        # ── Pop-up Windows ────────────────────────────────────────────────
+        self._summary_window = None
+        self._preferences_window = None
+        self._help_window = None
+
         # ── Playback state ────────────────────────────────────────────────
         self.records:     list[dict] = []
         self.records_len: int        = 0
@@ -2004,7 +2002,7 @@ class Atom2Viewer(tk.Tk):
 
         my_logger.debug("After configure logging.")
 
-        my_logger.info(f"Platform: {PLATFORM_SYSTEM}")
+        my_logger.info("Platform: %s", PLATFORM_SYSTEM)
 
         # macOS: double-click on .fc2 in Finder
         if PLATFORM_SYSTEM == "Darwin":
@@ -2014,8 +2012,8 @@ class Atom2Viewer(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         try:
             self.createcommand("tk::mac::Quit", self._on_close)
-        except Exception:
-            pass
+        except Exception as e:
+            my_logger.error(str(e))
 
     def _mac_open(self, *filenames):
         my_logger.debug("_mac_open")
@@ -2086,11 +2084,6 @@ class Atom2Viewer(tk.Tk):
                  bg=self.prefs["color_panel_bg"],
                  fg=self.prefs["color_accent"],
                  font=self.prefs["font_small"]).pack(side=tk.LEFT, padx=10)
-
-        # ── Pop-up windows (hidden until needed) ──────────────────────────
-        self._summary_window = None
-        self._preferences_window = None
-        self._help_window = None
 
         # ── Keyboard shortcuts ────────────────────────────────────────────
         self._bind_keys()
@@ -2320,7 +2313,7 @@ class Atom2Viewer(tk.Tk):
         self._update_display(0)
 
         # Update summary window if it's open
-        if self._summary_window != None and self._summary_window.winfo_viewable():
+        if self._summary_window is not None and self._summary_window.winfo_viewable():
             self._summary_window.refresh(self._all_records, self.current_file)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -2487,10 +2480,10 @@ class Atom2Viewer(tk.Tk):
                     )
                     written += 1
                 else:
-                    my_logger.info(f"{Path(path).name}: 0 records.")
+                    my_logger.info("%s has 0 records.", Path(path).name)
                     errors.append(f"{Path(path).name}: 0 records.")
             except Exception as exc:
-                my_logger.warning(f"{Path(path).name}: {exc}")
+                my_logger.warning("%s: %s", Path(path).name, str(exc))
                 errors.append(f"{Path(path).name}: {exc}")
 
         msg = f"Exported {written} of {len(paths)} files."
@@ -2504,7 +2497,7 @@ class Atom2Viewer(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
 
     def _show_summary(self):
-        if self._summary_window == None:
+        if self._summary_window is None:
             self._summary_window = FlightSummaryWindow(self, self.prefs)
 
         self._summary_window.refresh(self._all_records, self.current_file)
@@ -2512,7 +2505,7 @@ class Atom2Viewer(tk.Tk):
 
     def _show_log(self):
         try:
-            my_logger._tk_window.show()
+            my_logger.show_tk_window()
         except Exception as e:
             my_logger.error(str(e))
             messagebox.showinfo("Log", "Log window is not available.")
@@ -2524,7 +2517,7 @@ class Atom2Viewer(tk.Tk):
             messagebox.showinfo("No Data", "No flight path is loaded.")
 
     def _show_prefs(self):
-        if self._preferences_window == None:
+        if self._preferences_window is None:
             self._preferences_window = PrefsDialog(self, self.prefs,
                                                    self._save_prefs,
                                                    self._menubar)
@@ -2563,28 +2556,27 @@ class Atom2Viewer(tk.Tk):
             self.prefs["sash_position"] = self._paned.sash_coord(0)[0]
         except Exception as e:
             my_logger.error(str(e))
-            pass
 
         save_prefs(self.prefs)
         self.quit()
 
+    def cli_load_file(self, path: str):
+        """ Used to load a file when running from the command line. """
+        if Path(path).exists():
+            self._file_list_pane.add_files([path])
+            self.after(200, lambda: self._load_file(path))
+        else:
+            my_logger.error("File not found: %s", path)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Entry point
-# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
+    """ Main entry point... because pylint insists on a docstring here."""
     app = Atom2Viewer()
 
     # Allow a single fc2 path as a command-line argument (convenience)
     if len(sys.argv) > 1:
         path = sys.argv[1]
-        if Path(path).exists():
-            app._file_list_pane.add_files([path])
-            app.after(200, lambda: app._load_file(path))
-        else:
-            my_logger.error("File not found: %s", path)
-
+        app.cli_load_file(path)
     app.mainloop()
 
 
