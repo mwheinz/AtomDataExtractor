@@ -13,7 +13,7 @@ Menus
 -----
   File   : Import FC2…  |  Import Directory…  | ──  | Export CSV…  | Export All CSV…
            ── | Preferences… | ── | View Log… | ── | Quit
-  View   : Show Flight Summary  |  Show Log Window  |  Fit Map to Path
+  View   : Show Flight Detail  |  Show Log Window  |  Fit Map to Path
   Playback : Play/Pause  |  Step Back  |  Step Forward  |  Rewind  |  Speed ←  |  Speed →
   Help   : About
 
@@ -23,7 +23,7 @@ Keyboard shortcuts (non-Mac)
   Ctrl+E   Export current file to CSV
   Ctrl+Q   Quit
 
-  Ctrl+F   Show Flight Summary
+  Ctrl+F   Show Flight Detail
   Ctrl+L   Show Log
 
   Ctrl+0   Zoom map to fit window.
@@ -895,7 +895,10 @@ class PlaybackControls(tk.Frame):
     Callbacks injected by the parent so this widget stays decoupled.
     """
 
+    # At higher playback speeds we start skipping records to avoid
+    # overloading the playback loop.
     PLAYBACK_SPEEDS = [1, 2, 4, 8, 16]
+    PLAYBACK_INCREMENT = [1, 1, 2, 4, 8]
 
     def __init__(self, parent, prefs: dict,
                  on_play_pause, on_step_back, on_step_fwd,
@@ -1255,35 +1258,35 @@ class MapPane(tk.Frame):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  FlightSummaryWindow  –  pop-up showing stats for the loaded file
+#  FlightDetailWindow  –  pop-up showing stats for the loaded file
 #
 #  Displays min/max statistics for all basic fields of the currently
 #  loaded fc2 file.  Populated by calling refresh(records).
 # ─────────────────────────────────────────────────────────────────────────────
 
-class FlightSummaryWindow(tk.Toplevel):
+class FlightDetailWindow(tk.Toplevel):
     """
-    Flight summary pop-up built around a ttk.Treeview table.
+    Flight detail pop-up built around a ttk.Treeview table.
 
     Columns
     -------
     Field   – human-readable field name
+    Unit    – unit string
+    Now     - the value at the current time index
     Min     – minimum value across all records
     Max     – maximum value across all records
-    Unit    – unit string
 
-    The table covers every numeric field found in BASIC_DATA plus the
-    derived speed and distance fields.  A header strip above the table
-    shows file name, total record count, and flight duration.
+    The table covers most of the interesting fields in the data.
+    A header strip above the table shows file name, total record count, and
+    flight duration.
 
-    Clicking a column header sorts the table by that column (toggle
-    ascending / descending).  The window is resizable; columns resize
-    with it.
+    The window is resizable; columns resize with it.
     """
 
     # Fields to summarise.  Tuple: (data_key, display_name, unit)
     # Add or remove rows here without touching anything else.
-    SUMMARY_FIELDS = [
+    FIELD_LIST = [
+        ("Date/Time",                  "Date/Time", ""),
         ("alt (m)",                    "Altitude",        "m"),
         ("heading (deg)",              "Heading",         "°"),
         ("pitch angle (deg)",          "Pitch",           "°"),
@@ -1292,46 +1295,43 @@ class FlightSummaryWindow(tk.Toplevel):
         ("3d Travelled Distance (m)",  "Distance Travelled",  "m"),
         ("3d Derived Distance (m)",    "Distance to Home",   "m"),
         ("Wind Speed (m/s)",           "Wind Speed",      "m/s"),
-        ("Wind Direction (deg)",       "Wind Direction",  "°"),
+        ("Wind (deg)",                 "Wind Direction",  "°"),
         ("Battery Level (%)",          "Battery Level",   "%"),
         ("Battery (mv)",               "Battery Voltage", "mV"),
         ("Battery Current (ma)",       "Battery Current", "mA"),
         ("Battery Temp (c)",           "Battery Temp", "C"),
+        ("Motor 1 RPM",                "Motor 1", "RPM"),
+        ("Motor 2 RPM",                "Motor 2", "RPM"),
+        ("Motor 3 RPM",                "Motor 3", "RPM"),
+        ("Motor 4 RPM",                "Motor 4", "RPM"),
         ("Satellites",                 "Satellites",      ""),
-        ("Signal Strength (%)",        "Signal Strength", "%"),
-        ("Date/Time",                  "Date/Time", ""),
-        ("Motor 1 RPM",                "Motor 1 RPM", ""),
-        ("Motor 2 RPM",                "Motor 2 RPM", ""),
-        ("Motor 3 RPM",                "Motor 3 RPM", ""),
-        ("Motor 4 RPM",                "Motor 4 RPM", ""),
     ]
 
     # Column definitions: (treeview id, header label, anchor, min width, stretch)
     _COLUMNS = [
         ("field", "Field",  tk.W,  80, True),
         ("unit",  "Unit",   tk.E,  20, True),
+        ("now",  "Current",   tk.E, 80, True),
         ("min",   "Min",    tk.E,   80, True),
         ("max",   "Max",    tk.E,   80, True),
     ]
 
     def __init__(self, parent, prefs: dict):
-        my_logger.debug("Creating Flight Summary Window.")
+        my_logger.debug("Creating Flight Detail Window.")
 
         super().__init__(parent)
         self.prefs = prefs
-        self.title("Flight Summary")
+        self.title("Flight Detail")
         self.resizable(True, True)
         self.transient(parent)
+
+        self._rows = None
 
         x=parent.winfo_x() + (parent.winfo_width()  - 760)  // 2
         y=parent.winfo_y() + (parent.winfo_height() - 420) // 2
         self.geometry(f"760x420+{x}+{y}")
 
         self.configure(bg=prefs["color_bg"])
-
-        self._sort_col = "field"
-        self._sort_asc = True
-        self._rows = None
 
         self._build()
 
@@ -1414,10 +1414,9 @@ class FlightSummaryWindow(tk.Toplevel):
         hsb.config(command=self._tree.xview)
         self._tree.pack(fill=tk.BOTH, expand=True)
 
-        # Configure each column and bind header click for sorting.
+        # Configure each column
         for col_id, label, anchor, minwidth, stretch in self._COLUMNS:
-            self._tree.heading(col_id, text=label,
-                               command=lambda c=col_id: self._sort_by(c))
+            self._tree.heading(col_id, text=label)
             self._tree.column(col_id, anchor=anchor,
                               minwidth=minwidth, width=minwidth, stretch=stretch)
 
@@ -1450,7 +1449,7 @@ class FlightSummaryWindow(tk.Toplevel):
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def refresh(self, records: list[dict], file_name: str = ""):
+    def refresh(self, records: list[dict], idx: int = 0, file_name: str = ""):
         """Recompute statistics from records and repopulate the table."""
 
         # Clear existing rows.
@@ -1463,7 +1462,7 @@ class FlightSummaryWindow(tk.Toplevel):
             return
 
         fname = Path(file_name).name if file_name else "unknown"
-        self.title(f"Flight Summary — {fname}")
+        self.title(f"Flight Detail — {fname}")
         self._title_var.set(fname)
 
         # ── Flight duration ───────────────────────────────────────────────
@@ -1481,35 +1480,43 @@ class FlightSummaryWindow(tk.Toplevel):
         self._meta_var.set(f"Duration: {dur_str}   Records: {len(records):,}")
 
         # ── Build rows ────────────────────────────────────────────────────
-        rows = []  # list of (field_label, unit, min, max, mean, range, sort_key)
-        for data_key, display_name, unit in self.SUMMARY_FIELDS:
-            vals = [r[data_key] for r in records
-                    if isinstance(r.get(data_key), (int, float))]
+        rows = []  # list of (field_label, unit, min, max, mean, range)
+        for data_key, display_name, unit in self.FIELD_LIST:
+            try:
+                vals = [r[data_key] for r in records]
 
-            if not vals:
-                continue
-            vmin  = min(vals)
-            vmax  = max(vals)
-            vmean = sum(vals) / len(vals)
-            vrange = vmax - vmin
-            rows.append({
-                "field": display_name,
-                "unit":  unit,
-                "min":   vmin,
-                "max":   vmax,
-                "mean":  vmean,
-                "range": vrange,
-            })
+                if not vals:
+                    continue
 
-        # Store for re-sort without re-computing.
+                if data_key == "Date/Time": # special handling...
+                    def format_dt(dt):
+                        return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+                    vnow = format_dt(vals[idx])
+                    vmin = format_dt(vals[0])
+                    vmax = format_dt(vals[-1])
+                else:
+                    vnow  = vals[idx]
+                    vmin  = min(vals)
+                    vmax  = max(vals)
+
+                rows.append({
+                    "field": display_name,
+                    "unit":  unit,
+                    "now":   vnow,
+                    "min":   vmin,
+                    "max":   vmax,
+                })
+
+            except Exception as e:
+                my_logger.error("Error extracting %s: %s",data_key,str(e))
+
         self._rows = rows
         self._populate_tree(rows)
 
         # ── Footer ───────────────────────────────────────────────────────
-        gps_count = sum(1 for r in records if r.get("GPS Lock") == "Yes")
-        gps_pct   = 100 * gps_count / len(records) if records else 0
         self._footer_var.set(
-            f"GPS lock: {gps_count:,} of {len(records):,} records  ({gps_pct:.0f}%)"
+            f"Record #{idx:,} of {len(records):,} records."
         )
 
     def show(self):
@@ -1522,48 +1529,21 @@ class FlightSummaryWindow(tk.Toplevel):
         """Insert rows into the Treeview, applying sort and alternating colours."""
         self._tree.delete(*self._tree.get_children())
 
-        # Determine sort key and direction.
-        col  = self._sort_col
-        asc  = self._sort_asc
-        numeric_cols = {"min", "max", "mean", "range"}
-
-        def sort_key(r):
-            v = r.get(col, "")
-            if col in numeric_cols:
-                return v if isinstance(v, (int, float)) else float("-inf")
-            return str(v).lower()
-
-        sorted_rows = sorted(rows, key=sort_key, reverse=not asc)
-
-        # Update heading arrows.
-        for col_id, label, *_ in self._COLUMNS:
-            arrow = (" ▲" if asc else " ▼") if col_id == col else ""
-            self._tree.heading(col_id, text=label + arrow)
-
-        for i, row in enumerate(sorted_rows):
+        for i, row in enumerate(rows):
             tag = "even" if i % 2 == 0 else "odd"
             self._tree.insert("", tk.END, tags=(tag,), values=(
                 row["field"],
                 row["unit"],
+                self._fmtn(row["now"]),
                 self._fmtn(row["min"]),
                 self._fmtn(row["max"]),
             ))
-
-    def _sort_by(self, col_id: str):
-        """Toggle sort direction when the same column is clicked again."""
-        if self._sort_col == col_id:
-            self._sort_asc = not self._sort_asc
-        else:
-            self._sort_col = col_id
-            self._sort_asc = True
-        if hasattr(self, "_rows"):
-            self._populate_tree(self._rows)
 
     @staticmethod
     def _fmtn(v) -> str:
         """Format a numeric value for display: integers without decimals."""
         if not isinstance(v, (int, float)):
-            return "—"
+            return v
         if v == int(v) and abs(v) < 10_000:
             return f"{int(v)}"
         return f"{v:.2f}"
@@ -1612,7 +1592,7 @@ class HelpWindow(tk.Toplevel):
     Tabbed help window with sections for:
       • Overview / Quick Start
       • Keyboard Shortcuts
-      • Window descriptions (Main, Flight Summary, Log, Preferences)
+      • Window descriptions (Main, Flight Detail, Log, Preferences)
     """
 
     # ── Content ───────────────────────────────────────────────────────────────
@@ -1625,7 +1605,7 @@ class HelpWindow(tk.Toplevel):
         ("Ctrl+,  /  ⌘,",     "Open Preferences"),
         ("Ctrl+Q  /  ⌘Q",     "Quit"),
         # View
-        ("Ctrl+F  /  ⌘F",     "Show / hide Flight Summary"),
+        ("Ctrl+F  /  ⌘F",     "Show / hide Flight Detail"),
         ("Ctrl+L  /  ⌘L",     "Show / hide Log window"),
         ("Ctrl+0  /  ⌘0",     "Fit map to flight path"),
         ("Ctrl+minus  /  ⌘-", "Zoom out"),
@@ -1675,15 +1655,16 @@ Right pane – Dashboard, Map, and Playback Controls
 Status bar (very bottom): shows the last operation or any error messages.""",
         ),
         (
-            "Flight Summary",
+            "Flight Detail",
             """\
-Opened via View > Flight Summary… or Ctrl+F / ⌘F.
+Opened via View > Flight Detail… or Ctrl+F / ⌘F.
 
-Displays a sortable table of statistics for the currently loaded file.
+Displays a table of statistics for the currently loaded file.
 
 Columns
   • Field    – telemetry field name (e.g. Altitude, Speed, Battery Level)
   • Unit     – measurement unit (m, m/s, %, etc.)
+  • Now      – The value recorded for the current record
   • Min      – minimum value recorded during the flight
   • Max      – maximum value recorded during the flight
 
@@ -1691,14 +1672,9 @@ Header strip
   • Shows the file name, total record count, and flight duration.
 
 Footer bar
-  • Reports how many records had a valid GPS lock, and what percentage
-    of the flight that represents.
+  • Shows the current record number and the maximum number of records.
 
-Clicking any column header sorts the table by that column.
-Clicking the same header again reverses the sort order (▲ / ▼ arrow shown).
-
-The window updates automatically whenever a new file is loaded
-while the Flight Summary is visible.""",
+To update the window, use the shortcut key or menu item a second time.""",
         ),
         (
             "Log Window",
@@ -1960,7 +1936,7 @@ QUICK START
    • The dashboard tiles at the top update in real time.
 
 4. View statistics
-   • Open View > Flight Summary ({acc}F) for a sortable table of min/max
+   • Open View > Flight Detail ({acc}F) for a sortable table of min/max
      values for every telemetry channel.
 
 5. Export to CSV
@@ -1990,8 +1966,6 @@ class Atom2Viewer(tk.Tk):
     splits the file-list pane from the map pane, and all playback state.
     """
 
-    PLAYBACK_INCREMENT = [1, 1, 2, 4, 8]   # record steps per tick at each speed index
-
     def __init__(self):
         my_logger.debug("Creating top level window.")
         super().__init__()
@@ -2006,7 +1980,7 @@ class Atom2Viewer(tk.Tk):
         self.geometry(self.prefs.get("window_geometry", "1400x860"))
 
         # ── Pop-up Windows ────────────────────────────────────────────────
-        self._summary_window = None
+        self._detail_window = None
         self._preferences_window = None
         self._help_window = None
         self._file_list_pane = None
@@ -2174,7 +2148,7 @@ class Atom2Viewer(tk.Tk):
 
         acc = "Command" if PLATFORM_SYSTEM == "Darwin" else "Ctrl"
 
-        m.add_command(label="Flight Summary…",
+        m.add_command(label="Flight Detail View…",
                       command=self._show_summary,
                       accelerator=f"{acc}+F",
                       underline=0)
@@ -2185,7 +2159,16 @@ class Atom2Viewer(tk.Tk):
         m.add_separator()
         m.add_command(label="Fit Map to Path",
                       command=self._fit_map,
+                      accelerator=f"{acc}+0",
                       underline=0)
+        m.add_command(label="Zoom In",
+                      command=self._zoom_in,
+                      accelerator=f"{acc}++",
+                      underline=5)
+        m.add_command(label="Zoom Out",
+                      command=self._zoom_out,
+                      accelerator=f"{acc}+-",
+                      underline=5)
 
     def _build_playback_menu(self):
         m = tk.Menu(self._menubar)
@@ -2356,8 +2339,8 @@ class Atom2Viewer(tk.Tk):
         self._update_display(0)
 
         # Update summary window if it's open
-        if self._summary_window is not None and self._summary_window.winfo_viewable():
-            self._summary_window.refresh(self._all_records, self.current_file)
+        if self._detail_window is not None and self._detail_window.winfo_viewable():
+            self._detail_window.refresh(self._all_records, self.current_idx, self.current_file)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Display update  (called every frame during playback)
@@ -2416,7 +2399,7 @@ class Atom2Viewer(tk.Tk):
 
     def _playback_loop(self):
         """Background thread: advances frames at the correct wall-clock rate."""
-        incr = self.PLAYBACK_INCREMENT
+        incr = PlaybackControls.PLAYBACK_INCREMENT
         speeds = PlaybackControls.PLAYBACK_SPEEDS
 
         while not self._stop_event.is_set():
@@ -2512,11 +2495,11 @@ class Atom2Viewer(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
 
     def _show_summary(self):
-        if self._summary_window is None:
-            self._summary_window = FlightSummaryWindow(self, self.prefs)
+        if self._detail_window is None:
+            self._detail_window = FlightDetailWindow(self, self.prefs)
 
-        self._summary_window.refresh(self._all_records, self.current_file)
-        self._summary_window.show()
+        self._detail_window.refresh(self._all_records, self.current_idx, self.current_file)
+        self._detail_window.show()
 
     def _show_log(self):
         try:
