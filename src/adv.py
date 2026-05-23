@@ -515,7 +515,10 @@ class PrefsDialog(tk.Toplevel):
         self.update_idletasks()
         x=parent.winfo_x() + (parent.winfo_width()  - self.winfo_width())  // 2
         y=parent.winfo_y() + (parent.winfo_height() - self.winfo_height()) // 2
+        my_logger.critical(f"{parent.winfo_x()} + ({parent.winfo_width()}  - {self.winfo_width()})  // 2")
+        my_logger.critical(f"{parent.winfo_y()} + ({parent.winfo_height()} - {self.winfo_height()}) // 2")
         self.geometry(f"+{x}+{y}")
+        self.update_idletasks()
 
     def _pick_color(self, key: str):
         current=self._prefs.get(key, "#000000")
@@ -784,7 +787,7 @@ class FileListPane(tk.Frame):
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def add_files(self, paths: list[str]):
+    def add_files(self, paths: list[str], parent):
         """Add one or more paths; duplicates and non-existent files are ignored."""
         added = 0
         for p in paths:
@@ -792,15 +795,18 @@ class FileListPane(tk.Frame):
             existing = [entry[0] for entry in self._paths]
             if p in existing:
                 my_logger.info("%s is already in the file list. Skipping.", p)
+                parent.set_status(f"Skipping {p}")
             elif Path(p).exists():
                 # Skip files that don't really contain fc2 data.
                 try:
                     records = atom2_parser(file_name=p, logger=my_logger)
                 except Exception as e:
                     my_logger.error("%s failed to load: %s", p, str(e))
+                    parent.set_status(f"Error adding {p}")
                     continue
 
                 my_logger.debug("Adding %s to the file list.", p)
+                parent.set_status(f"Adding {p}")
                 ts = self._ms_to_datetime_str(atom2_parse_filename(p))
                 mappable = any(r.get("GPS Lock") == "Yes" for r in records)
 
@@ -2261,9 +2267,12 @@ class Atom2Viewer(tk.Tk):
         )
         if not files:
             return
+        self.config(cursor="watch")
+        self.update()
         self.prefs["last_import_dir"] = str(Path(files[0]).parent)
-        self._file_list_pane.add_files(list(files))
+        self._file_list_pane.add_files(list(files), self)
         self._set_status(f"Added {len(files)} file(s) to the list.")
+        self.config(cursor="")
 
     def _import_directory(self):
         directory = filedialog.askdirectory(
@@ -2278,8 +2287,11 @@ class Atom2Viewer(tk.Tk):
             messagebox.showinfo("No FC2 Files",
                                 f"No .fc2 files found in:\n{directory}")
             return
-        self._file_list_pane.add_files([str(p) for p in fc2_files])
+        self.config(cursor="watch")
+        self.update()
+        self._file_list_pane.add_files([str(p) for p in fc2_files], self)
         self._set_status(f"Added {len(fc2_files)} file(s) from directory.")
+        self.config(cursor="")
 
     # ─────────────────────────────────────────────────────────────────────────
     # File loading  (parses the binary and updates the map / dashboard)
@@ -2554,6 +2566,10 @@ class Atom2Viewer(tk.Tk):
     def _set_status(self, msg: str):
         self._status_var.set(msg)
 
+    def set_status(self, msg:str):
+        self._set_status(msg)
+        self.update_idletasks()
+
     # ─────────────────────────────────────────────────────────────────────────
     # Shutdown
     # ─────────────────────────────────────────────────────────────────────────
@@ -2573,7 +2589,7 @@ class Atom2Viewer(tk.Tk):
     def cli_load_file(self, path: str):
         """ Used to load a file when running from the command line. """
         if Path(path).exists():
-            self._file_list_pane.add_files([path])
+            self._file_list_pane.add_files([path], self)
             self.after(200, lambda: self._load_file(path))
         else:
             my_logger.error("File not found: %s", path)
