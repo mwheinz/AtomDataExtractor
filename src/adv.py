@@ -69,7 +69,7 @@ except ImportError:
     HAS_MAP = False
 
 try:
-    from PIL import Image, ImageDraw, ImageFont, ImageTk
+    from PIL import Image, ImageDraw, ImageFont, ImageTk, ImageGrab
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
@@ -1608,6 +1608,7 @@ class HelpWindow(tk.Toplevel):
         # File
         ("Ctrl+O  /  ⌘O",     "Import FC2 file(s)"),
         ("Ctrl+E  /  ⌘E",     "Export selected files to CSV"),
+        ("Ctrl+S  /  ⌘S",     "Save the displayed map to disk"),
         ("Ctrl+,  /  ⌘,",     "Open Preferences"),
         ("Ctrl+Q  /  ⌘Q",     "Quit"),
         # View
@@ -2132,6 +2133,9 @@ class Atom2Viewer(tk.Tk):
         m.add_command(label="Delete Selected Files…",
                       command=self._file_list_pane.remove_selected,
                       underline=0)
+        m.add_command(label="Save Map Image…",
+                      command=self._save_map_image,
+                      underline=0)
         m.add_separator()
         m.add_command(label="Preferences…",
                       command=self._show_prefs,
@@ -2226,6 +2230,7 @@ class Atom2Viewer(tk.Tk):
             # File Menu
             self.bind("<Command-o>", lambda e: self._import_files())
             self.bind("<Command-e>", lambda e: self._export_csv_selected())
+            self.bind("<Command-s>", lambda e: self._save_map_image())
             self.bind("<Command-q>", lambda e: self._on_close())
             self.bind("<Command-,>", lambda e: self._show_prefs())
             # View Menu
@@ -2238,6 +2243,7 @@ class Atom2Viewer(tk.Tk):
             # File Menu
             self.bind("<Control-o>", lambda e: self._import_files())
             self.bind("<Control-e>", lambda e: self._export_csv_selected())
+            self.bind("<Control-s>", lambda e: self._save_map_image())
             self.bind("<Control-q>", lambda e: self._on_close())
             # View Menu
             self.bind("<Control-f>", lambda e: self._show_summary())
@@ -2537,6 +2543,39 @@ class Atom2Viewer(tk.Tk):
             self._map_pane.decrease_zoom()
         else:
             messagebox.showinfo("No Data", "No flight path is loaded.")
+
+    def _save_map_image(self):
+        """Save a screenshot of the map widget area."""
+        try:
+            suggested_name = f"{Path(self.current_file).stem}_map.png" if self.current_file else "map_capture.png"
+            file_path = filedialog.asksaveasfilename(
+                title="Save Map Image",
+                defaultextension=".png",
+                filetypes=[("PNG files", "*.png"), ("All files", "*.*")],
+                initialfile=suggested_name
+            )
+            if not file_path:
+                return
+
+            # 1. Get absolute screen coordinates of the map widget
+            widget = self._map_pane.map_widget
+            x = widget.winfo_rootx()
+            y = widget.winfo_rooty()
+            w = widget.winfo_width()
+            h = widget.winfo_height()
+            
+            # 2. Capture the bounding box region of the screen where the map is displayed
+            # The bbox argument takes (left, top, right, bottom) coordinates
+            img = ImageGrab.grab(bbox=(x, y, x + w, y + h))
+            
+            # 3. Save via PIL
+            img.save(file_path)
+            
+            self._set_status(f"Map saved to: {file_path}")
+            my_logger.info("Map screenshot saved to %s", file_path)
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not save map image:\n{e}")
+            my_logger.error("Failed to capture map image: %s", str(e))
 
     def _show_prefs(self):
         if self._preferences_window is None:
