@@ -2557,6 +2557,15 @@ class Atom2Viewer(tk.Tk):
             if not file_path:
                 return
 
+            self.after(500, self._execute_map_capture, file_path)
+
+        except Exception as e:
+            my_logger.error("Error starting map capture process: %s", str(e))
+
+    def _execute_map_capture(self, file_path: str):
+        try:
+            self.update()
+
             # 1. Get absolute screen coordinates of the map widget
             widget = self._map_pane.map_widget
             x = widget.winfo_rootx()
