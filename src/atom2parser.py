@@ -376,6 +376,8 @@ def _add_derived_fields(record, prev):
                 record["Drone Mode (text)"] = "AI: WPT"
             elif record["Auto"] == 6:
                 record["Drone Mode (text)"] = "AI: QS"
+            elif record["Auto"] == 7:
+                record["Drone Mode (text)"] = "AI: Cruise"
             else:
                 record["Drone Mode (text)"] = f"AI: ({record['Auto']})"
         elif record["Drone Mode (text)"] == "Launching":
