@@ -76,7 +76,7 @@ def main() -> None:
     arg_parser.add_argument(
         "-d","--derived",
         action="store_true",
-        help="Calcuate some additional fields to compare against the raw data."
+        help="Calculate some additional fields to compare against the raw data."
     )
 
     arg_parser.add_argument(
