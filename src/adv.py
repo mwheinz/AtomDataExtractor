@@ -60,7 +60,8 @@ from tkinter.colorchooser import askcolor
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Third-party – install with:
-#   pip install tkintermapview pillow
+#   pip install pillow
+# tkintermapview is vendored in src/tkintermapview (see VENDORED.md there).
 # ─────────────────────────────────────────────────────────────────────────────
 try:
     import tkintermapview
@@ -1099,6 +1100,10 @@ class MapPane(tk.Frame):
         if HAS_MAP:
             self.map_widget = tkintermapview.TkinterMapView(
                 map_container, corner_radius=0)
+            # OSM's tile policy requires an identifying User-Agent (#29).
+            self.map_widget.set_user_agent(
+                f"AtomDataExtractor/{_version} "
+                "(+https://github.com/mwheinz/AtomDataExtractor)")
             self.map_widget.pack(fill=tk.BOTH, expand=True)
         else:
             # Fallback placeholder

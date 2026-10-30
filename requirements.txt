@@ -1,3 +1,8 @@
 tk
-tkintermapview
+# tkintermapview is vendored in src/tkintermapview; these are its dependencies.
+customtkinter
+geocoder
+pillow
+pyperclip
+requests
 pyinstaller
