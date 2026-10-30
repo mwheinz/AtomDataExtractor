@@ -59,14 +59,14 @@ DUMPER_FIELDS = [
     FLFD("Gyroscope X (deg/s)", "<f", 31, 4, FLFD.radians_to_degrees),
     FLFD("Gyroscope Y (deg/s)", "<f", 35, 4, FLFD.radians_to_degrees),
     FLFD("Gyroscope Z (deg/s)", "<f", 39, 4, FLFD.radians_to_degrees),
-    FLFD("Barometer", "<h", 43, 2),
+    FLFD("IMU Temp (c)", "<h", 43, 2, FLFD.fix_imu_temp),
 
     # GPS data (45-58)
     FLFD("GPS Lock", "<B", 45, 1, FLFD.gps_lock),
     FLFD("Satellites","<B", 46, 1),
     FLFD("lat (deg)", "<i", 47, 4, FLFD.fix_lat_lon),
     FLFD("lon (deg)", "<i", 51, 4, FLFD.fix_lat_lon),
-    FLFD("GPS Quality", "<i", 55, 4),
+    FLFD("GPS Ellipsoid Height (m)", "<i", 55, 4, FLFD.fix_hae),
 
     # Position uncertainty estimates? (59-70)
     # These vary by positioning mode:
@@ -76,7 +76,7 @@ DUMPER_FIELDS = [
     #
     #  Note that the correlation here is that these values get lower
     #  as the drone progresses from ATTI to OPTI to GPS and drop further as
-    #  "GPS Quality" increases. Since the drone never flies far in either
+    #  the satellite count increases. Since the drone never flies far in either
     #  ATTI or OPTI modes, it is possible that this is not correct.
     FLFD("f59", "<f", 59, 4, FLFD.round3),
     FLFD("f63", "<f", 63, 4, FLFD.round3),

@@ -258,7 +258,7 @@ Fields are all little-endian.
 | 31 | 4 | float | The x-axis reading of the gyroscope. (rads/s) | ✓ |
 | 35 | 4 | float | The y-axis reading of the gyroscope. (rads/s) | ✓ |
 | 39 | 4 | float | The z-axis reading of the gyroscope. (rads/s) | ✓ |
-| 43 | 2 | short | Possibly the reading of the internal barometer. Unknown units. ||
+| 43 | 2 | short | IMU temperature in hundredths of a degree C. (Identified by wdc-rsat, issue #28.) | ✓ |
 
 ### GNSS and Positioning
 | Byte: | Length: | Format: | Description: | Correct: |
@@ -267,6 +267,7 @@ Fields are all little-endian.
 | 46 | 1 | byte | # of GNSS satellites the drone has a lock on. | ✓ |
 | 47 | 4 | integer | drone's latitude in ten-millionths of degrees. 0 if unknown. | ✓ |
 | 51 | 4 | integer | drone's longitude in ten-millionths of degrees. 0 if unknown. | ✓ |
+| 55 | 4 | integer | GNSS height above the WGS84 ellipsoid, in millimeters, as reported by the u-blox GPS (UBX-NAV-PVT). 0 if unknown. Not the same as altitude above sea level. (Identified by wdc-rsat, issue #28.) | ✓ |
 | 71 | 4 | float | The barometric pressure, in Pascals. | ✓ |
 | 75 | 2 | short | GPS HDOP * 100 | 50% |
 | 304 | 4 | float | How far east or west the drone is from the home point in meters. | ✓ |
@@ -339,7 +340,6 @@ Fields are all little-endian.
 |-------|---------|---------|--------------|----------|
 | 13 | 2 | short | Starts as zero but occasionally changes to one of a few distinct values. Observed values are 0, 25, 30, 35, 40, 120. Initially zero, goes to a non-zero value very early in the log. May occasionally change during flight.||
 | 15 | 2 | short | Starts as zero but then may change to a value that will match field 13. ||
-| 55 | 4 | integer | Seems to represent the GNSS signal strength, higher is better. ||
 | 59 | 4 | float | 0 or 1 when no satellites found. Possibly represents confidence in the GPS position, with 0.0 the best and 1.0 the worst. ||
 | 63 | 4 | float | Possibly related to confidence in the drone's horizontal position, with 5.0 being poor and 0.0 being best. ||
 | 67 | 4 | float | Possibly related to confidence in the drone's vertical position, with 10.0 being poor and 0.0 being best. ||

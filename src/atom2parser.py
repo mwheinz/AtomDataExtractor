@@ -55,6 +55,7 @@ BASIC_DATA = [
 """ These fields are only used in the extended report. """
 EXTENDED_DATA = [
     "HDOP",
+    "GPS Ellipsoid Height (m)",
 
     "Accelerometer X (m/s2)",
     "Accelerometer Y (m/s2)",
@@ -62,7 +63,7 @@ EXTENDED_DATA = [
     "Gyroscope X (deg/s)",
     "Gyroscope Y (deg/s)",
     "Gyroscope Z (deg/s)",
-    "Barometer",
+    "IMU Temp (c)",
     "Air Pressure (pascals)",
 
     "Magnetometer X",
@@ -160,6 +161,18 @@ class FLFD:
     def fix_hdop(data) -> float:
         """Scale the HDOP value."""
         return data/100.0
+
+    @staticmethod
+    def fix_imu_temp(data) -> float:
+        """Convert the IMU temperature from centidegrees to degrees C."""
+        return data/100.0
+
+    @staticmethod
+    def fix_hae(data):
+        """Convert the GNSS height above ellipsoid from mm to meters."""
+        if data == 0:
+            return "" # Treat as missing data.
+        return data/1000.0
 
     @staticmethod
     def flight_mode(data) -> str:
@@ -275,7 +288,7 @@ ATOM2_FIELDS = [
     FLFD("Gyroscope X (deg/s)", "<f", 31, 4, FLFD.radians_to_degrees),
     FLFD("Gyroscope Y (deg/s)", "<f", 35, 4, FLFD.radians_to_degrees),
     FLFD("Gyroscope Z (deg/s)", "<f", 39, 4, FLFD.radians_to_degrees),
-    FLFD("Barometer", "<h", 43, 2),
+    FLFD("IMU Temp (c)", "<h", 43, 2, FLFD.fix_imu_temp),
 
     #
     # GNSS & Positioning Data
@@ -284,6 +297,7 @@ ATOM2_FIELDS = [
     FLFD("Satellites","<B", 46, 1),
     FLFD("lat (deg)", "<i", 47, 4, FLFD.fix_lat_lon),
     FLFD("lon (deg)", "<i", 51, 4, FLFD.fix_lat_lon),
+    FLFD("GPS Ellipsoid Height (m)", "<i", 55, 4, FLFD.fix_hae),
     FLFD("Air Pressure (pascals)", "<f", 71, 4, FLFD.round3),
     FLFD("HDOP", "<h", 75, 2),
     FLFD("Position X (m)", "<f", 304,4, FLFD.round3),
